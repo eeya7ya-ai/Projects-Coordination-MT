@@ -47,6 +47,28 @@
 </div>
 
 <script>
+// If already logged in, redirect to the appropriate panel
+(function() {
+  const token = localStorage.getItem('elv_token');
+  const user = JSON.parse(localStorage.getItem('elv_user') || '{}');
+  if (token && user.role) {
+    window.location.href = user.role === 'admin' ? '/admin' : '/dashboard';
+  }
+})();
+
+// Show session-expired notice if redirected from admin/dashboard
+(function() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('session') === 'expired') {
+    window.addEventListener('DOMContentLoaded', function() {
+      const alertEl = document.getElementById('alert');
+      alertEl.className = 'alert alert-error';
+      alertEl.textContent = 'Your session has expired or you are not authorized. Please log in again.';
+      alertEl.classList.remove('hidden');
+    });
+  }
+})();
+
 // Generate floating particles
 const particlesEl = document.getElementById('particles');
 for (let i = 0; i < 30; i++) {

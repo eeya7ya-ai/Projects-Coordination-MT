@@ -10,8 +10,12 @@ let currentModuleId = null;
 let currentProjectId = null;
 
 // ── Auth check ────────────────────────────────────────
-if (!token || currentUser.role === 'admin') {
-  window.location.href = currentUser.role === 'admin' ? '/admin' : '/';
+if (!token) {
+  localStorage.removeItem('elv_token');
+  localStorage.removeItem('elv_user');
+  window.location.href = '/?session=expired';
+} else if (currentUser.role === 'admin') {
+  window.location.href = '/admin';
 }
 
 const headers = () => ({ 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` });
