@@ -13,7 +13,10 @@ let excelData = null;
 
 // ── Auth check ────────────────────────────────────────
 if (!token || currentUser.role !== 'admin') {
-  window.location.href = '/';
+  // Clear any stale data
+  localStorage.removeItem('elv_token');
+  localStorage.removeItem('elv_user');
+  window.location.href = '/?session=expired';
 }
 
 const headers = () => ({ 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` });
