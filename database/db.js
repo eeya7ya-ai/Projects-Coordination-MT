@@ -2,9 +2,13 @@ const Database = require('better-sqlite3');
 const bcrypt = require('bcryptjs');
 const path = require('path');
 
+// On Vercel, /tmp is the only writable location. Each cold start gets a fresh /tmp,
+// so initializeDB() seeds demo data automatically on every cold start to ensure
+// the app always has users and projects to show.
 const DB_PATH = process.env.VERCEL
   ? '/tmp/elv_coordinator.db'
   : path.join(__dirname, 'elv_coordinator.db');
+
 const db = new Database(DB_PATH);
 
 // Enable WAL mode for performance
@@ -125,18 +129,45 @@ function initializeDB() {
     );
   `);
 
-  // Create default admin if not exists
+  // ── Admin user ────────────────────────────────────────
   const adminExists = db.prepare('SELECT id FROM users WHERE role = ? LIMIT 1').get('admin');
+  let adminId;
   if (!adminExists) {
     const hashedPw = bcrypt.hashSync('admin123', 10);
-    db.prepare(`
+    const res = db.prepare(`
       INSERT INTO users (username, password, full_name, role, avatar_color)
       VALUES (?, ?, ?, ?, ?)
     `).run('admin', hashedPw, 'System Administrator', 'admin', '#8B0000');
+    adminId = res.lastInsertRowid;
     console.log('Default admin created: username=admin, password=admin123');
+  } else {
+    adminId = adminExists.id;
   }
 
-  // Seed default checklists per module type
+  // ── Seed demo team members if none exist ─────────────
+  const userCount = db.prepare("SELECT COUNT(*) as c FROM users WHERE role = 'user'").get().c;
+  if (userCount === 0) {
+    const pw = bcrypt.hashSync('user123', 10);
+    const u1 = db.prepare(`
+      INSERT INTO users (username, password, full_name, role, department, phone, email, avatar_color)
+      VALUES (?, ?, ?, 'user', ?, ?, ?, ?)
+    `).run('ahmed', pw, 'Ahmed Al-Rashid', 'ELV Engineering', '+962 79 123 4567', 'ahmed@elv.jo', '#c0392b');
+    const u2 = db.prepare(`
+      INSERT INTO users (username, password, full_name, role, department, phone, email, avatar_color)
+      VALUES (?, ?, ?, 'user', ?, ?, ?, ?)
+    `).run('sara', bcrypt.hashSync('user123', 10), 'Sara Khalil', 'Technical Operations',
+      '+962 77 987 6543', 'sara@elv.jo', '#8B0000');
+
+    console.log('Demo users seeded. ahmed / user123  |  sara / user123');
+
+    // Seed demo projects if none exist
+    const projCount = db.prepare('SELECT COUNT(*) as c FROM projects').get().c;
+    if (projCount === 0) {
+      seedDemoProjects(adminId, u1.lastInsertRowid, u2.lastInsertRowid);
+    }
+  }
+
+  // ── Module checklists reference (used in projects.js) ─
   const MODULE_CHECKLISTS = {
     'Maintenance': [
       'Initial site inspection and assessment',
@@ -198,10 +229,90 @@ function initializeDB() {
     ]
   };
 
-  // Store these globally for seeding new modules
   db.MODULE_CHECKLISTS = MODULE_CHECKLISTS;
-
   console.log('Database initialized successfully.');
+}
+
+function seedDemoProjects(adminId, userId1, userId2) {
+  const checklists = {
+    'Installation and Wiring': [
+      'Review installation drawings', 'Prepare materials and tools',
+      'Cable routing and labeling', 'Equipment mounting and installation',
+      'Wiring and terminations', 'Quality check on all connections', 'Initial power-up test'
+    ],
+    'Site Survey': [
+      'Review existing drawings/plans', 'Photograph site conditions',
+      'Measure and document dimensions', 'Identify cable routes',
+      'Note power availability', 'Document survey findings', 'Prepare survey report'
+    ]
+  };
+
+  // Project 1: CCTV Installation – In Progress
+  const p1 = db.prepare(`
+    INSERT INTO projects (project_name, client_name_1, client_number, location_name,
+      location_lat, location_lng, user_id_1, user_id_2, start_date, end_date,
+      status, priority, created_by)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    'CCTV Installation – Amman Tower', 'Jordan Properties Group',
+    '+962 6 555 0101', 'Queen Rania Al-Abdullah St, Amman',
+    31.9730, 35.8986, userId1, userId2,
+    '2026-02-01', '2026-03-15', 'in_progress', 'high', adminId
+  );
+
+  const mod1 = db.prepare(`
+    INSERT INTO project_modules (project_id, module_type, scope_of_work, status, progress)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(p1.lastInsertRowid, 'Installation and Wiring',
+    'Install 24 IP cameras across all floors, run Cat6 cables to NVR room, configure recording system',
+    'in_progress', 57);
+
+  checklists['Installation and Wiring'].forEach((task, idx) => {
+    db.prepare('INSERT INTO module_checklist (module_id, task_title, is_completed, sort_order) VALUES (?, ?, ?, ?)')
+      .run(mod1.lastInsertRowid, task, idx < 4 ? 1 : 0, idx);
+  });
+
+  db.prepare('INSERT INTO module_devices (module_id, device_model, device_qty, device_description, added_by) VALUES (?, ?, ?, ?, ?)')
+    .run(mod1.lastInsertRowid, 'Hikvision DS-2CD2143G2-I', 24, '4MP AcuSense Fixed Dome Camera', adminId);
+  db.prepare('INSERT INTO module_devices (module_id, device_model, device_qty, device_description, added_by) VALUES (?, ?, ?, ?, ?)')
+    .run(mod1.lastInsertRowid, 'Hikvision DS-7732NI-K4', 1, '32-Channel NVR', adminId);
+
+  // Project 2: Fire Alarm System – Pending
+  const p2 = db.prepare(`
+    INSERT INTO projects (project_name, client_name_1, client_number, location_name,
+      location_lat, location_lng, user_id_1, start_date, end_date, status, priority, created_by)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    'Fire Alarm System – Zarqa Mall', 'Al-Zarqa Commercial Co.',
+    '+962 5 388 7700', 'Prince Hassan St, Zarqa',
+    32.0714, 36.0881, userId2,
+    '2026-03-01', '2026-04-30', 'pending', 'urgent', adminId
+  );
+
+  const mod2 = db.prepare(`
+    INSERT INTO project_modules (project_id, module_type, scope_of_work, status, progress)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(p2.lastInsertRowid, 'Site Survey',
+    'Survey entire mall for fire alarm zones, detector placement, and cable routes',
+    'pending', 0);
+
+  checklists['Site Survey'].forEach((task, idx) => {
+    db.prepare('INSERT INTO module_checklist (module_id, task_title, is_completed, sort_order) VALUES (?, ?, ?, ?)')
+      .run(mod2.lastInsertRowid, task, 0, idx);
+  });
+
+  // Notifications for assigned users
+  db.prepare("INSERT INTO notifications (user_id, title, message, type) VALUES (?, ?, ?, 'project')")
+    .run(userId1, 'New Project: CCTV Installation – Amman Tower',
+      'You have been assigned as primary engineer. Installation in progress.');
+  db.prepare("INSERT INTO notifications (user_id, title, message, type) VALUES (?, ?, ?, 'project')")
+    .run(userId2, 'New Project: CCTV Installation – Amman Tower',
+      'You have been assigned as secondary engineer.');
+  db.prepare("INSERT INTO notifications (user_id, title, message, type) VALUES (?, ?, ?, 'project')")
+    .run(userId2, 'New Project: Fire Alarm System – Zarqa Mall',
+      'You have been assigned as primary engineer. Start with site survey.');
+
+  console.log('Demo projects seeded: CCTV Installation (in_progress) | Fire Alarm (pending)');
 }
 
 initializeDB();
