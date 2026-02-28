@@ -32,7 +32,11 @@ window.addEventListener('DOMContentLoaded', async () => {
   av.style.background = currentUser.avatar_color || '#8B0000';
 
   initMap();
-  await Promise.all([loadDashboard(), loadUsers(), loadProjects()]);
+
+  // Load users first (needed for dropdowns), then load the rest in parallel
+  await loadUsers();
+  await Promise.all([loadDashboard(), loadProjects()]);
+
   loadNotifications();
   setInterval(loadNotifications, 30000);
   setInterval(() => { loadProjects(); loadUsers(); }, 60000);
@@ -47,6 +51,18 @@ window.addEventListener('DOMContentLoaded', async () => {
     if (document.getElementById('page-projects').classList.contains('active')) {
       filterProjects(e.target.value);
     }
+  });
+
+  // Map search autocomplete (debounced)
+  let mapSearchTimeout = null;
+  document.getElementById('map-search-input').addEventListener('input', function() {
+    clearTimeout(mapSearchTimeout);
+    const query = this.value.trim();
+    if (query.length < 3) {
+      document.getElementById('map-search-results').style.display = 'none';
+      return;
+    }
+    mapSearchTimeout = setTimeout(() => searchMapLocation(), 400);
   });
 
   // Excel drag & drop
@@ -81,7 +97,11 @@ function navigate(page) {
   if (page === 'projects') loadProjects();
   if (page === 'reports') loadReports();
   if (page === 'users') loadUsersTable();
-  if (page === 'new-project') { resetProjectForm(); setTimeout(() => map?.invalidateSize(), 200); }
+  if (page === 'new-project') {
+    resetProjectForm();
+    populateUserDropdowns();
+    setTimeout(() => map?.invalidateSize(), 200);
+  }
 }
 
 // ── Dashboard ─────────────────────────────────────────
@@ -571,10 +591,10 @@ function resetProjectForm() {
   document.getElementById('excel-result').classList.add('hidden');
   excelData = null;
   if (marker) { marker.remove(); marker = null; }
-  if (map) { map.setView([31.9539, 35.9106], 8); }
+  if (map) { map.setView([31.9539, 35.9106], 8); map.invalidateSize(); }
   document.getElementById('map-search-input').value = '';
   document.getElementById('map-search-results').style.display = 'none';
-  document.getElementById('map-coords').textContent = 'Search for a location above or click on the map to pin';
+  document.getElementById('map-coords').textContent = 'Search for a street or click on the map to pin';
 }
 
 // ── Users ─────────────────────────────────────────────
@@ -739,20 +759,32 @@ async function loadReports() {
 }
 
 // ── Map ───────────────────────────────────────────────
+const redIcon = L.divIcon({
+  html: `<div style="background:var(--red);width:18px;height:18px;border-radius:50%;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.4)"></div>`,
+  iconSize: [18, 18],
+  iconAnchor: [9, 9],
+  className: ''
+});
+
 function initMap() {
-  // Jordan center: Amman ~31.95, 35.93 — zoom 8 shows all of Jordan
-  map = L.map('map-picker').setView([31.9539, 35.9106], 8);
+  // Jordan bounds: restrict map to Jordan only
+  const jordanBounds = L.latLngBounds(
+    L.latLng(29.0, 34.8),  // SW corner
+    L.latLng(33.5, 39.4)   // NE corner
+  );
+
+  map = L.map('map-picker', {
+    center: [31.9539, 35.9106],
+    zoom: 8,
+    minZoom: 7,
+    maxBounds: jordanBounds.pad(0.05),
+    maxBoundsViscosity: 1.0
+  });
+
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap contributors',
+    attribution: '© OpenStreetMap',
     maxZoom: 19
   }).addTo(map);
-
-  const redIcon = L.divIcon({
-    html: `<div style="background:var(--red);width:18px;height:18px;border-radius:50%;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.4)"></div>`,
-    iconSize: [18, 18],
-    iconAnchor: [9, 9],
-    className: ''
-  });
 
   map.on('click', (e) => {
     const { lat, lng } = e.latlng;
@@ -760,61 +792,92 @@ function initMap() {
     marker = L.marker([lat, lng], { icon: redIcon }).addTo(map);
     document.getElementById('p-lat').value = lat.toFixed(6);
     document.getElementById('p-lng').value = lng.toFixed(6);
-    document.getElementById('map-coords').textContent = `📍 Pinned: ${lat.toFixed(4)}°N, ${lng.toFixed(4)}°E`;
-    if (!document.getElementById('p-location-name').value) {
-      document.getElementById('p-location-name').value = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-    }
+    document.getElementById('map-coords').textContent = `Pinned: ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+    // Reverse geocode to get the street name
+    reverseGeocode(lat, lng);
   });
+}
+
+async function reverseGeocode(lat, lng) {
+  try {
+    const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1&zoom=18`;
+    const res = await fetch(url, { headers: { 'Accept-Language': 'en', 'User-Agent': 'ELVCoordinator/1.0' } });
+    const data = await res.json();
+    if (data && data.display_name) {
+      const addr = data.address || {};
+      const streetName = addr.road || addr.neighbourhood || addr.suburb || '';
+      const area = addr.city || addr.town || addr.village || addr.state || '';
+      const locationName = [streetName, area].filter(Boolean).join(', ') || data.display_name.split(',').slice(0, 2).join(',').trim();
+      document.getElementById('p-location-name').value = locationName;
+      document.getElementById('map-coords').textContent = `Pinned: ${locationName}`;
+    }
+  } catch(e) { /* keep coordinate-based name */ }
 }
 
 async function searchMapLocation() {
   const query = document.getElementById('map-search-input').value.trim();
-  if (!query) return;
+  if (!query || query.length < 2) return;
   const btn = document.getElementById('map-search-btn');
   btn.textContent = '...';
   btn.disabled = true;
   try {
-    // Restrict search to Jordan (countrycodes=jo)
-    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&countrycodes=jo&format=json&limit=5`;
+    // Search restricted to Jordan with street-level detail
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&countrycodes=jo&format=json&limit=6&addressdetails=1&viewbox=34.8,33.5,39.4,29.0&bounded=1`;
     const res = await fetch(url, { headers: { 'Accept-Language': 'en', 'User-Agent': 'ELVCoordinator/1.0' } });
     const results = await res.json();
     const listEl = document.getElementById('map-search-results');
     if (!results.length) {
-      listEl.innerHTML = '<div style="padding:8px 12px;color:var(--gray-400);font-size:13px">No results found in Jordan</div>';
+      listEl.innerHTML = '<div style="padding:10px 14px;color:var(--gray-400);font-size:13px">No results found in Jordan. Try a different street or area name.</div>';
       listEl.style.display = 'block';
     } else {
-      listEl.innerHTML = results.map((r, i) => `
-        <div class="map-search-result-item" onclick="selectMapResult(${r.lat},${r.lon},'${r.display_name.replace(/'/g,"\\'")}')">
-          📍 ${r.display_name}
-        </div>
-      `).join('');
+      // Store results for click handler (avoid inline quote issues)
+      window._mapSearchResults = results;
+      listEl.innerHTML = results.map((r, i) => {
+        const addr = r.address || {};
+        const street = addr.road || addr.neighbourhood || '';
+        const area = addr.city || addr.town || addr.village || addr.state || '';
+        const label = street ? `${street}, ${area}` : r.display_name.split(',').slice(0, 3).join(',').trim();
+        return `
+          <div class="map-search-result-item" onclick="selectMapResultByIndex(${i})" style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--gray-100);font-size:13px;transition:background 0.15s">
+            <strong>${label}</strong>
+            <div style="font-size:11px;color:var(--gray-400);margin-top:2px">${r.display_name}</div>
+          </div>
+        `;
+      }).join('');
       listEl.style.display = 'block';
     }
   } catch(e) {
-    alert('Search failed. Check your connection.');
+    console.error('Map search failed:', e);
   } finally {
     btn.textContent = '🔍';
     btn.disabled = false;
   }
 }
 
-function selectMapResult(lat, lng, displayName) {
+function selectMapResultByIndex(index) {
+  const r = window._mapSearchResults?.[index];
+  if (!r) return;
+  selectMapResult(r.lat, r.lon, r.display_name, r.address);
+}
+
+function selectMapResult(lat, lng, displayName, address) {
   lat = parseFloat(lat); lng = parseFloat(lng);
-  const redIcon = L.divIcon({
-    html: `<div style="background:var(--red);width:18px;height:18px;border-radius:50%;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.4)"></div>`,
-    iconSize: [18, 18], iconAnchor: [9, 9], className: ''
-  });
   if (marker) marker.remove();
   marker = L.marker([lat, lng], { icon: redIcon }).addTo(map);
-  map.setView([lat, lng], 15);
+  map.setView([lat, lng], 17); // Street-level zoom
   document.getElementById('p-lat').value = lat.toFixed(6);
   document.getElementById('p-lng').value = lng.toFixed(6);
-  document.getElementById('map-coords').textContent = `📍 Pinned: ${lat.toFixed(4)}°N, ${lng.toFixed(4)}°E`;
-  // Use a clean short name for the location name field
-  const shortName = displayName.split(',').slice(0, 2).join(',').trim();
-  document.getElementById('p-location-name').value = shortName;
+
+  // Build a clean location name from address parts
+  const addr = address || {};
+  const street = addr.road || addr.neighbourhood || addr.suburb || '';
+  const area = addr.city || addr.town || addr.village || addr.state || '';
+  const locationName = [street, area].filter(Boolean).join(', ') || displayName.split(',').slice(0, 2).join(',').trim();
+
+  document.getElementById('p-location-name').value = locationName;
+  document.getElementById('map-coords').textContent = `Pinned: ${locationName}`;
   document.getElementById('map-search-results').style.display = 'none';
-  document.getElementById('map-search-input').value = shortName;
+  document.getElementById('map-search-input').value = locationName;
 }
 
 // ── Excel Upload ──────────────────────────────────────

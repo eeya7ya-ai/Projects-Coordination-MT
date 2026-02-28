@@ -228,6 +228,9 @@ router.post('/', verifyToken, requireAdmin, (req, res) => {
 
 // ── Update project (admin only) ─────────────────────────
 router.put('/:id', verifyToken, requireAdmin, (req, res) => {
+  const existing = db.prepare('SELECT * FROM projects WHERE id=?').get(req.params.id);
+  if (!existing) return res.status(404).json({ error: 'Project not found' });
+
   const { project_name, client_name_1, client_name_2, client_number,
     location_name, location_lat, location_lng, user_id_1, user_id_2,
     start_date, end_date, status, priority } = req.body;
@@ -237,9 +240,22 @@ router.put('/:id', verifyToken, requireAdmin, (req, res) => {
       location_name=?, location_lat=?, location_lng=?, user_id_1=?, user_id_2=?,
       start_date=?, end_date=?, status=?, priority=?, updated_at=CURRENT_TIMESTAMP
     WHERE id=?
-  `).run(project_name, client_name_1, client_name_2, client_number,
-    location_name, location_lat, location_lng, user_id_1, user_id_2,
-    start_date, end_date, status, priority, req.params.id);
+  `).run(
+    project_name ?? existing.project_name,
+    client_name_1 ?? existing.client_name_1,
+    client_name_2 ?? existing.client_name_2,
+    client_number ?? existing.client_number,
+    location_name ?? existing.location_name,
+    location_lat ?? existing.location_lat,
+    location_lng ?? existing.location_lng,
+    user_id_1 ?? existing.user_id_1,
+    user_id_2 ?? existing.user_id_2,
+    start_date ?? existing.start_date,
+    end_date ?? existing.end_date,
+    status ?? existing.status,
+    priority ?? existing.priority,
+    req.params.id
+  );
 
   res.json({ success: true, message: 'Project updated' });
 });

@@ -11,13 +11,10 @@ router.get('/users', (req, res) => {
   const users = db.prepare(`
     SELECT u.id, u.username, u.full_name, u.role, u.department, u.phone, u.email,
            u.avatar_color, u.is_active, u.created_at, u.last_login,
-           COUNT(DISTINCT p1.id) + COUNT(DISTINCT p2.id) AS total_projects,
-           SUM(CASE WHEN p1.status='completed' OR p2.status='completed' THEN 1 ELSE 0 END) AS completed_projects
+           (SELECT COUNT(*) FROM projects WHERE user_id_1 = u.id OR user_id_2 = u.id) AS total_projects,
+           (SELECT COUNT(*) FROM projects WHERE (user_id_1 = u.id OR user_id_2 = u.id) AND status='completed') AS completed_projects
     FROM users u
-    LEFT JOIN projects p1 ON p1.user_id_1 = u.id
-    LEFT JOIN projects p2 ON p2.user_id_2 = u.id
-    WHERE u.role != 'admin'
-    GROUP BY u.id
+    WHERE u.role != 'admin' AND u.is_active = 1
     ORDER BY u.created_at DESC
   `).all();
   res.json(users);
