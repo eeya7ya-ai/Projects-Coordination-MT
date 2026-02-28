@@ -10,9 +10,17 @@ const connectionString = process.env.POSTGRES_URL
   || process.env.POSTGRES_URL_NON_POOLING
   || process.env.DATABASE_URL;
 
+if (!connectionString) {
+  console.error(
+    '❌ FATAL: No database connection string found.\n' +
+    '   Set POSTGRES_URL (or POSTGRES_URL_NON_POOLING / DATABASE_URL) in your environment.\n' +
+    '   On Vercel: Project Settings → Environment Variables → add POSTGRES_URL.'
+  );
+}
+
 const pool = new Pool({
   connectionString,
-  ssl: { rejectUnauthorized: false },
+  ssl: connectionString ? { rejectUnauthorized: false } : false,
   max: 3,
   idleTimeoutMillis: 20000,
   connectionTimeoutMillis: 10000
@@ -88,7 +96,13 @@ const db = {
 };
 
 // ── Schema & seeding ────────────────────────────────────
+
+// Critical init: verify connection + create schema + ensure admin exists.
+// Demo seeding runs in background so it never blocks cold-start requests.
 async function initializeDB() {
+  // Quick connectivity check first - gives a clear error if POSTGRES_URL is wrong
+  await pool.query('SELECT 1');
+
   await db.exec(`
     CREATE TABLE IF NOT EXISTS users (
       id SERIAL PRIMARY KEY,
@@ -202,7 +216,7 @@ async function initializeDB() {
     );
   `);
 
-  // ── Admin user ────────────────────────────────────────
+  // ── Admin user (blocking - needed before any login can succeed) ──────────
   const adminExists = await db.get("SELECT id FROM users WHERE role = $1 LIMIT 1", ['admin']);
   let adminId;
   if (!adminExists) {
@@ -217,7 +231,15 @@ async function initializeDB() {
     adminId = adminExists.id;
   }
 
-  // ── Seed demo team members if none exist ─────────────
+  console.log('Database ready. Seeding demo data in background...');
+
+  // ── Demo seeding runs in background so it never delays requests ──────────
+  seedDemoData(adminId).catch(err =>
+    console.error('Background seeding error (non-fatal):', err.message)
+  );
+}
+
+async function seedDemoData(adminId) {
   const userCount = await db.get("SELECT COUNT(*) as c FROM users WHERE role = 'user'");
   if (userCount.c === 0 || Number(userCount.c) === 0) {
     const pw = bcrypt.hashSync('user123', 10);
@@ -232,14 +254,11 @@ async function initializeDB() {
     );
     console.log('Demo users seeded. ahmed / user123  |  sara / user123');
 
-    // Seed demo projects if none exist
     const projCount = await db.get('SELECT COUNT(*) as c FROM projects');
     if (projCount.c === 0 || Number(projCount.c) === 0) {
       await seedDemoProjects(adminId, u1.lastInsertRowid, u2.lastInsertRowid);
     }
   }
-
-  console.log('Database initialized successfully.');
 }
 
 async function seedDemoProjects(adminId, userId1, userId2) {
@@ -340,10 +359,31 @@ async function seedDemoProjects(adminId, userId1, userId2) {
   console.log('Demo projects seeded: CCTV Installation (in_progress) | Fire Alarm (pending)');
 }
 
-// Initialize once and cache the promise
-db.ready = initializeDB().catch(err => {
-  console.error('Database initialization failed:', err);
-  throw err;
-});
+// Initialize with exponential backoff retry
+async function initializeWithRetry() {
+  const delays = [2000, 4000, 8000];
+  let lastErr;
+  for (let i = 0; i <= delays.length; i++) {
+    try {
+      await initializeDB();
+      return;
+    } catch (err) {
+      lastErr = err;
+      console.error(`Database init attempt ${i + 1}/${delays.length + 1} failed:`, err.message);
+      if (i < delays.length) {
+        await new Promise(r => setTimeout(r, delays[i]));
+      }
+    }
+  }
+  throw lastErr;
+}
+
+db.ready = initializeWithRetry();
+
+// Allow middleware to trigger a fresh reconnect attempt after failure
+db.reconnect = () => {
+  db.ready = initializeWithRetry();
+  return db.ready;
+};
 
 module.exports = db;
