@@ -232,8 +232,21 @@
                   <label>Location Name / Address</label>
                   <input type="text" id="p-location-name" placeholder="Enter address or place name">
                 </div>
+                <div style="position:relative;margin-bottom:8px">
+                  <div style="display:flex;gap:6px">
+                    <input type="text" id="map-search-input" placeholder="🔍 Search location in Jordan (e.g. Amman, Zarqa...)"
+                      style="flex:1;padding:8px 12px;border:1px solid var(--gray-200);border-radius:8px;font-size:13px"
+                      onkeydown="if(event.key==='Enter'){event.preventDefault();searchMapLocation()}"
+                    >
+                    <button id="map-search-btn" type="button" onclick="searchMapLocation()"
+                      style="padding:8px 14px;background:var(--red);color:white;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600">
+                      🔍
+                    </button>
+                  </div>
+                  <div id="map-search-results" style="display:none;position:absolute;top:100%;left:0;right:0;background:white;border:1px solid var(--gray-200);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.1);z-index:9999;max-height:200px;overflow-y:auto;margin-top:4px"></div>
+                </div>
                 <div id="map-picker"></div>
-                <div class="map-coords" id="map-coords">Click on the map to pin the exact location</div>
+                <div class="map-coords" id="map-coords">Search for a location above or click on the map to pin</div>
                 <input type="hidden" id="p-lat">
                 <input type="hidden" id="p-lng">
               </div>

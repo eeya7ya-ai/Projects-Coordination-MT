@@ -32,9 +32,10 @@ window.addEventListener('DOMContentLoaded', async () => {
   av.style.background = currentUser.avatar_color || '#8B0000';
 
   initMap();
-  await Promise.all([loadDashboard(), loadUsers()]);
+  await Promise.all([loadDashboard(), loadUsers(), loadProjects()]);
   loadNotifications();
   setInterval(loadNotifications, 30000);
+  setInterval(() => { loadProjects(); loadUsers(); }, 60000);
 
   // Nav click handlers
   document.querySelectorAll('.nav-item[data-page]').forEach(el => {
@@ -548,6 +549,7 @@ async function submitProject() {
   if (res.ok) {
     alert(`Project "${name}" created successfully!`);
     resetProjectForm();
+    await loadProjects();
     navigate('projects');
     loadDashboard();
   } else {
@@ -569,8 +571,10 @@ function resetProjectForm() {
   document.getElementById('excel-result').classList.add('hidden');
   excelData = null;
   if (marker) { marker.remove(); marker = null; }
-  if (map) { map.setView([24.7136, 46.6753], 6); }
-  document.getElementById('map-coords').textContent = 'Click on the map to pin the exact location';
+  if (map) { map.setView([31.9539, 35.9106], 8); }
+  document.getElementById('map-search-input').value = '';
+  document.getElementById('map-search-results').style.display = 'none';
+  document.getElementById('map-coords').textContent = 'Search for a location above or click on the map to pin';
 }
 
 // ── Users ─────────────────────────────────────────────
@@ -582,7 +586,7 @@ async function loadUsers() {
 }
 
 async function loadUsersTable() {
-  if (!allUsers.length) await loadUsers();
+  await loadUsers();
   const tbody = document.querySelector('#users-table tbody');
   tbody.innerHTML = allUsers.map(u => {
     const initials = u.full_name.split(' ').map(n => n[0]).join('').substring(0,2).toUpperCase();
@@ -736,7 +740,8 @@ async function loadReports() {
 
 // ── Map ───────────────────────────────────────────────
 function initMap() {
-  map = L.map('map-picker').setView([24.7136, 46.6753], 6);
+  // Jordan center: Amman ~31.95, 35.93 — zoom 8 shows all of Jordan
+  map = L.map('map-picker').setView([31.9539, 35.9106], 8);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap contributors',
     maxZoom: 19
@@ -760,6 +765,56 @@ function initMap() {
       document.getElementById('p-location-name').value = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
     }
   });
+}
+
+async function searchMapLocation() {
+  const query = document.getElementById('map-search-input').value.trim();
+  if (!query) return;
+  const btn = document.getElementById('map-search-btn');
+  btn.textContent = '...';
+  btn.disabled = true;
+  try {
+    // Restrict search to Jordan (countrycodes=jo)
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&countrycodes=jo&format=json&limit=5`;
+    const res = await fetch(url, { headers: { 'Accept-Language': 'en', 'User-Agent': 'ELVCoordinator/1.0' } });
+    const results = await res.json();
+    const listEl = document.getElementById('map-search-results');
+    if (!results.length) {
+      listEl.innerHTML = '<div style="padding:8px 12px;color:var(--gray-400);font-size:13px">No results found in Jordan</div>';
+      listEl.style.display = 'block';
+    } else {
+      listEl.innerHTML = results.map((r, i) => `
+        <div class="map-search-result-item" onclick="selectMapResult(${r.lat},${r.lon},'${r.display_name.replace(/'/g,"\\'")}')">
+          📍 ${r.display_name}
+        </div>
+      `).join('');
+      listEl.style.display = 'block';
+    }
+  } catch(e) {
+    alert('Search failed. Check your connection.');
+  } finally {
+    btn.textContent = '🔍';
+    btn.disabled = false;
+  }
+}
+
+function selectMapResult(lat, lng, displayName) {
+  lat = parseFloat(lat); lng = parseFloat(lng);
+  const redIcon = L.divIcon({
+    html: `<div style="background:var(--red);width:18px;height:18px;border-radius:50%;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.4)"></div>`,
+    iconSize: [18, 18], iconAnchor: [9, 9], className: ''
+  });
+  if (marker) marker.remove();
+  marker = L.marker([lat, lng], { icon: redIcon }).addTo(map);
+  map.setView([lat, lng], 15);
+  document.getElementById('p-lat').value = lat.toFixed(6);
+  document.getElementById('p-lng').value = lng.toFixed(6);
+  document.getElementById('map-coords').textContent = `📍 Pinned: ${lat.toFixed(4)}°N, ${lng.toFixed(4)}°E`;
+  // Use a clean short name for the location name field
+  const shortName = displayName.split(',').slice(0, 2).join(',').trim();
+  document.getElementById('p-location-name').value = shortName;
+  document.getElementById('map-search-results').style.display = 'none';
+  document.getElementById('map-search-input').value = shortName;
 }
 
 // ── Excel Upload ──────────────────────────────────────
