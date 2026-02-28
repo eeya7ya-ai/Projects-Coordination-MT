@@ -1,20 +1,97 @@
-const Database = require('better-sqlite3');
+const { Pool, types } = require('pg');
 const bcrypt = require('bcryptjs');
-const path = require('path');
 
-const DB_PATH = process.env.VERCEL
-  ? '/tmp/elv_coordinator.db'
-  : path.join(__dirname, 'elv_coordinator.db');
-const db = new Database(DB_PATH);
+// Parse COUNT/BIGINT (type 20) as JavaScript numbers instead of strings
+types.setTypeParser(20, val => parseInt(val, 10));
 
-// Enable WAL mode for performance
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
+// ── PostgreSQL connection (Supabase via Vercel) ───────
+// Vercel's Supabase integration sets POSTGRES_URL (pooled connection)
+const connectionString = process.env.POSTGRES_URL
+  || process.env.POSTGRES_URL_NON_POOLING
+  || process.env.DATABASE_URL;
 
-function initializeDB() {
-  db.exec(`
+const pool = new Pool({
+  connectionString,
+  ssl: { rejectUnauthorized: false },
+  max: 3,
+  idleTimeoutMillis: 20000,
+  connectionTimeoutMillis: 10000
+});
+
+// Convert SQLite-style ? placeholders to PostgreSQL $1, $2, ...
+function pgify(sql) {
+  let i = 0;
+  return sql.replace(/\?/g, () => `$${++i}`);
+}
+
+const db = {
+  async get(sql, params = []) {
+    const { rows } = await pool.query(pgify(sql), params);
+    return rows[0] || null;
+  },
+
+  async all(sql, params = []) {
+    const { rows } = await pool.query(pgify(sql), params);
+    return rows;
+  },
+
+  async run(sql, params = []) {
+    const pgSql = pgify(sql);
+    const isInsert = sql.trim().toUpperCase().startsWith('INSERT');
+    const finalSql = isInsert && !pgSql.toUpperCase().includes('RETURNING')
+      ? pgSql + ' RETURNING id'
+      : pgSql;
+    const result = await pool.query(finalSql, params);
+    return {
+      lastInsertRowid: result.rows[0]?.id,
+      changes: result.rowCount
+    };
+  },
+
+  async exec(sql) {
+    await pool.query(sql);
+  },
+
+  async transaction(fn) {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const tx = {
+        async get(sql, params = []) {
+          const { rows } = await client.query(pgify(sql), params);
+          return rows[0] || null;
+        },
+        async all(sql, params = []) {
+          const { rows } = await client.query(pgify(sql), params);
+          return rows;
+        },
+        async run(sql, params = []) {
+          const pgSql = pgify(sql);
+          const isInsert = sql.trim().toUpperCase().startsWith('INSERT');
+          const finalSql = isInsert && !pgSql.toUpperCase().includes('RETURNING')
+            ? pgSql + ' RETURNING id'
+            : pgSql;
+          const result = await client.query(finalSql, params);
+          return { lastInsertRowid: result.rows[0]?.id, changes: result.rowCount };
+        }
+      };
+      const result = await fn(tx);
+      await client.query('COMMIT');
+      return result;
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
+    }
+  }
+};
+
+// ── Schema & seeding ────────────────────────────────────
+async function initializeDB() {
+  await db.exec(`
     CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id SERIAL PRIMARY KEY,
       username TEXT UNIQUE NOT NULL,
       password TEXT NOT NULL,
       full_name TEXT NOT NULL,
@@ -24,12 +101,12 @@ function initializeDB() {
       email TEXT,
       avatar_color TEXT DEFAULT '#c0392b',
       is_active INTEGER NOT NULL DEFAULT 1,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      last_login DATETIME
+      created_at TIMESTAMP DEFAULT NOW(),
+      last_login TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS projects (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id SERIAL PRIMARY KEY,
       project_name TEXT NOT NULL,
       client_name_1 TEXT,
       client_name_2 TEXT,
@@ -44,62 +121,62 @@ function initializeDB() {
       status TEXT DEFAULT 'pending',
       priority TEXT DEFAULT 'normal',
       created_by INTEGER REFERENCES users(id),
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW()
     );
 
     CREATE TABLE IF NOT EXISTS project_modules (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id SERIAL PRIMARY KEY,
       project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
       module_type TEXT NOT NULL,
       scope_of_work TEXT,
       issue_details TEXT,
       status TEXT DEFAULT 'pending',
       progress INTEGER DEFAULT 0,
-      started_at DATETIME,
-      completed_at DATETIME,
+      started_at TIMESTAMP,
+      completed_at TIMESTAMP,
       user_notes TEXT,
       admin_notes TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW()
     );
 
     CREATE TABLE IF NOT EXISTS module_documents (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id SERIAL PRIMARY KEY,
       module_id INTEGER NOT NULL REFERENCES project_modules(id) ON DELETE CASCADE,
       doc_type TEXT NOT NULL,
       file_name TEXT,
       file_path TEXT,
       content TEXT,
       uploaded_by INTEGER REFERENCES users(id),
-      uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      uploaded_at TIMESTAMP DEFAULT NOW()
     );
 
     CREATE TABLE IF NOT EXISTS module_devices (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id SERIAL PRIMARY KEY,
       module_id INTEGER NOT NULL REFERENCES project_modules(id) ON DELETE CASCADE,
       device_model TEXT,
       device_qty INTEGER DEFAULT 1,
       device_description TEXT,
       serial_number TEXT,
       added_by INTEGER REFERENCES users(id),
-      added_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      added_at TIMESTAMP DEFAULT NOW()
     );
 
     CREATE TABLE IF NOT EXISTS module_checklist (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id SERIAL PRIMARY KEY,
       module_id INTEGER NOT NULL REFERENCES project_modules(id) ON DELETE CASCADE,
       task_title TEXT NOT NULL,
       task_description TEXT,
       is_completed INTEGER DEFAULT 0,
       completed_by INTEGER REFERENCES users(id),
-      completed_at DATETIME,
+      completed_at TIMESTAMP,
       sort_order INTEGER DEFAULT 0,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      created_at TIMESTAMP DEFAULT NOW()
     );
 
     CREATE TABLE IF NOT EXISTS module_reports (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id SERIAL PRIMARY KEY,
       module_id INTEGER NOT NULL REFERENCES project_modules(id) ON DELETE CASCADE,
       submitted_by INTEGER NOT NULL REFERENCES users(id),
       report_text TEXT,
@@ -107,103 +184,166 @@ function initializeDB() {
       issues_found TEXT,
       next_steps TEXT,
       hours_spent REAL,
-      submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      submitted_at TIMESTAMP DEFAULT NOW(),
       reviewed_by INTEGER REFERENCES users(id),
       review_status TEXT DEFAULT 'pending',
       review_notes TEXT,
-      reviewed_at DATETIME
+      reviewed_at TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS notifications (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id SERIAL PRIMARY KEY,
       user_id INTEGER NOT NULL REFERENCES users(id),
       title TEXT NOT NULL,
       message TEXT,
       type TEXT DEFAULT 'info',
       is_read INTEGER DEFAULT 0,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      created_at TIMESTAMP DEFAULT NOW()
     );
   `);
 
-  // Create default admin if not exists
-  const adminExists = db.prepare('SELECT id FROM users WHERE role = ? LIMIT 1').get('admin');
+  // ── Admin user ────────────────────────────────────────
+  const adminExists = await db.get("SELECT id FROM users WHERE role = $1 LIMIT 1", ['admin']);
+  let adminId;
   if (!adminExists) {
     const hashedPw = bcrypt.hashSync('admin123', 10);
-    db.prepare(`
-      INSERT INTO users (username, password, full_name, role, avatar_color)
-      VALUES (?, ?, ?, ?, ?)
-    `).run('admin', hashedPw, 'System Administrator', 'admin', '#8B0000');
+    const res = await db.run(
+      "INSERT INTO users (username, password, full_name, role, avatar_color) VALUES ($1, $2, $3, $4, $5)",
+      ['admin', hashedPw, 'System Administrator', 'admin', '#8B0000']
+    );
+    adminId = res.lastInsertRowid;
     console.log('Default admin created: username=admin, password=admin123');
+  } else {
+    adminId = adminExists.id;
   }
 
-  // Seed default checklists per module type
-  const MODULE_CHECKLISTS = {
-    'Maintenance': [
-      'Initial site inspection and assessment',
-      'Check all existing equipment status',
-      'Perform scheduled maintenance tasks',
-      'Test all systems post-maintenance',
-      'Document findings and actions taken',
-      'Obtain client sign-off'
-    ],
-    'Handover': [
-      'Prepare handover documentation',
-      'Verify all systems are operational',
-      'Conduct client walkthrough',
-      'Train client on system operation',
-      'Provide as-built drawings',
-      'Collect all signed documents',
-      'Final handover sign-off'
-    ],
-    'Installation and Wiring': [
-      'Review installation drawings',
-      'Prepare materials and tools',
-      'Cable routing and labeling',
-      'Equipment mounting and installation',
-      'Wiring and terminations',
-      'Quality check on all connections',
-      'Initial power-up test'
-    ],
-    'Programming and Trouble Shooting': [
-      'Load/verify configuration files',
-      'Program device parameters',
-      'Test all programmed functions',
-      'Troubleshoot identified issues',
-      'Document all changes made',
-      'Final system validation'
-    ],
-    'Delivering': [
-      'Prepare delivery manifest',
-      'Pack and label equipment',
-      'Coordinate delivery logistics',
-      'Verify delivery receipt',
-      'Obtain signed delivery note'
-    ],
-    'Site Survey': [
-      'Review existing drawings/plans',
-      'Photograph site conditions',
-      'Measure and document dimensions',
-      'Identify cable routes',
-      'Note power availability',
-      'Document survey findings',
-      'Prepare survey report'
-    ],
-    'POC': [
-      'Define POC objectives',
-      'Setup test environment',
-      'Configure demo equipment',
-      'Conduct demonstration to client',
-      'Document client feedback',
-      'Prepare POC summary report'
-    ]
-  };
+  // ── Seed demo team members if none exist ─────────────
+  const userCount = await db.get("SELECT COUNT(*) as c FROM users WHERE role = 'user'");
+  if (userCount.c === 0 || Number(userCount.c) === 0) {
+    const pw = bcrypt.hashSync('user123', 10);
+    const u1 = await db.run(
+      "INSERT INTO users (username, password, full_name, role, department, phone, email, avatar_color) VALUES ($1, $2, $3, 'user', $4, $5, $6, $7)",
+      ['ahmed', pw, 'Ahmed Al-Rashid', 'ELV Engineering', '+962 79 123 4567', 'ahmed@elv.jo', '#c0392b']
+    );
+    const u2 = await db.run(
+      "INSERT INTO users (username, password, full_name, role, department, phone, email, avatar_color) VALUES ($1, $2, $3, 'user', $4, $5, $6, $7)",
+      ['sara', bcrypt.hashSync('user123', 10), 'Sara Khalil', 'Technical Operations',
+        '+962 77 987 6543', 'sara@elv.jo', '#8B0000']
+    );
+    console.log('Demo users seeded. ahmed / user123  |  sara / user123');
 
-  // Store these globally for seeding new modules
-  db.MODULE_CHECKLISTS = MODULE_CHECKLISTS;
+    // Seed demo projects if none exist
+    const projCount = await db.get('SELECT COUNT(*) as c FROM projects');
+    if (projCount.c === 0 || Number(projCount.c) === 0) {
+      await seedDemoProjects(adminId, u1.lastInsertRowid, u2.lastInsertRowid);
+    }
+  }
 
   console.log('Database initialized successfully.');
 }
 
-initializeDB();
+async function seedDemoProjects(adminId, userId1, userId2) {
+  const checklists = {
+    'Installation and Wiring': [
+      'Review installation drawings', 'Prepare materials and tools',
+      'Cable routing and labeling', 'Equipment mounting and installation',
+      'Wiring and terminations', 'Quality check on all connections', 'Initial power-up test'
+    ],
+    'Site Survey': [
+      'Review existing drawings/plans', 'Photograph site conditions',
+      'Measure and document dimensions', 'Identify cable routes',
+      'Note power availability', 'Document survey findings', 'Prepare survey report'
+    ]
+  };
+
+  // Project 1: CCTV Installation – In Progress
+  const p1 = await db.run(
+    `INSERT INTO projects (project_name, client_name_1, client_number, location_name,
+      location_lat, location_lng, user_id_1, user_id_2, start_date, end_date,
+      status, priority, created_by)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+    ['CCTV Installation – Amman Tower', 'Jordan Properties Group',
+      '+962 6 555 0101', 'Queen Rania Al-Abdullah St, Amman',
+      31.9730, 35.8986, userId1, userId2,
+      '2026-02-01', '2026-03-15', 'in_progress', 'high', adminId]
+  );
+
+  const mod1 = await db.run(
+    `INSERT INTO project_modules (project_id, module_type, scope_of_work, status, progress)
+    VALUES ($1, $2, $3, $4, $5)`,
+    [p1.lastInsertRowid, 'Installation and Wiring',
+      'Install 24 IP cameras across all floors, run Cat6 cables to NVR room, configure recording system',
+      'in_progress', 57]
+  );
+
+  for (let idx = 0; idx < checklists['Installation and Wiring'].length; idx++) {
+    const task = checklists['Installation and Wiring'][idx];
+    await db.run(
+      'INSERT INTO module_checklist (module_id, task_title, is_completed, sort_order) VALUES ($1, $2, $3, $4)',
+      [mod1.lastInsertRowid, task, idx < 4 ? 1 : 0, idx]
+    );
+  }
+
+  await db.run(
+    'INSERT INTO module_devices (module_id, device_model, device_qty, device_description, added_by) VALUES ($1, $2, $3, $4, $5)',
+    [mod1.lastInsertRowid, 'Hikvision DS-2CD2143G2-I', 24, '4MP AcuSense Fixed Dome Camera', adminId]
+  );
+  await db.run(
+    'INSERT INTO module_devices (module_id, device_model, device_qty, device_description, added_by) VALUES ($1, $2, $3, $4, $5)',
+    [mod1.lastInsertRowid, 'Hikvision DS-7732NI-K4', 1, '32-Channel NVR', adminId]
+  );
+
+  // Project 2: Fire Alarm System – Pending
+  const p2 = await db.run(
+    `INSERT INTO projects (project_name, client_name_1, client_number, location_name,
+      location_lat, location_lng, user_id_1, start_date, end_date, status, priority, created_by)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+    ['Fire Alarm System – Zarqa Mall', 'Al-Zarqa Commercial Co.',
+      '+962 5 388 7700', 'Prince Hassan St, Zarqa',
+      32.0714, 36.0881, userId2,
+      '2026-03-01', '2026-04-30', 'pending', 'urgent', adminId]
+  );
+
+  const mod2 = await db.run(
+    `INSERT INTO project_modules (project_id, module_type, scope_of_work, status, progress)
+    VALUES ($1, $2, $3, $4, $5)`,
+    [p2.lastInsertRowid, 'Site Survey',
+      'Survey entire mall for fire alarm zones, detector placement, and cable routes',
+      'pending', 0]
+  );
+
+  for (let idx = 0; idx < checklists['Site Survey'].length; idx++) {
+    const task = checklists['Site Survey'][idx];
+    await db.run(
+      'INSERT INTO module_checklist (module_id, task_title, is_completed, sort_order) VALUES ($1, $2, $3, $4)',
+      [mod2.lastInsertRowid, task, 0, idx]
+    );
+  }
+
+  // Notifications for assigned users
+  await db.run(
+    "INSERT INTO notifications (user_id, title, message, type) VALUES ($1, $2, $3, 'project')",
+    [userId1, 'New Project: CCTV Installation – Amman Tower',
+      'You have been assigned as primary engineer. Installation in progress.']
+  );
+  await db.run(
+    "INSERT INTO notifications (user_id, title, message, type) VALUES ($1, $2, $3, 'project')",
+    [userId2, 'New Project: CCTV Installation – Amman Tower',
+      'You have been assigned as secondary engineer.']
+  );
+  await db.run(
+    "INSERT INTO notifications (user_id, title, message, type) VALUES ($1, $2, $3, 'project')",
+    [userId2, 'New Project: Fire Alarm System – Zarqa Mall',
+      'You have been assigned as primary engineer. Start with site survey.']
+  );
+
+  console.log('Demo projects seeded: CCTV Installation (in_progress) | Fire Alarm (pending)');
+}
+
+// Initialize once and cache the promise
+db.ready = initializeDB().catch(err => {
+  console.error('Database initialization failed:', err);
+  throw err;
+});
 
 module.exports = db;

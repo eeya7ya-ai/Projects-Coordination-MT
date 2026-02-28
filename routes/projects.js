@@ -82,271 +82,339 @@ const MODULE_CHECKLISTS = {
 };
 
 // ── Get all projects ────────────────────────────────────
-router.get('/', verifyToken, (req, res) => {
-  let query, params;
-  if (req.user.role === 'admin') {
-    query = `
-      SELECT p.*, u1.full_name as user1_name, u1.avatar_color as user1_color,
-             u2.full_name as user2_name, u2.avatar_color as user2_color,
-             COUNT(pm.id) as module_count
-      FROM projects p
-      LEFT JOIN users u1 ON u1.id=p.user_id_1
-      LEFT JOIN users u2 ON u2.id=p.user_id_2
-      LEFT JOIN project_modules pm ON pm.project_id=p.id
-      GROUP BY p.id
-      ORDER BY p.created_at DESC
-    `;
-    params = [];
-  } else {
-    query = `
-      SELECT p.*, u1.full_name as user1_name, u1.avatar_color as user1_color,
-             u2.full_name as user2_name, u2.avatar_color as user2_color,
-             COUNT(pm.id) as module_count
-      FROM projects p
-      LEFT JOIN users u1 ON u1.id=p.user_id_1
-      LEFT JOIN users u2 ON u2.id=p.user_id_2
-      LEFT JOIN project_modules pm ON pm.project_id=p.id
-      WHERE p.user_id_1=? OR p.user_id_2=?
-      GROUP BY p.id
-      ORDER BY p.created_at DESC
-    `;
-    params = [req.user.id, req.user.id];
+router.get('/', verifyToken, async (req, res) => {
+  try {
+    let projects;
+    if (req.user.role === 'admin') {
+      projects = await db.all(`
+        SELECT p.*, u1.full_name as user1_name, u1.avatar_color as user1_color,
+               u2.full_name as user2_name, u2.avatar_color as user2_color,
+               (SELECT COUNT(*) FROM project_modules WHERE project_id = p.id) as module_count
+        FROM projects p
+        LEFT JOIN users u1 ON u1.id=p.user_id_1
+        LEFT JOIN users u2 ON u2.id=p.user_id_2
+        ORDER BY p.created_at DESC
+      `);
+    } else {
+      projects = await db.all(`
+        SELECT p.*, u1.full_name as user1_name, u1.avatar_color as user1_color,
+               u2.full_name as user2_name, u2.avatar_color as user2_color,
+               (SELECT COUNT(*) FROM project_modules WHERE project_id = p.id) as module_count
+        FROM projects p
+        LEFT JOIN users u1 ON u1.id=p.user_id_1
+        LEFT JOIN users u2 ON u2.id=p.user_id_2
+        WHERE p.user_id_1=? OR p.user_id_2=?
+        ORDER BY p.created_at DESC
+      `, [req.user.id, req.user.id]);
+    }
+    res.json(projects);
+  } catch (err) {
+    console.error('Get projects error:', err);
+    res.status(500).json({ error: 'Internal server error' });
   }
-  const projects = db.prepare(query).all(...params);
-  res.json(projects);
 });
 
 // ── Get single project with modules ────────────────────
-router.get('/:id', verifyToken, (req, res) => {
-  const project = db.prepare(`
-    SELECT p.*, u1.full_name as user1_name, u1.avatar_color as user1_color,
-           u2.full_name as user2_name, u2.avatar_color as user2_color
-    FROM projects p
-    LEFT JOIN users u1 ON u1.id=p.user_id_1
-    LEFT JOIN users u2 ON u2.id=p.user_id_2
-    WHERE p.id=?
-  `).get(req.params.id);
+router.get('/:id', verifyToken, async (req, res) => {
+  try {
+    const project = await db.get(`
+      SELECT p.*, u1.full_name as user1_name, u1.avatar_color as user1_color,
+             u2.full_name as user2_name, u2.avatar_color as user2_color
+      FROM projects p
+      LEFT JOIN users u1 ON u1.id=p.user_id_1
+      LEFT JOIN users u2 ON u2.id=p.user_id_2
+      WHERE p.id=?
+    `, [req.params.id]);
 
-  if (!project) return res.status(404).json({ error: 'Project not found' });
-  if (req.user.role !== 'admin' && project.user_id_1 !== req.user.id && project.user_id_2 !== req.user.id) {
-    return res.status(403).json({ error: 'Access denied' });
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+    if (req.user.role !== 'admin' && project.user_id_1 !== req.user.id && project.user_id_2 !== req.user.id) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const modules = await db.all('SELECT * FROM project_modules WHERE project_id=? ORDER BY id', [req.params.id]);
+
+    for (const mod of modules) {
+      mod.checklist = await db.all('SELECT * FROM module_checklist WHERE module_id=? ORDER BY sort_order', [mod.id]);
+      mod.devices = await db.all('SELECT * FROM module_devices WHERE module_id=? ORDER BY id', [mod.id]);
+      mod.documents = await db.all('SELECT id, doc_type, file_name, uploaded_at FROM module_documents WHERE module_id=? ORDER BY id', [mod.id]);
+      mod.reports = await db.all(`
+        SELECT mr.*, u.full_name as submitted_by_name
+        FROM module_reports mr JOIN users u ON u.id=mr.submitted_by
+        WHERE mr.module_id=? ORDER BY mr.submitted_at DESC
+      `, [mod.id]);
+    }
+
+    project.modules = modules;
+    res.json(project);
+  } catch (err) {
+    console.error('Get project error:', err);
+    res.status(500).json({ error: 'Internal server error' });
   }
-
-  const modules = db.prepare('SELECT * FROM project_modules WHERE project_id=? ORDER BY id').all(req.params.id);
-
-  for (const mod of modules) {
-    mod.checklist = db.prepare('SELECT * FROM module_checklist WHERE module_id=? ORDER BY sort_order').all(mod.id);
-    mod.devices = db.prepare('SELECT * FROM module_devices WHERE module_id=? ORDER BY id').all(mod.id);
-    mod.documents = db.prepare('SELECT id, doc_type, file_name, uploaded_at FROM module_documents WHERE module_id=? ORDER BY id').all(mod.id);
-    mod.reports = db.prepare(`
-      SELECT mr.*, u.full_name as submitted_by_name
-      FROM module_reports mr JOIN users u ON u.id=mr.submitted_by
-      WHERE mr.module_id=? ORDER BY mr.submitted_at DESC
-    `).all(mod.id);
-  }
-
-  project.modules = modules;
-  res.json(project);
 });
 
 // ── Create project (admin only) ─────────────────────────
-router.post('/', verifyToken, requireAdmin, (req, res) => {
-  const {
-    project_name, client_name_1, client_name_2, client_number,
-    location_name, location_lat, location_lng,
-    user_id_1, user_id_2, start_date, end_date, priority, modules
-  } = req.body;
+router.post('/', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    const {
+      project_name, client_name_1, client_name_2, client_number,
+      location_name, location_lat, location_lng,
+      user_id_1, user_id_2, start_date, end_date, priority, modules
+    } = req.body;
 
-  if (!project_name) return res.status(400).json({ error: 'Project name is required' });
-  if (!modules || !modules.length) return res.status(400).json({ error: 'At least one module required' });
+    if (!project_name) return res.status(400).json({ error: 'Project name is required' });
+    if (!modules || !modules.length) return res.status(400).json({ error: 'At least one module required' });
 
-  const insertProject = db.transaction(() => {
-    const result = db.prepare(`
-      INSERT INTO projects (project_name, client_name_1, client_name_2, client_number,
-        location_name, location_lat, location_lng, user_id_1, user_id_2,
-        start_date, end_date, status, priority, created_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
-    `).run(project_name, client_name_1, client_name_2, client_number,
-      location_name, location_lat, location_lng, user_id_1, user_id_2,
-      start_date, end_date, priority || 'normal', req.user.id);
+    const projectId = await db.transaction(async (tx) => {
+      const result = await tx.run(
+        `INSERT INTO projects (project_name, client_name_1, client_name_2, client_number,
+          location_name, location_lat, location_lng, user_id_1, user_id_2,
+          start_date, end_date, status, priority, created_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
+        [project_name, client_name_1, client_name_2, client_number,
+          location_name, location_lat, location_lng, user_id_1, user_id_2,
+          start_date, end_date, priority || 'normal', req.user.id]
+      );
 
-    const projectId = result.lastInsertRowid;
+      const projId = result.lastInsertRowid;
 
-    for (const mod of modules) {
-      const modResult = db.prepare(`
-        INSERT INTO project_modules (project_id, module_type, scope_of_work, issue_details)
-        VALUES (?, ?, ?, ?)
-      `).run(projectId, mod.module_type, mod.scope_of_work || '', mod.issue_details || '');
+      for (const mod of modules) {
+        const modResult = await tx.run(
+          `INSERT INTO project_modules (project_id, module_type, scope_of_work, issue_details)
+          VALUES (?, ?, ?, ?)`,
+          [projId, mod.module_type, mod.scope_of_work || '', mod.issue_details || '']
+        );
 
-      const modId = modResult.lastInsertRowid;
+        const modId = modResult.lastInsertRowid;
 
-      // Seed default checklist
-      const defaultTasks = MODULE_CHECKLISTS[mod.module_type] || [];
-      defaultTasks.forEach((task, idx) => {
-        db.prepare(`
-          INSERT INTO module_checklist (module_id, task_title, sort_order) VALUES (?, ?, ?)
-        `).run(modId, task, idx);
-      });
+        // Seed default checklist
+        const defaultTasks = MODULE_CHECKLISTS[mod.module_type] || [];
+        for (let idx = 0; idx < defaultTasks.length; idx++) {
+          await tx.run(
+            'INSERT INTO module_checklist (module_id, task_title, sort_order) VALUES (?, ?, ?)',
+            [modId, defaultTasks[idx], idx]
+          );
+        }
 
-      // Custom checklist items
-      if (mod.checklist_items) {
-        mod.checklist_items.forEach((item, idx) => {
-          db.prepare(`
-            INSERT INTO module_checklist (module_id, task_title, task_description, sort_order)
-            VALUES (?, ?, ?, ?)
-          `).run(modId, item.title, item.description || '', defaultTasks.length + idx);
-        });
-      }
+        // Custom checklist items
+        if (mod.checklist_items) {
+          for (let idx = 0; idx < mod.checklist_items.length; idx++) {
+            const item = mod.checklist_items[idx];
+            await tx.run(
+              'INSERT INTO module_checklist (module_id, task_title, task_description, sort_order) VALUES (?, ?, ?, ?)',
+              [modId, item.title, item.description || '', defaultTasks.length + idx]
+            );
+          }
+        }
 
-      // Devices
-      if (mod.devices) {
-        for (const dev of mod.devices) {
-          db.prepare(`
-            INSERT INTO module_devices (module_id, device_model, device_qty, device_description, serial_number, added_by)
-            VALUES (?, ?, ?, ?, ?, ?)
-          `).run(modId, dev.model, dev.qty || 1, dev.description || '', dev.serial || '', req.user.id);
+        // Devices
+        if (mod.devices) {
+          for (const dev of mod.devices) {
+            await tx.run(
+              `INSERT INTO module_devices (module_id, device_model, device_qty, device_description, serial_number, added_by)
+              VALUES (?, ?, ?, ?, ?, ?)`,
+              [modId, dev.model, dev.qty || 1, dev.description || '', dev.serial || '', req.user.id]
+            );
+          }
         }
       }
-    }
 
-    // Notify assigned users
-    const userIds = [user_id_1, user_id_2].filter(Boolean);
-    for (const uid of userIds) {
-      db.prepare(`
-        INSERT INTO notifications (user_id, title, message, type)
-        VALUES (?, ?, ?, 'project')
-      `).run(uid, `New Project Assigned: ${project_name}`,
-        `You have been assigned to project "${project_name}". Please review your tasks.`);
-    }
+      // Notify assigned users
+      const userIds = [user_id_1, user_id_2].filter(Boolean);
+      for (const uid of userIds) {
+        await tx.run(
+          "INSERT INTO notifications (user_id, title, message, type) VALUES (?, ?, ?, 'project')",
+          [uid, `New Project Assigned: ${project_name}`,
+            `You have been assigned to project "${project_name}". Please review your tasks.`]
+        );
+      }
 
-    return projectId;
-  });
+      return projId;
+    });
 
-  const projectId = insertProject();
-  res.json({ success: true, id: projectId, message: 'Project created successfully' });
+    res.json({ success: true, id: projectId, message: 'Project created successfully' });
+  } catch (err) {
+    console.error('Create project error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 // ── Update project (admin only) ─────────────────────────
-router.put('/:id', verifyToken, requireAdmin, (req, res) => {
-  const existing = db.prepare('SELECT * FROM projects WHERE id=?').get(req.params.id);
-  if (!existing) return res.status(404).json({ error: 'Project not found' });
+router.put('/:id', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    const existing = await db.get('SELECT * FROM projects WHERE id=?', [req.params.id]);
+    if (!existing) return res.status(404).json({ error: 'Project not found' });
 
-  const { project_name, client_name_1, client_name_2, client_number,
-    location_name, location_lat, location_lng, user_id_1, user_id_2,
-    start_date, end_date, status, priority } = req.body;
+    const { project_name, client_name_1, client_name_2, client_number,
+      location_name, location_lat, location_lng, user_id_1, user_id_2,
+      start_date, end_date, status, priority } = req.body;
 
-  db.prepare(`
-    UPDATE projects SET project_name=?, client_name_1=?, client_name_2=?, client_number=?,
-      location_name=?, location_lat=?, location_lng=?, user_id_1=?, user_id_2=?,
-      start_date=?, end_date=?, status=?, priority=?, updated_at=CURRENT_TIMESTAMP
-    WHERE id=?
-  `).run(
-    project_name ?? existing.project_name,
-    client_name_1 ?? existing.client_name_1,
-    client_name_2 ?? existing.client_name_2,
-    client_number ?? existing.client_number,
-    location_name ?? existing.location_name,
-    location_lat ?? existing.location_lat,
-    location_lng ?? existing.location_lng,
-    user_id_1 ?? existing.user_id_1,
-    user_id_2 ?? existing.user_id_2,
-    start_date ?? existing.start_date,
-    end_date ?? existing.end_date,
-    status ?? existing.status,
-    priority ?? existing.priority,
-    req.params.id
-  );
+    await db.run(
+      `UPDATE projects SET project_name=?, client_name_1=?, client_name_2=?, client_number=?,
+        location_name=?, location_lat=?, location_lng=?, user_id_1=?, user_id_2=?,
+        start_date=?, end_date=?, status=?, priority=?, updated_at=NOW()
+      WHERE id=?`,
+      [
+        project_name ?? existing.project_name,
+        client_name_1 ?? existing.client_name_1,
+        client_name_2 ?? existing.client_name_2,
+        client_number ?? existing.client_number,
+        location_name ?? existing.location_name,
+        location_lat ?? existing.location_lat,
+        location_lng ?? existing.location_lng,
+        user_id_1 ?? existing.user_id_1,
+        user_id_2 ?? existing.user_id_2,
+        start_date ?? existing.start_date,
+        end_date ?? existing.end_date,
+        status ?? existing.status,
+        priority ?? existing.priority,
+        req.params.id
+      ]
+    );
 
-  res.json({ success: true, message: 'Project updated' });
+    res.json({ success: true, message: 'Project updated' });
+  } catch (err) {
+    console.error('Update project error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
-router.delete('/:id', verifyToken, requireAdmin, (req, res) => {
-  db.prepare('DELETE FROM projects WHERE id=?').run(req.params.id);
-  res.json({ success: true, message: 'Project deleted' });
+router.delete('/:id', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    await db.run('DELETE FROM projects WHERE id=?', [req.params.id]);
+    res.json({ success: true, message: 'Project deleted' });
+  } catch (err) {
+    console.error('Delete project error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 // ── Module updates (users can update their module status) ─
-router.put('/:projectId/modules/:moduleId', verifyToken, (req, res) => {
-  const { status, progress, user_notes, admin_notes } = req.body;
-  const mod = db.prepare('SELECT pm.*, p.user_id_1, p.user_id_2 FROM project_modules pm JOIN projects p ON p.id=pm.project_id WHERE pm.id=?').get(req.params.moduleId);
-  if (!mod) return res.status(404).json({ error: 'Module not found' });
+router.put('/:projectId/modules/:moduleId', verifyToken, async (req, res) => {
+  try {
+    const { status, progress, user_notes, admin_notes } = req.body;
+    const mod = await db.get(
+      'SELECT pm.*, p.user_id_1, p.user_id_2 FROM project_modules pm JOIN projects p ON p.id=pm.project_id WHERE pm.id=?',
+      [req.params.moduleId]
+    );
+    if (!mod) return res.status(404).json({ error: 'Module not found' });
 
-  if (req.user.role !== 'admin' && mod.user_id_1 !== req.user.id && mod.user_id_2 !== req.user.id) {
-    return res.status(403).json({ error: 'Access denied' });
+    if (req.user.role !== 'admin' && mod.user_id_1 !== req.user.id && mod.user_id_2 !== req.user.id) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const updates = {};
+    if (status) updates.status = status;
+    if (progress !== undefined) updates.progress = progress;
+    if (user_notes !== undefined) updates.user_notes = user_notes;
+    if (admin_notes !== undefined && req.user.role === 'admin') updates.admin_notes = admin_notes;
+    if (status === 'in_progress' && !mod.started_at) updates.started_at = new Date().toISOString();
+    if (status === 'completed') updates.completed_at = new Date().toISOString();
+
+    if (Object.keys(updates).length > 0) {
+      const keys = Object.keys(updates);
+      const fields = keys.map((k, i) => `${k}=$${i + 1}`).join(', ');
+      const vals = keys.map(k => updates[k]);
+      vals.push(req.params.moduleId);
+      // SQL already uses $N notation, pgify won't touch it
+      await db.run(
+        `UPDATE project_modules SET ${fields}, updated_at=NOW() WHERE id=$${vals.length}`,
+        vals
+      );
+    }
+
+    res.json({ success: true, message: 'Module updated' });
+  } catch (err) {
+    console.error('Update module error:', err);
+    res.status(500).json({ error: 'Internal server error' });
   }
-
-  const updates = {};
-  if (status) updates.status = status;
-  if (progress !== undefined) updates.progress = progress;
-  if (user_notes !== undefined) updates.user_notes = user_notes;
-  if (admin_notes !== undefined && req.user.role === 'admin') updates.admin_notes = admin_notes;
-  if (status === 'in_progress' && !mod.started_at) updates.started_at = new Date().toISOString();
-  if (status === 'completed') updates.completed_at = new Date().toISOString();
-
-  const fields = Object.keys(updates).map(k => `${k}=?`).join(', ');
-  const vals = Object.values(updates);
-  db.prepare(`UPDATE project_modules SET ${fields}, updated_at=CURRENT_TIMESTAMP WHERE id=?`).run(...vals, req.params.moduleId);
-
-  res.json({ success: true, message: 'Module updated' });
 });
 
 // ── Checklist item toggle ───────────────────────────────
-router.put('/:projectId/modules/:moduleId/checklist/:itemId', verifyToken, (req, res) => {
-  const { is_completed } = req.body;
-  const item = db.prepare('SELECT mc.* FROM module_checklist mc JOIN project_modules pm ON pm.id=mc.module_id JOIN projects p ON p.id=pm.project_id WHERE mc.id=?').get(req.params.itemId);
-  if (!item) return res.status(404).json({ error: 'Checklist item not found' });
+router.put('/:projectId/modules/:moduleId/checklist/:itemId', verifyToken, async (req, res) => {
+  try {
+    const { is_completed } = req.body;
+    const item = await db.get(
+      'SELECT mc.* FROM module_checklist mc JOIN project_modules pm ON pm.id=mc.module_id JOIN projects p ON p.id=pm.project_id WHERE mc.id=?',
+      [req.params.itemId]
+    );
+    if (!item) return res.status(404).json({ error: 'Checklist item not found' });
 
-  if (is_completed) {
-    db.prepare('UPDATE module_checklist SET is_completed=1, completed_by=?, completed_at=CURRENT_TIMESTAMP WHERE id=?').run(req.user.id, req.params.itemId);
-  } else {
-    db.prepare('UPDATE module_checklist SET is_completed=0, completed_by=NULL, completed_at=NULL WHERE id=?').run(req.params.itemId);
+    if (is_completed) {
+      await db.run(
+        'UPDATE module_checklist SET is_completed=1, completed_by=?, completed_at=NOW() WHERE id=?',
+        [req.user.id, req.params.itemId]
+      );
+    } else {
+      await db.run(
+        'UPDATE module_checklist SET is_completed=0, completed_by=NULL, completed_at=NULL WHERE id=?',
+        [req.params.itemId]
+      );
+    }
+
+    // Auto-update module progress
+    const allItems = await db.get('SELECT COUNT(*) as total FROM module_checklist WHERE module_id=?', [req.params.moduleId]);
+    const doneItems = await db.get('SELECT COUNT(*) as done FROM module_checklist WHERE module_id=? AND is_completed=1', [req.params.moduleId]);
+    const progressVal = allItems.total > 0 ? Math.round((doneItems.done / allItems.total) * 100) : 0;
+    await db.run('UPDATE project_modules SET progress=? WHERE id=?', [progressVal, req.params.moduleId]);
+
+    res.json({ success: true, progress: progressVal });
+  } catch (err) {
+    console.error('Toggle checklist error:', err);
+    res.status(500).json({ error: 'Internal server error' });
   }
-
-  // Auto-update module progress
-  const allItems = db.prepare('SELECT COUNT(*) as total FROM module_checklist WHERE module_id=?').get(req.params.moduleId);
-  const doneItems = db.prepare('SELECT COUNT(*) as done FROM module_checklist WHERE module_id=? AND is_completed=1').get(req.params.moduleId);
-  const progress = allItems.total > 0 ? Math.round((doneItems.done / allItems.total) * 100) : 0;
-  db.prepare('UPDATE project_modules SET progress=? WHERE id=?').run(progress, req.params.moduleId);
-
-  res.json({ success: true, progress });
 });
 
 // ── Submit report ───────────────────────────────────────
-router.post('/:projectId/modules/:moduleId/reports', verifyToken, (req, res) => {
-  const { report_text, work_done, issues_found, next_steps, hours_spent } = req.body;
-  const result = db.prepare(`
-    INSERT INTO module_reports (module_id, submitted_by, report_text, work_done, issues_found, next_steps, hours_spent)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(req.params.moduleId, req.user.id, report_text, work_done, issues_found, next_steps, hours_spent);
-
-  // Check if all checklist items done => auto-complete module
-  const allItems = db.prepare('SELECT COUNT(*) as total FROM module_checklist WHERE module_id=?').get(req.params.moduleId);
-  const doneItems = db.prepare('SELECT COUNT(*) as done FROM module_checklist WHERE module_id=? AND is_completed=1').get(req.params.moduleId);
-  if (allItems.total > 0 && allItems.total === doneItems.done) {
-    db.prepare("UPDATE project_modules SET status='completed', progress=100, completed_at=CURRENT_TIMESTAMP WHERE id=?").run(req.params.moduleId);
-  }
-
-  // Notify admin
-  const admins = db.prepare("SELECT id FROM users WHERE role='admin'").all();
-  const proj = db.prepare('SELECT project_name FROM projects WHERE id=?').get(req.params.projectId);
-  for (const admin of admins) {
-    db.prepare(`INSERT INTO notifications (user_id, title, message, type) VALUES (?, ?, ?, 'report')`).run(
-      admin.id,
-      `Report Submitted: ${proj?.project_name}`,
-      `${req.user.full_name} submitted a report for module #${req.params.moduleId}`
+router.post('/:projectId/modules/:moduleId/reports', verifyToken, async (req, res) => {
+  try {
+    const { report_text, work_done, issues_found, next_steps, hours_spent } = req.body;
+    const result = await db.run(
+      `INSERT INTO module_reports (module_id, submitted_by, report_text, work_done, issues_found, next_steps, hours_spent)
+      VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [req.params.moduleId, req.user.id, report_text, work_done, issues_found, next_steps, hours_spent]
     );
-  }
 
-  res.json({ success: true, id: result.lastInsertRowid });
+    // Check if all checklist items done => auto-complete module
+    const allItems = await db.get('SELECT COUNT(*) as total FROM module_checklist WHERE module_id=?', [req.params.moduleId]);
+    const doneItems = await db.get('SELECT COUNT(*) as done FROM module_checklist WHERE module_id=? AND is_completed=1', [req.params.moduleId]);
+    if (allItems.total > 0 && Number(allItems.total) === Number(doneItems.done)) {
+      await db.run(
+        "UPDATE project_modules SET status='completed', progress=100, completed_at=NOW() WHERE id=?",
+        [req.params.moduleId]
+      );
+    }
+
+    // Notify admin
+    const admins = await db.all("SELECT id FROM users WHERE role='admin'");
+    const proj = await db.get('SELECT project_name FROM projects WHERE id=?', [req.params.projectId]);
+    for (const admin of admins) {
+      await db.run(
+        "INSERT INTO notifications (user_id, title, message, type) VALUES (?, ?, ?, 'report')",
+        [admin.id, `Report Submitted: ${proj?.project_name}`,
+          `${req.user.full_name} submitted a report for module #${req.params.moduleId}`]
+      );
+    }
+
+    res.json({ success: true, id: result.lastInsertRowid });
+  } catch (err) {
+    console.error('Submit report error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 // ── Review report (admin) ───────────────────────────────
-router.put('/:projectId/modules/:moduleId/reports/:reportId', verifyToken, requireAdmin, (req, res) => {
-  const { review_status, review_notes } = req.body;
-  db.prepare(`
-    UPDATE module_reports SET review_status=?, review_notes=?, reviewed_by=?, reviewed_at=CURRENT_TIMESTAMP WHERE id=?
-  `).run(review_status, review_notes, req.user.id, req.params.reportId);
-  res.json({ success: true });
+router.put('/:projectId/modules/:moduleId/reports/:reportId', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    const { review_status, review_notes } = req.body;
+    await db.run(
+      'UPDATE module_reports SET review_status=?, review_notes=?, reviewed_by=?, reviewed_at=NOW() WHERE id=?',
+      [review_status, review_notes, req.user.id, req.params.reportId]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Review report error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 // ── Excel upload & parsing ──────────────────────────────
@@ -363,7 +431,6 @@ router.post('/excel-parse', verifyToken, upload.single('file'), (req, res) => {
 
     for (const row of data) {
       const keys = Object.keys(row);
-      // Try to detect device rows
       const modelKey = keys.find(k => /model|device|item|product/i.test(k));
       const qtyKey = keys.find(k => /qty|quantity|count|pcs/i.test(k));
       const descKey = keys.find(k => /desc|description|spec|detail/i.test(k));
@@ -378,15 +445,11 @@ router.post('/excel-parse', verifyToken, upload.single('file'), (req, res) => {
         });
       }
 
-      // Scope of work detection
       const scopeKey = keys.find(k => /scope|work|task|activity/i.test(k));
       if (scopeKey && row[scopeKey]) {
         scopeLines.push(String(row[scopeKey]).trim());
       }
     }
-
-    // Store file path for reference
-    const filePath = req.file.path;
 
     res.json({
       success: true,
@@ -394,7 +457,7 @@ router.post('/excel-parse', verifyToken, upload.single('file'), (req, res) => {
       scope_of_work: scopeLines.join('\n'),
       raw_rows: data.length,
       file_name: req.file.originalname,
-      file_path: filePath
+      file_path: req.file.path
     });
   } catch (err) {
     res.status(500).json({ error: 'Failed to parse Excel file: ' + err.message });
@@ -402,19 +465,37 @@ router.post('/excel-parse', verifyToken, upload.single('file'), (req, res) => {
 });
 
 // ── Notifications ───────────────────────────────────────
-router.get('/notifications/mine', verifyToken, (req, res) => {
-  const notes = db.prepare('SELECT * FROM notifications WHERE user_id=? ORDER BY created_at DESC LIMIT 50').all(req.user.id);
-  res.json(notes);
+router.get('/notifications/mine', verifyToken, async (req, res) => {
+  try {
+    const notes = await db.all(
+      'SELECT * FROM notifications WHERE user_id=? ORDER BY created_at DESC LIMIT 50',
+      [req.user.id]
+    );
+    res.json(notes);
+  } catch (err) {
+    console.error('Get notifications error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
-router.put('/notifications/:id/read', verifyToken, (req, res) => {
-  db.prepare('UPDATE notifications SET is_read=1 WHERE id=? AND user_id=?').run(req.params.id, req.user.id);
-  res.json({ success: true });
+router.put('/notifications/:id/read', verifyToken, async (req, res) => {
+  try {
+    await db.run('UPDATE notifications SET is_read=1 WHERE id=? AND user_id=?', [req.params.id, req.user.id]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Mark notification read error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
-router.put('/notifications/read-all', verifyToken, (req, res) => {
-  db.prepare('UPDATE notifications SET is_read=1 WHERE user_id=?').run(req.user.id);
-  res.json({ success: true });
+router.put('/notifications/read-all', verifyToken, async (req, res) => {
+  try {
+    await db.run('UPDATE notifications SET is_read=1 WHERE user_id=?', [req.user.id]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Mark all read error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 module.exports = router;
