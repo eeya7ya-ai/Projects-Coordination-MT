@@ -14,16 +14,27 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+// Health check — bypass db.ready so you can always diagnose DB status
+app.get('/api/health', async (req, res) => {
+  const hasConnStr = !!(process.env.POSTGRES_URL || process.env.POSTGRES_URL_NON_POOLING || process.env.DATABASE_URL);
+  try {
+    await db.ready;
+    res.json({ status: 'ok', db: 'connected', connectionStringSet: hasConnStr });
+  } catch (err) {
+    res.status(503).json({ status: 'error', db: err.message, connectionStringSet: hasConnStr });
+  }
+});
+
 // Wait for database initialization before handling API requests
 app.use('/api', async (req, res, next) => {
   try {
     await db.ready;
     next();
   } catch (err) {
-    console.error('Database not ready:', err);
+    console.error('Database not ready:', err.message);
     // Kick off a fresh reconnect so the next request will retry
     db.reconnect();
-    res.status(503).json({ error: 'Database initializing, please retry' });
+    res.status(503).json({ error: 'Database initializing, please retry', detail: err.message });
   }
 });
 
