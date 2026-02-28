@@ -7,121 +7,148 @@ const router = express.Router();
 router.use(verifyToken, requireAdmin);
 
 // ── Users ──────────────────────────────────────────────
-router.get('/users', (req, res) => {
-  const users = db.prepare(`
-    SELECT u.id, u.username, u.full_name, u.role, u.department, u.phone, u.email,
-           u.avatar_color, u.is_active, u.created_at, u.last_login,
-           (SELECT COUNT(*) FROM projects WHERE user_id_1 = u.id OR user_id_2 = u.id) AS total_projects,
-           (SELECT COUNT(*) FROM projects WHERE (user_id_1 = u.id OR user_id_2 = u.id) AND status='completed') AS completed_projects
-    FROM users u
-    WHERE u.role != 'admin' AND u.is_active = 1
-    ORDER BY u.created_at DESC
-  `).all();
-  res.json(users);
-});
-
-router.post('/users', (req, res) => {
-  const { username, password, full_name, department, phone, email, avatar_color } = req.body;
-  if (!username || !password || !full_name) {
-    return res.status(400).json({ error: 'Username, password, and full name are required' });
+router.get('/users', async (req, res) => {
+  try {
+    const users = await db.all(`
+      SELECT u.id, u.username, u.full_name, u.role, u.department, u.phone, u.email,
+             u.avatar_color, u.is_active, u.created_at, u.last_login,
+             (SELECT COUNT(*) FROM projects WHERE user_id_1 = u.id OR user_id_2 = u.id) AS total_projects,
+             (SELECT COUNT(*) FROM projects WHERE (user_id_1 = u.id OR user_id_2 = u.id) AND status='completed') AS completed_projects
+      FROM users u
+      WHERE u.role != 'admin' AND u.is_active = 1
+      ORDER BY u.created_at DESC
+    `);
+    res.json(users);
+  } catch (err) {
+    console.error('Get users error:', err);
+    res.status(500).json({ error: 'Internal server error' });
   }
-  const existing = db.prepare('SELECT id FROM users WHERE username = ?').get(username);
-  if (existing) return res.status(400).json({ error: 'Username already exists' });
-
-  const hashed = bcrypt.hashSync(password, 10);
-  const colors = ['#c0392b', '#e74c3c', '#8B0000', '#922B21', '#CB4335', '#A93226'];
-  const color = avatar_color || colors[Math.floor(Math.random() * colors.length)];
-
-  const result = db.prepare(`
-    INSERT INTO users (username, password, full_name, role, department, phone, email, avatar_color)
-    VALUES (?, ?, ?, 'user', ?, ?, ?, ?)
-  `).run(username, hashed, full_name, department, phone, email, color);
-
-  res.json({ success: true, id: result.lastInsertRowid, message: 'User created successfully' });
 });
 
-router.put('/users/:id', (req, res) => {
-  const { full_name, department, phone, email, avatar_color, is_active, password } = req.body;
-  const user = db.prepare('SELECT id FROM users WHERE id = ? AND role != ?').get(req.params.id, 'admin');
-  if (!user) return res.status(404).json({ error: 'User not found' });
+router.post('/users', async (req, res) => {
+  try {
+    const { username, password, full_name, department, phone, email, avatar_color } = req.body;
+    if (!username || !password || !full_name) {
+      return res.status(400).json({ error: 'Username, password, and full name are required' });
+    }
+    const existing = await db.get('SELECT id FROM users WHERE username = ?', [username]);
+    if (existing) return res.status(400).json({ error: 'Username already exists' });
 
-  if (password) {
     const hashed = bcrypt.hashSync(password, 10);
-    db.prepare('UPDATE users SET password = ? WHERE id = ?').run(hashed, req.params.id);
+    const colors = ['#c0392b', '#e74c3c', '#8B0000', '#922B21', '#CB4335', '#A93226'];
+    const color = avatar_color || colors[Math.floor(Math.random() * colors.length)];
+
+    const result = await db.run(
+      `INSERT INTO users (username, password, full_name, role, department, phone, email, avatar_color)
+       VALUES (?, ?, ?, 'user', ?, ?, ?, ?)`,
+      [username, hashed, full_name, department, phone, email, color]
+    );
+
+    res.json({ success: true, id: result.lastInsertRowid, message: 'User created successfully' });
+  } catch (err) {
+    console.error('Create user error:', err);
+    res.status(500).json({ error: 'Internal server error' });
   }
-
-  db.prepare(`
-    UPDATE users SET full_name=?, department=?, phone=?, email=?, avatar_color=?, is_active=?, updated_at=CURRENT_TIMESTAMP
-    WHERE id = ?
-  `).run(full_name, department, phone, email, avatar_color, is_active ?? 1, req.params.id);
-
-  res.json({ success: true, message: 'User updated successfully' });
 });
 
-router.delete('/users/:id', (req, res) => {
-  const user = db.prepare('SELECT id FROM users WHERE id = ? AND role != ?').get(req.params.id, 'admin');
-  if (!user) return res.status(404).json({ error: 'User not found' });
-  db.prepare('UPDATE users SET is_active = 0 WHERE id = ?').run(req.params.id);
-  res.json({ success: true, message: 'User deactivated' });
+router.put('/users/:id', async (req, res) => {
+  try {
+    const { full_name, department, phone, email, avatar_color, is_active, password } = req.body;
+    const user = await db.get('SELECT id FROM users WHERE id = ? AND role != ?', [req.params.id, 'admin']);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    if (password) {
+      const hashed = bcrypt.hashSync(password, 10);
+      await db.run('UPDATE users SET password = ? WHERE id = ?', [hashed, req.params.id]);
+    }
+
+    await db.run(
+      `UPDATE users SET full_name=?, department=?, phone=?, email=?, avatar_color=?, is_active=?
+       WHERE id = ?`,
+      [full_name, department, phone, email, avatar_color, is_active ?? 1, req.params.id]
+    );
+
+    res.json({ success: true, message: 'User updated successfully' });
+  } catch (err) {
+    console.error('Update user error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.delete('/users/:id', async (req, res) => {
+  try {
+    const user = await db.get('SELECT id FROM users WHERE id = ? AND role != ?', [req.params.id, 'admin']);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    await db.run('UPDATE users SET is_active = 0 WHERE id = ?', [req.params.id]);
+    res.json({ success: true, message: 'User deactivated' });
+  } catch (err) {
+    console.error('Delete user error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 // ── Analytics ──────────────────────────────────────────
-router.get('/analytics', (req, res) => {
-  const stats = {
-    total_projects: db.prepare("SELECT COUNT(*) as c FROM projects").get().c,
-    active_projects: db.prepare("SELECT COUNT(*) as c FROM projects WHERE status NOT IN ('completed','cancelled')").get().c,
-    completed_projects: db.prepare("SELECT COUNT(*) as c FROM projects WHERE status='completed'").get().c,
-    total_users: db.prepare("SELECT COUNT(*) as c FROM users WHERE role='user' AND is_active=1").get().c,
-    pending_reports: db.prepare("SELECT COUNT(*) as c FROM module_reports WHERE review_status='pending'").get().c,
-    total_modules: db.prepare("SELECT COUNT(*) as c FROM project_modules").get().c
-  };
+router.get('/analytics', async (req, res) => {
+  try {
+    const stats = {
+      total_projects: (await db.get("SELECT COUNT(*) as c FROM projects")).c,
+      active_projects: (await db.get("SELECT COUNT(*) as c FROM projects WHERE status NOT IN ('completed','cancelled')")).c,
+      completed_projects: (await db.get("SELECT COUNT(*) as c FROM projects WHERE status='completed'")).c,
+      total_users: (await db.get("SELECT COUNT(*) as c FROM users WHERE role='user' AND is_active=1")).c,
+      pending_reports: (await db.get("SELECT COUNT(*) as c FROM module_reports WHERE review_status='pending'")).c,
+      total_modules: (await db.get("SELECT COUNT(*) as c FROM project_modules")).c
+    };
 
-  const user_achievements = db.prepare(`
-    SELECT u.id, u.full_name, u.avatar_color, u.department,
-      COUNT(DISTINCT pm.id) AS total_modules,
-      SUM(CASE WHEN pm.status='completed' THEN 1 ELSE 0 END) AS completed_modules,
-      SUM(CASE WHEN pm.status='in_progress' THEN 1 ELSE 0 END) AS active_modules,
-      COUNT(DISTINCT mr.id) AS total_reports,
-      AVG(pm.progress) AS avg_progress
-    FROM users u
-    LEFT JOIN projects p ON p.user_id_1=u.id OR p.user_id_2=u.id
-    LEFT JOIN project_modules pm ON pm.project_id=p.id
-    LEFT JOIN module_reports mr ON mr.submitted_by=u.id
-    WHERE u.role='user' AND u.is_active=1
-    GROUP BY u.id
-    ORDER BY completed_modules DESC
-  `).all();
+    const user_achievements = await db.all(`
+      SELECT u.id, u.full_name, u.avatar_color, u.department,
+        COUNT(DISTINCT pm.id) AS total_modules,
+        SUM(CASE WHEN pm.status='completed' THEN 1 ELSE 0 END) AS completed_modules,
+        SUM(CASE WHEN pm.status='in_progress' THEN 1 ELSE 0 END) AS active_modules,
+        COUNT(DISTINCT mr.id) AS total_reports,
+        AVG(pm.progress) AS avg_progress
+      FROM users u
+      LEFT JOIN projects p ON p.user_id_1=u.id OR p.user_id_2=u.id
+      LEFT JOIN project_modules pm ON pm.project_id=p.id
+      LEFT JOIN module_reports mr ON mr.submitted_by=u.id
+      WHERE u.role='user' AND u.is_active=1
+      GROUP BY u.id, u.full_name, u.avatar_color, u.department
+      ORDER BY completed_modules DESC
+    `);
 
-  const module_breakdown = db.prepare(`
-    SELECT module_type,
-      COUNT(*) as total,
-      SUM(CASE WHEN status='completed' THEN 1 ELSE 0 END) as completed,
-      SUM(CASE WHEN status='in_progress' THEN 1 ELSE 0 END) as in_progress,
-      AVG(progress) as avg_progress
-    FROM project_modules
-    GROUP BY module_type
-  `).all();
+    const module_breakdown = await db.all(`
+      SELECT module_type,
+        COUNT(*) as total,
+        SUM(CASE WHEN status='completed' THEN 1 ELSE 0 END) as completed,
+        SUM(CASE WHEN status='in_progress' THEN 1 ELSE 0 END) as in_progress,
+        AVG(progress) as avg_progress
+      FROM project_modules
+      GROUP BY module_type
+    `);
 
-  const recent_projects = db.prepare(`
-    SELECT p.id, p.project_name, p.status, p.start_date, p.end_date, p.priority,
-      u1.full_name as user1_name, u2.full_name as user2_name,
-      p.client_name_1, p.created_at
-    FROM projects p
-    LEFT JOIN users u1 ON u1.id=p.user_id_1
-    LEFT JOIN users u2 ON u2.id=p.user_id_2
-    ORDER BY p.created_at DESC LIMIT 10
-  `).all();
+    const recent_projects = await db.all(`
+      SELECT p.id, p.project_name, p.status, p.start_date, p.end_date, p.priority,
+        u1.full_name as user1_name, u2.full_name as user2_name,
+        p.client_name_1, p.created_at
+      FROM projects p
+      LEFT JOIN users u1 ON u1.id=p.user_id_1
+      LEFT JOIN users u2 ON u2.id=p.user_id_2
+      ORDER BY p.created_at DESC LIMIT 10
+    `);
 
-  const project_timeline = db.prepare(`
-    SELECT strftime('%Y-%m', created_at) as month,
-      COUNT(*) as created,
-      SUM(CASE WHEN status='completed' THEN 1 ELSE 0 END) as completed
-    FROM projects
-    GROUP BY month
-    ORDER BY month DESC LIMIT 12
-  `).all();
+    const project_timeline = await db.all(`
+      SELECT TO_CHAR(created_at, 'YYYY-MM') as month,
+        COUNT(*) as created,
+        SUM(CASE WHEN status='completed' THEN 1 ELSE 0 END) as completed
+      FROM projects
+      GROUP BY TO_CHAR(created_at, 'YYYY-MM')
+      ORDER BY TO_CHAR(created_at, 'YYYY-MM') DESC LIMIT 12
+    `);
 
-  res.json({ stats, user_achievements, module_breakdown, recent_projects, project_timeline });
+    res.json({ stats, user_achievements, module_breakdown, recent_projects, project_timeline });
+  } catch (err) {
+    console.error('Analytics error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 module.exports = router;
