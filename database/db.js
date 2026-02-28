@@ -52,6 +52,17 @@ const db = {
     await pool.query(sql);
   },
 
+  // Re-run initialization and cache the new promise.
+  // Called by server.js when db.ready rejects, so the next request retries
+  // instead of staying permanently stuck at 503.
+  reinitialize() {
+    this.ready = initializeDB().catch(err => {
+      console.error('Database initialization failed:', err);
+      throw err;
+    });
+    return this.ready;
+  },
+
   async transaction(fn) {
     const client = await pool.connect();
     try {
@@ -89,6 +100,17 @@ const db = {
 
 // ── Schema & seeding ────────────────────────────────────
 async function initializeDB() {
+  // Fast path: if the schema already exists, skip all DDL and seeding.
+  // This keeps Vercel cold-starts cheap — one query instead of 8+ DDL round-trips.
+  const { rows } = await pool.query(
+    "SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'users' LIMIT 1"
+  );
+  if (rows.length > 0) {
+    console.log('Database ready.');
+    return;
+  }
+
+  console.log('Database first-time setup: creating schema…');
   await db.exec(`
     CREATE TABLE IF NOT EXISTS users (
       id SERIAL PRIMARY KEY,
@@ -340,10 +362,7 @@ async function seedDemoProjects(adminId, userId1, userId2) {
   console.log('Demo projects seeded: CCTV Installation (in_progress) | Fire Alarm (pending)');
 }
 
-// Initialize once and cache the promise
-db.ready = initializeDB().catch(err => {
-  console.error('Database initialization failed:', err);
-  throw err;
-});
+// Kick off initialization on module load and cache the promise.
+db.reinitialize();
 
 module.exports = db;
