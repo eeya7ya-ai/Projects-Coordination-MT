@@ -399,10 +399,11 @@ async function loadMyReports() {
   container.innerHTML = '<div class="text-center text-muted" style="padding:20px">Loading...</div>';
 
   const reportItems = [];
-  for (const p of myProjects) {
-    const res = await apiFetch(`/projects/${p.id}`);
-    if (!res?.ok) continue;
-    const pd = await res.json();
+  const details = await Promise.all(
+    myProjects.map(p => apiFetch(`/projects/${p.id}`).then(r => r?.ok ? r.json() : null))
+  );
+  for (const pd of details) {
+    if (!pd) continue;
     for (const m of pd.modules || []) {
       for (const r of m.reports || []) {
         if (r.submitted_by === currentUser.id || String(r.submitted_by) === String(currentUser.id)) {
