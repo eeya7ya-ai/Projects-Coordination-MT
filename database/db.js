@@ -340,10 +340,31 @@ async function seedDemoProjects(adminId, userId1, userId2) {
   console.log('Demo projects seeded: CCTV Installation (in_progress) | Fire Alarm (pending)');
 }
 
-// Initialize once and cache the promise
-db.ready = initializeDB().catch(err => {
-  console.error('Database initialization failed:', err);
-  throw err;
-});
+// Initialize with exponential backoff retry
+async function initializeWithRetry() {
+  const delays = [2000, 4000, 8000];
+  let lastErr;
+  for (let i = 0; i <= delays.length; i++) {
+    try {
+      await initializeDB();
+      return;
+    } catch (err) {
+      lastErr = err;
+      console.error(`Database init attempt ${i + 1}/${delays.length + 1} failed:`, err.message);
+      if (i < delays.length) {
+        await new Promise(r => setTimeout(r, delays[i]));
+      }
+    }
+  }
+  throw lastErr;
+}
+
+db.ready = initializeWithRetry();
+
+// Allow middleware to trigger a fresh reconnect attempt after failure
+db.reconnect = () => {
+  db.ready = initializeWithRetry();
+  return db.ready;
+};
 
 module.exports = db;

@@ -21,6 +21,8 @@ app.use('/api', async (req, res, next) => {
     next();
   } catch (err) {
     console.error('Database not ready:', err);
+    // Kick off a fresh reconnect so the next request will retry
+    db.reconnect();
     res.status(503).json({ error: 'Database initializing, please retry' });
   }
 });
