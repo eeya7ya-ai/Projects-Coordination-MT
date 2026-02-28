@@ -444,6 +444,79 @@
   </div>
 </div>
 
+<!-- ═══ EDIT PROJECT MODAL ═══ -->
+<div class="modal-overlay" id="edit-project-modal">
+  <div class="modal modal-xl">
+    <div class="modal-header">
+      <h2>Edit Project</h2>
+      <button class="modal-close" onclick="closeModal('edit-project-modal')">×</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="edit-proj-id">
+      <div class="form-grid">
+        <div class="form-group form-full">
+          <label>Project Name *</label>
+          <input type="text" id="ep-name" placeholder="Project name">
+        </div>
+        <div class="form-group">
+          <label>Client Name (Primary)</label>
+          <input type="text" id="ep-client1" placeholder="Primary client">
+        </div>
+        <div class="form-group">
+          <label>Client Name (Secondary)</label>
+          <input type="text" id="ep-client2" placeholder="Secondary client">
+        </div>
+        <div class="form-group">
+          <label>Client Contact</label>
+          <input type="text" id="ep-client-num" placeholder="Phone / reference">
+        </div>
+        <div class="form-group">
+          <label>Location Name</label>
+          <input type="text" id="ep-location-name" placeholder="Site / city name">
+        </div>
+        <div class="form-group">
+          <label>Assigned User 1</label>
+          <select id="ep-user1"></select>
+        </div>
+        <div class="form-group">
+          <label>Assigned User 2</label>
+          <select id="ep-user2"></select>
+        </div>
+        <div class="form-group">
+          <label>Start Date</label>
+          <input type="date" id="ep-start">
+        </div>
+        <div class="form-group">
+          <label>End Date (Est.)</label>
+          <input type="date" id="ep-end">
+        </div>
+        <div class="form-group">
+          <label>Status</label>
+          <select id="ep-status">
+            <option value="pending">Pending</option>
+            <option value="in_progress">In Progress</option>
+            <option value="completed">Completed</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Priority</label>
+          <select id="ep-priority">
+            <option value="normal">Normal</option>
+            <option value="high">High</option>
+            <option value="urgent">Urgent</option>
+          </select>
+        </div>
+      </div>
+      <div id="edit-proj-alert"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('edit-project-modal')">Cancel</button>
+      <button class="btn btn-danger" onclick="saveEditProject()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
 <!-- ═══ CHANGE PASSWORD MODAL ═══ -->
 <div class="modal-overlay" id="pw-modal">
   <div class="modal" style="max-width:400px">

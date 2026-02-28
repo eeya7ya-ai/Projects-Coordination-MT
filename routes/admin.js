@@ -54,7 +54,7 @@ router.put('/users/:id', (req, res) => {
   }
 
   db.prepare(`
-    UPDATE users SET full_name=?, department=?, phone=?, email=?, avatar_color=?, is_active=?, updated_at=CURRENT_TIMESTAMP
+    UPDATE users SET full_name=?, department=?, phone=?, email=?, avatar_color=?, is_active=?
     WHERE id = ?
   `).run(full_name, department, phone, email, avatar_color, is_active ?? 1, req.params.id);
 

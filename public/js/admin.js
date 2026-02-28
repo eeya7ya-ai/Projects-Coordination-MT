@@ -406,9 +406,62 @@ async function deleteProject(id, name) {
   if (res?.ok) { loadProjects(); loadDashboard(); }
 }
 
-function editProject(id) {
-  // Navigate to projects for now; could open edit modal
-  alert('Edit project functionality — open project detail to update status, or re-create the project.');
+async function editProject(id) {
+  const res = await apiFetch(`/projects/${id}`);
+  if (!res?.ok) { alert('Failed to load project data'); return; }
+  const p = await res.json();
+
+  document.getElementById('edit-proj-id').value = p.id;
+  document.getElementById('ep-name').value = p.project_name || '';
+  document.getElementById('ep-client1').value = p.client_name_1 || '';
+  document.getElementById('ep-client2').value = p.client_name_2 || '';
+  document.getElementById('ep-client-num').value = p.client_number || '';
+  document.getElementById('ep-location-name').value = p.location_name || '';
+  document.getElementById('ep-start').value = p.start_date || '';
+  document.getElementById('ep-end').value = p.end_date || '';
+  document.getElementById('ep-status').value = p.status || 'pending';
+  document.getElementById('ep-priority').value = p.priority || 'normal';
+  document.getElementById('edit-proj-alert').innerHTML = '';
+
+  const userOpts = '<option value="">— None —</option>' + allUsers.filter(u => u.is_active).map(u =>
+    `<option value="${u.id}">${u.full_name}</option>`).join('');
+  document.getElementById('ep-user1').innerHTML = userOpts;
+  document.getElementById('ep-user2').innerHTML = userOpts;
+  if (p.user_id_1) document.getElementById('ep-user1').value = p.user_id_1;
+  if (p.user_id_2) document.getElementById('ep-user2').value = p.user_id_2;
+
+  openModal('edit-project-modal');
+}
+
+async function saveEditProject() {
+  const id = document.getElementById('edit-proj-id').value;
+  const name = document.getElementById('ep-name').value.trim();
+  const alertEl = document.getElementById('edit-proj-alert');
+  if (!name) { alertEl.innerHTML = '<div class="alert alert-error">Project name is required</div>'; return; }
+
+  const payload = {
+    project_name: name,
+    client_name_1: document.getElementById('ep-client1').value.trim(),
+    client_name_2: document.getElementById('ep-client2').value.trim(),
+    client_number: document.getElementById('ep-client-num').value.trim(),
+    location_name: document.getElementById('ep-location-name').value.trim(),
+    user_id_1: document.getElementById('ep-user1').value || null,
+    user_id_2: document.getElementById('ep-user2').value || null,
+    start_date: document.getElementById('ep-start').value,
+    end_date: document.getElementById('ep-end').value,
+    status: document.getElementById('ep-status').value,
+    priority: document.getElementById('ep-priority').value
+  };
+
+  const res = await apiFetch(`/projects/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
+  const data = await res.json();
+  if (res.ok) {
+    closeModal('edit-project-modal');
+    loadProjects();
+    loadDashboard();
+  } else {
+    alertEl.innerHTML = `<div class="alert alert-error">${data.error || 'Failed to save'}</div>`;
+  }
 }
 
 // ── New Project Form ──────────────────────────────────
@@ -686,12 +739,14 @@ async function loadReports() {
   if (!res?.ok) return;
   const projects = await res.json();
   const container = document.getElementById('reports-list');
+  container.innerHTML = '<div class="text-center text-muted" style="padding:20px">Loading reports...</div>';
 
   const reportCards = [];
-  for (const p of projects) {
-    const pRes = await apiFetch(`/projects/${p.id}`);
-    if (!pRes?.ok) continue;
-    const pd = await pRes.json();
+  const details = await Promise.all(
+    projects.map(p => apiFetch(`/projects/${p.id}`).then(r => r?.ok ? r.json() : null))
+  );
+  for (const pd of details) {
+    if (!pd) continue;
     for (const m of pd.modules || []) {
       for (const r of m.reports || []) {
         reportCards.push({ ...r, project: pd, module: m });
