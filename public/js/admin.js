@@ -247,9 +247,16 @@ function renderProjects(projects) {
         </div>
       </div>
     `;
-  }).join('') || `<div style="grid-column:1/-1;text-align:center;padding:60px;color:var(--gray-400)">
-    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" style="margin-bottom:16px;opacity:0.4"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
-    <p>No projects yet. <button class="btn btn-danger btn-sm" onclick="navigate('new-project')">Create your first project</button></p>
+  }).join('') || `<div style="grid-column:1/-1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px 20px;text-align:center">
+    <div style="width:96px;height:96px;background:var(--gray-100);border-radius:24px;display:flex;align-items:center;justify-content:center;margin-bottom:24px">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--gray-400)" stroke-width="1.5"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+    </div>
+    <h3 style="font-size:20px;font-weight:700;color:var(--gray-700);margin-bottom:8px">No projects yet</h3>
+    <p style="font-size:14px;color:var(--gray-500);margin-bottom:24px;max-width:320px">Create your first project to start coordinating your ELV team's work.</p>
+    <button class="btn btn-danger" onclick="navigate('new-project')" style="padding:12px 28px;font-size:15px;font-weight:600;border-radius:12px;display:inline-flex;align-items:center;gap:8px">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+      Create First Project
+    </button>
   </div>`;
 }
 
@@ -344,9 +351,30 @@ function renderModuleCard(m, projectId) {
 
         ${m.devices?.length ? `
           <div style="margin-bottom:12px">
-            <span style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--gray-400);font-weight:700">Devices (${m.devices.length})</span>
-            <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:6px">
-              ${m.devices.map(d => `<span style="background:var(--gray-100);padding:4px 10px;border-radius:6px;font-size:12px;font-weight:600">${d.device_model} × ${d.device_qty}</span>`).join('')}
+            <span style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--gray-400);font-weight:700">Devices / Equipment (${m.devices.length})</span>
+            <div style="margin-top:8px;overflow-x:auto">
+              <table style="width:100%;border-collapse:collapse;font-size:12px">
+                <thead>
+                  <tr style="background:var(--gray-100);color:var(--gray-600)">
+                    <th style="text-align:left;padding:7px 10px;border-radius:6px 0 0 6px">#</th>
+                    <th style="text-align:left;padding:7px 10px">Model</th>
+                    <th style="text-align:center;padding:7px 10px">Qty</th>
+                    <th style="text-align:left;padding:7px 10px">Description</th>
+                    <th style="text-align:left;padding:7px 10px;border-radius:0 6px 6px 0">Serial #</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${m.devices.map((d, idx) => `
+                    <tr style="border-bottom:1px solid var(--gray-100)">
+                      <td style="padding:6px 10px;color:var(--gray-400)">${idx + 1}</td>
+                      <td style="padding:6px 10px;font-weight:600;color:var(--gray-800)">${d.device_model || '—'}</td>
+                      <td style="padding:6px 10px;text-align:center"><span style="background:var(--red-pale);color:var(--red-dark);padding:2px 8px;border-radius:12px;font-weight:700">${d.device_qty}</span></td>
+                      <td style="padding:6px 10px;color:var(--gray-600)">${d.device_description || '—'}</td>
+                      <td style="padding:6px 10px;color:var(--gray-500);font-family:monospace;font-size:11px">${d.serial_number || '—'}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
             </div>
           </div>
         ` : ''}
@@ -401,7 +429,7 @@ async function updateProjectStatus(projectId) {
     body: JSON.stringify({ status })
   });
   if (res?.ok) {
-    alert('Project status updated!');
+    showToast('Project status updated', 'success');
     closeModal('project-detail-modal');
     loadProjects();
     loadDashboard();
@@ -415,7 +443,7 @@ async function reviewReport(reportId, projectId, moduleId, status) {
     body: JSON.stringify({ review_status: status, review_notes: notes || '' })
   });
   if (res?.ok) {
-    alert(`Report ${status}!`);
+    showToast(`Report ${status}`, 'success');
     openProjectDetail(projectId);
     loadDashboard();
   }
@@ -427,9 +455,64 @@ async function deleteProject(id, name) {
   if (res?.ok) { loadProjects(); loadDashboard(); }
 }
 
-function editProject(id) {
-  // Navigate to projects for now; could open edit modal
-  alert('Edit project functionality — open project detail to update status, or re-create the project.');
+async function editProject(id) {
+  const p = allProjects.find(x => x.id === id);
+  if (!p) {
+    const res = await apiFetch(`/projects/${id}`);
+    if (!res?.ok) return;
+    Object.assign(p || {}, await res.json());
+  }
+
+  const proj = allProjects.find(x => x.id === id) || {};
+  document.getElementById('edit-proj-id').value = id;
+  document.getElementById('edit-proj-name').value = proj.project_name || '';
+  document.getElementById('edit-proj-client1').value = proj.client_name_1 || '';
+  document.getElementById('edit-proj-client2').value = proj.client_name_2 || '';
+  document.getElementById('edit-proj-clientnum').value = proj.client_number || '';
+  document.getElementById('edit-proj-location').value = proj.location_name || '';
+  document.getElementById('edit-proj-start').value = proj.start_date || '';
+  document.getElementById('edit-proj-end').value = proj.end_date || '';
+  document.getElementById('edit-proj-priority').value = proj.priority || 'normal';
+  document.getElementById('edit-proj-status').value = proj.status || 'pending';
+
+  const userOpts = '<option value="">— None —</option>' + allUsers.filter(u => u.is_active).map(u => `<option value="${u.id}">${u.full_name}</option>`).join('');
+  document.getElementById('edit-proj-user1').innerHTML = userOpts;
+  document.getElementById('edit-proj-user2').innerHTML = userOpts;
+  if (proj.user_id_1) document.getElementById('edit-proj-user1').value = proj.user_id_1;
+  if (proj.user_id_2) document.getElementById('edit-proj-user2').value = proj.user_id_2;
+
+  openModal('edit-project-modal');
+}
+
+async function saveEditProject() {
+  const id = document.getElementById('edit-proj-id').value;
+  const name = document.getElementById('edit-proj-name').value.trim();
+  if (!name) { showToast('Project name is required', 'error'); return; }
+
+  const payload = {
+    project_name: name,
+    client_name_1: document.getElementById('edit-proj-client1').value.trim(),
+    client_name_2: document.getElementById('edit-proj-client2').value.trim(),
+    client_number: document.getElementById('edit-proj-clientnum').value.trim(),
+    location_name: document.getElementById('edit-proj-location').value.trim(),
+    user_id_1: document.getElementById('edit-proj-user1').value || null,
+    user_id_2: document.getElementById('edit-proj-user2').value || null,
+    start_date: document.getElementById('edit-proj-start').value,
+    end_date: document.getElementById('edit-proj-end').value,
+    priority: document.getElementById('edit-proj-priority').value,
+    status: document.getElementById('edit-proj-status').value
+  };
+
+  const res = await apiFetch(`/projects/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
+  if (res?.ok) {
+    closeModal('edit-project-modal');
+    showToast('Project updated successfully', 'success');
+    await loadProjects();
+    loadDashboard();
+  } else {
+    const data = await res.json();
+    showToast('Error: ' + (data.error || 'Failed to update'), 'error');
+  }
 }
 
 // ── New Project Form ──────────────────────────────────
@@ -529,8 +612,8 @@ function importExcelToModule(slug) {
 
 async function submitProject() {
   const name = document.getElementById('p-name').value.trim();
-  if (!name) { alert('Project name is required'); return; }
-  if (selectedModules.size === 0) { alert('Please select at least one module'); return; }
+  if (!name) { showToast('Project name is required', 'error'); return; }
+  if (selectedModules.size === 0) { showToast('Please select at least one module', 'error'); return; }
 
   const modules = [];
   for (const mod of selectedModules) {
@@ -567,13 +650,13 @@ async function submitProject() {
   const res = await apiFetch('/projects', { method: 'POST', body: JSON.stringify(payload) });
   const data = await res.json();
   if (res.ok) {
-    alert(`Project "${name}" created successfully!`);
+    showToast(`Project "${name}" created successfully`, 'success');
     resetProjectForm();
     await loadProjects();
     navigate('projects');
     loadDashboard();
   } else {
-    alert('Error: ' + data.error);
+    showToast('Error: ' + data.error, 'error');
   }
 }
 
@@ -680,8 +763,8 @@ async function saveUser() {
     is_active: document.getElementById('u-active')?.value ?? 1
   };
 
-  if (!payload.full_name || !payload.username) { alert('Full name and username are required'); return; }
-  if (!userId && !payload.password) { alert('Password is required for new users'); return; }
+  if (!payload.full_name || !payload.username) { showToast('Full name and username are required', 'error'); return; }
+  if (!userId && !payload.password) { showToast('Password is required for new users', 'error'); return; }
 
   const url = userId ? `/admin/users/${userId}` : '/admin/users';
   const method = userId ? 'PUT' : 'POST';
@@ -692,9 +775,9 @@ async function saveUser() {
     closeModal('user-modal');
     await loadUsers();
     loadUsersTable();
-    alert(data.message);
+    showToast(data.message, 'success');
   } else {
-    alert('Error: ' + data.error);
+    showToast('Error: ' + data.error, 'error');
   }
 }
 
@@ -711,11 +794,14 @@ async function loadReports() {
   const projects = await res.json();
   const container = document.getElementById('reports-list');
 
+  // Fetch all project details in parallel (instead of sequential N+1 calls)
+  const details = await Promise.all(
+    projects.map(p => apiFetch(`/projects/${p.id}`).then(r => r?.ok ? r.json() : null))
+  );
+
   const reportCards = [];
-  for (const p of projects) {
-    const pRes = await apiFetch(`/projects/${p.id}`);
-    if (!pRes?.ok) continue;
-    const pd = await pRes.json();
+  for (const pd of details) {
+    if (!pd) continue;
     for (const m of pd.modules || []) {
       for (const r of m.reports || []) {
         reportCards.push({ ...r, project: pd, module: m });
@@ -821,26 +907,49 @@ async function searchMapLocation() {
   btn.textContent = '...';
   btn.disabled = true;
   try {
-    // Search restricted to Jordan with street-level detail
-    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&countrycodes=jo&format=json&limit=6&addressdetails=1&viewbox=34.8,33.5,39.4,29.0&bounded=1`;
-    const res = await fetch(url, { headers: { 'Accept-Language': 'en', 'User-Agent': 'ELVCoordinator/1.0' } });
-    const results = await res.json();
+    // First try: country-restricted search with viewbox preference (not bounded)
+    const base = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&namedetails=1&limit=10`;
+    const joParams = `&countrycodes=jo&viewbox=34.8,29.0,39.4,33.5`;
+    const url1 = `${base}${joParams}&q=${encodeURIComponent(query)}`;
+    const headers = { 'Accept-Language': 'en,ar', 'User-Agent': 'ELVCoordinator/1.0' };
+
+    let res = await fetch(url1, { headers });
+    let results = await res.json();
+
+    // Fallback: try without viewbox restriction (catches more remote/small areas)
+    if (!results.length) {
+      const url2 = `${base}&countrycodes=jo&q=${encodeURIComponent(query + ' Jordan')}`;
+      res = await fetch(url2, { headers });
+      results = await res.json();
+    }
+
+    // Second fallback: free-text search including Jordan keyword
+    if (!results.length) {
+      const url3 = `${base}&q=${encodeURIComponent(query + ', Jordan')}`;
+      res = await fetch(url3, { headers });
+      const all = await res.json();
+      // Filter to only Jordanian results by checking address.country_code
+      results = all.filter(r => (r.address?.country_code || '').toLowerCase() === 'jo');
+    }
+
     const listEl = document.getElementById('map-search-results');
     if (!results.length) {
-      listEl.innerHTML = '<div style="padding:10px 14px;color:var(--gray-400);font-size:13px">No results found in Jordan. Try a different street or area name.</div>';
+      listEl.innerHTML = '<div style="padding:10px 14px;color:var(--gray-400);font-size:13px">No results found in Jordan. Try a district, city, or landmark name.</div>';
       listEl.style.display = 'block';
     } else {
-      // Store results for click handler (avoid inline quote issues)
       window._mapSearchResults = results;
       listEl.innerHTML = results.map((r, i) => {
         const addr = r.address || {};
-        const street = addr.road || addr.neighbourhood || '';
-        const area = addr.city || addr.town || addr.village || addr.state || '';
-        const label = street ? `${street}, ${area}` : r.display_name.split(',').slice(0, 3).join(',').trim();
+        const street = addr.road || addr.pedestrian || addr.path || addr.footway || addr.neighbourhood || '';
+        const district = addr.suburb || addr.quarter || addr.neighbourhood || '';
+        const area = addr.city || addr.town || addr.village || addr.county || addr.state_district || addr.state || '';
+        const parts = [street, district !== street ? district : '', area].filter(Boolean);
+        const label = parts.length ? parts.join(', ') : r.display_name.split(',').slice(0, 3).join(',').trim();
+        const sublabel = r.display_name.length > label.length + 5 ? r.display_name : '';
         return `
-          <div class="map-search-result-item" onclick="selectMapResultByIndex(${i})" style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--gray-100);font-size:13px;transition:background 0.15s">
+          <div class="map-search-result-item" onclick="selectMapResultByIndex(${i})" style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--gray-100);font-size:13px;transition:background 0.15s" onmouseover="this.style.background='var(--gray-50)'" onmouseout="this.style.background=''">
             <strong>${label}</strong>
-            <div style="font-size:11px;color:var(--gray-400);margin-top:2px">${r.display_name}</div>
+            ${sublabel ? `<div style="font-size:11px;color:var(--gray-400);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${sublabel}</div>` : ''}
           </div>
         `;
       }).join('');
@@ -864,15 +973,16 @@ function selectMapResult(lat, lng, displayName, address) {
   lat = parseFloat(lat); lng = parseFloat(lng);
   if (marker) marker.remove();
   marker = L.marker([lat, lng], { icon: redIcon }).addTo(map);
-  map.setView([lat, lng], 17); // Street-level zoom
+  map.setView([lat, lng], 17);
   document.getElementById('p-lat').value = lat.toFixed(6);
   document.getElementById('p-lng').value = lng.toFixed(6);
 
-  // Build a clean location name from address parts
   const addr = address || {};
-  const street = addr.road || addr.neighbourhood || addr.suburb || '';
-  const area = addr.city || addr.town || addr.village || addr.state || '';
-  const locationName = [street, area].filter(Boolean).join(', ') || displayName.split(',').slice(0, 2).join(',').trim();
+  const street = addr.road || addr.pedestrian || addr.path || addr.footway || addr.neighbourhood || addr.suburb || '';
+  const district = addr.suburb || addr.quarter || '';
+  const area = addr.city || addr.town || addr.village || addr.county || addr.state_district || addr.state || '';
+  const parts = [street, district !== street ? district : '', area].filter(Boolean);
+  const locationName = parts.length ? parts.join(', ') : displayName.split(',').slice(0, 2).join(',').trim();
 
   document.getElementById('p-location-name').value = locationName;
   document.getElementById('map-coords').textContent = `Pinned: ${locationName}`;
@@ -897,13 +1007,32 @@ async function handleExcelUpload(input) {
   if (res.ok) {
     excelData = data;
     document.getElementById('excel-result').classList.remove('hidden');
-    document.getElementById('excel-msg').textContent = `✓ Parsed ${data.raw_rows} rows — Found ${data.devices.length} devices`;
-    document.getElementById('excel-devices-preview').innerHTML = data.devices.slice(0,5).map(d =>
-      `<div style="background:var(--gray-50);padding:6px 10px;border-radius:6px;font-size:12px;margin-top:4px"><strong>${d.model}</strong> × ${d.qty} — ${d.description}</div>`
-    ).join('');
-    renderModuleDetails(); // refresh to show import button
+    const colInfo = data.columns_detected
+      ? `(Columns: model="${data.columns_detected.model || '?'}", qty="${data.columns_detected.qty || '?'}")`
+      : '';
+    document.getElementById('excel-msg').textContent = `✓ Parsed ${data.raw_rows} rows — Found ${data.devices.length} device(s) ${colInfo}`;
+    document.getElementById('excel-devices-preview').innerHTML = data.devices.length
+      ? `<table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:8px">
+          <thead><tr style="background:var(--gray-100)">
+            <th style="text-align:left;padding:6px 8px;border-radius:4px 0 0 4px">Model</th>
+            <th style="text-align:center;padding:6px 8px">Qty</th>
+            <th style="text-align:left;padding:6px 8px">Description</th>
+            <th style="text-align:left;padding:6px 8px;border-radius:0 4px 4px 0">Serial</th>
+          </tr></thead>
+          <tbody>${data.devices.slice(0,8).map(d => `
+            <tr style="border-bottom:1px solid var(--gray-100)">
+              <td style="padding:5px 8px;font-weight:600">${d.model}</td>
+              <td style="padding:5px 8px;text-align:center">${d.qty}</td>
+              <td style="padding:5px 8px;color:var(--gray-600)">${d.description || '—'}</td>
+              <td style="padding:5px 8px;color:var(--gray-600)">${d.serial || '—'}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+        ${data.devices.length > 8 ? `<div style="font-size:11px;color:var(--gray-400);margin-top:4px">...and ${data.devices.length - 8} more</div>` : ''}`
+      : '<div style="color:var(--gray-400);font-size:12px;margin-top:6px">No devices detected. Check that your sheet has columns named "Model", "Qty", or "Description".</div>';
+    renderModuleDetails();
   } else {
-    alert('Failed to parse file: ' + data.error);
+    showToast('Failed to parse file: ' + data.error, 'error');
   }
 }
 
@@ -971,6 +1100,20 @@ async function changePassword() {
 // ── Helpers ───────────────────────────────────────────
 function openModal(id) { document.getElementById(id).classList.add('open'); }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+function showToast(message, type = 'info', duration = 3500) {
+  const container = document.getElementById('toast-container');
+  if (!container) return;
+  const icons = { success: '✓', error: '✕', info: 'ℹ', warning: '⚠' };
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${type}`;
+  toast.innerHTML = `<span style="font-size:16px;flex-shrink:0">${icons[type] || 'ℹ'}</span><span>${message}</span>`;
+  container.appendChild(toast);
+  setTimeout(() => {
+    toast.classList.add('toast-out');
+    setTimeout(() => toast.remove(), 320);
+  }, duration);
+}
 
 function statusBadge(status) {
   const map = { pending: 'pending', in_progress: 'progress', completed: 'completed', cancelled: 'cancelled' };

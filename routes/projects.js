@@ -424,30 +424,78 @@ router.post('/excel-parse', verifyToken, upload.single('file'), (req, res) => {
     const workbook = xlsx.readFile(req.file.path);
     const sheetName = workbook.SheetNames[0];
     const sheet = workbook.Sheets[sheetName];
-    const data = xlsx.utils.sheet_to_json(sheet, { defval: '' });
+
+    // Get raw rows (array of arrays) so we can find the real header row
+    const rawRows = xlsx.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+
+    // Helper: test if a cell value looks like a header keyword
+    const MODEL_RE   = /model|device|item|product|equipment|part|unit|name|description/i;
+    const QTY_RE     = /qty|quantity|count|pcs|pieces|no\.|number|amount/i;
+    const DESC_RE    = /desc|description|spec|detail|remark|note|type/i;
+    const SN_RE      = /serial|sn|s\/n|barcode/i;
+    const SCOPE_RE   = /scope|work|task|activity|service/i;
+
+    // Find the first row that looks like a header (has at least a model-ish column)
+    let headerRowIdx = 0;
+    for (let i = 0; i < Math.min(10, rawRows.length); i++) {
+      const row = rawRows[i].map(c => String(c));
+      if (row.some(c => MODEL_RE.test(c)) || row.some(c => QTY_RE.test(c))) {
+        headerRowIdx = i;
+        break;
+      }
+    }
+
+    const headers = rawRows[headerRowIdx].map(c => String(c));
+
+    // Map column indices
+    const modelIdx = headers.findIndex(h => MODEL_RE.test(h));
+    const qtyIdx   = headers.findIndex(h => QTY_RE.test(h));
+    const descIdx  = headers.findIndex(h => DESC_RE.test(h) && !MODEL_RE.test(h));
+    const snIdx    = headers.findIndex(h => SN_RE.test(h));
+    const scopeIdx = headers.findIndex(h => SCOPE_RE.test(h));
 
     const devices = [];
     const scopeLines = [];
 
-    for (const row of data) {
-      const keys = Object.keys(row);
-      const modelKey = keys.find(k => /model|device|item|product/i.test(k));
-      const qtyKey = keys.find(k => /qty|quantity|count|pcs/i.test(k));
-      const descKey = keys.find(k => /desc|description|spec|detail/i.test(k));
-      const snKey = keys.find(k => /serial|sn|s\/n/i.test(k));
+    const dataRows = rawRows.slice(headerRowIdx + 1);
+    for (const row of dataRows) {
+      // Skip totally empty rows
+      if (row.every(c => c === '' || c == null)) continue;
 
-      if (modelKey && row[modelKey]) {
-        devices.push({
-          model: String(row[modelKey]).trim(),
-          qty: qtyKey ? Number(row[qtyKey]) || 1 : 1,
-          description: descKey ? String(row[descKey]).trim() : '',
-          serial: snKey ? String(row[snKey]).trim() : ''
-        });
+      const modelVal = modelIdx >= 0 ? String(row[modelIdx] ?? '').trim() : '';
+      if (modelVal && modelVal !== 'undefined') {
+        const qtyRaw = qtyIdx >= 0 ? row[qtyIdx] : '';
+        const qty = Number(qtyRaw) || 1;
+        const desc = descIdx >= 0 ? String(row[descIdx] ?? '').trim() : '';
+        const serial = snIdx >= 0 ? String(row[snIdx] ?? '').trim() : '';
+        devices.push({ model: modelVal, qty, description: desc, serial });
       }
 
-      const scopeKey = keys.find(k => /scope|work|task|activity/i.test(k));
-      if (scopeKey && row[scopeKey]) {
-        scopeLines.push(String(row[scopeKey]).trim());
+      if (scopeIdx >= 0) {
+        const scopeVal = String(row[scopeIdx] ?? '').trim();
+        if (scopeVal && scopeVal !== 'undefined') scopeLines.push(scopeVal);
+      }
+    }
+
+    // Fallback: if column-header strategy found nothing, use key-value JSON parse
+    if (!devices.length) {
+      const jsonRows = xlsx.utils.sheet_to_json(sheet, { defval: '' });
+      for (const row of jsonRows) {
+        const keys = Object.keys(row);
+        const modelKey = keys.find(k => MODEL_RE.test(k));
+        const qtyKey   = keys.find(k => QTY_RE.test(k));
+        const descKey  = keys.find(k => DESC_RE.test(k));
+        const snKey    = keys.find(k => SN_RE.test(k));
+        if (modelKey && row[modelKey]) {
+          devices.push({
+            model: String(row[modelKey]).trim(),
+            qty: qtyKey ? Number(row[qtyKey]) || 1 : 1,
+            description: descKey ? String(row[descKey]).trim() : '',
+            serial: snKey ? String(row[snKey]).trim() : ''
+          });
+        }
+        const scopeKey = keys.find(k => SCOPE_RE.test(k));
+        if (scopeKey && row[scopeKey]) scopeLines.push(String(row[scopeKey]).trim());
       }
     }
 
@@ -455,12 +503,35 @@ router.post('/excel-parse', verifyToken, upload.single('file'), (req, res) => {
       success: true,
       devices,
       scope_of_work: scopeLines.join('\n'),
-      raw_rows: data.length,
+      raw_rows: rawRows.length,
+      header_row: headerRowIdx,
+      columns_detected: { model: headers[modelIdx] || null, qty: headers[qtyIdx] || null, desc: headers[descIdx] || null, serial: headers[snIdx] || null },
       file_name: req.file.originalname,
       file_path: req.file.path
     });
   } catch (err) {
     res.status(500).json({ error: 'Failed to parse Excel file: ' + err.message });
+  }
+});
+
+// ── All reports (admin, single query) ──────────────────
+router.get('/reports/all', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    const reports = await db.all(`
+      SELECT mr.*,
+             u.full_name as submitted_by_name,
+             pm.module_type,
+             p.id as project_id, p.project_name
+      FROM module_reports mr
+      JOIN users u ON u.id = mr.submitted_by
+      JOIN project_modules pm ON pm.id = mr.module_id
+      JOIN projects p ON p.id = pm.project_id
+      ORDER BY mr.submitted_at DESC
+    `);
+    res.json(reports);
+  } catch (err) {
+    console.error('All reports error:', err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
