@@ -93,7 +93,7 @@ function closeSidebar() {
 // ── Navigation ────────────────────────────────────────
 function navigate(page) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.querySelectorAll('.nav-item, .mobile-nav-tab').forEach(n => n.classList.remove('active'));
   document.getElementById(`page-${page}`).classList.add('active');
   // Activate all matching nav items (sidebar + mobile bottom nav)
   document.querySelectorAll(`[data-page="${page}"]`).forEach(n => n.classList.add('active'));
