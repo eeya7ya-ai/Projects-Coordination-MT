@@ -106,7 +106,10 @@ router.get('/', verifyToken, async (req, res) => {
 
 // ── Daily Summary ────────────────────────────────────────
 // MUST be declared before /:id to prevent Express from matching "daily-summary" as an id param
-router.get('/daily-summary', verifyToken, requireAdmin, async (req, res) => {
+router.get('/daily-summary', verifyToken, async (req, res) => {
+  if (req.user.role !== 'admin' && req.user.role !== 'planner') {
+    return res.status(403).json({ error: 'Access denied' });
+  }
   try {
     const date = req.query.date || new Date().toISOString().slice(0, 10);
 
@@ -134,12 +137,50 @@ router.get('/daily-summary', verifyToken, requireAdmin, async (req, res) => {
           `SELECT device_model, device_qty, device_description FROM module_devices WHERE module_id = ? ORDER BY id`,
           [mod.id]
         );
+        // Include preparation status for the current user
+        const prep = await db.get(
+          'SELECT id FROM module_preparations WHERE module_id = ? AND prepared_date = ? AND prepared_by = ?',
+          [mod.id, date, req.user.id]
+        );
+        mod.is_prepared = !!prep;
       }
     }
 
     res.json({ date, projects });
   } catch (err) {
     console.error('Daily summary error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ── Toggle module preparation (planner/admin) ─────────────
+// Must be declared before /:id routes to avoid conflicts
+router.put('/modules/:moduleId/prepare', verifyToken, async (req, res) => {
+  if (req.user.role !== 'admin' && req.user.role !== 'planner') {
+    return res.status(403).json({ error: 'Access denied' });
+  }
+  try {
+    const { prepared_date, is_prepared } = req.body;
+    const date = prepared_date || new Date().toISOString().slice(0, 10);
+    const moduleId = req.params.moduleId;
+
+    if (is_prepared) {
+      await db.run(
+        `INSERT INTO module_preparations (module_id, prepared_date, prepared_by)
+         VALUES (?, ?, ?)
+         ON CONFLICT (module_id, prepared_date, prepared_by) DO NOTHING`,
+        [moduleId, date, req.user.id]
+      );
+    } else {
+      await db.run(
+        'DELETE FROM module_preparations WHERE module_id = ? AND prepared_date = ? AND prepared_by = ?',
+        [moduleId, date, req.user.id]
+      );
+    }
+
+    res.json({ success: true, is_prepared: !!is_prepared });
+  } catch (err) {
+    console.error('Toggle preparation error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

@@ -726,6 +726,7 @@ async function loadUsersTable() {
         <td><code style="background:var(--gray-100);padding:3px 8px;border-radius:5px;font-size:13px">${u.username}</code></td>
         <td>${u.department || '—'}</td>
         <td>${u.phone || '—'}</td>
+        <td><span class="badge badge-${u.role === 'planner' ? 'info' : 'pending'}" style="${u.role === 'planner' ? 'background:var(--info);color:#fff' : ''}">${u.role === 'planner' ? 'Planner' : 'Technician'}</span></td>
         <td><span class="badge badge-${u.total_projects > 0 ? 'progress' : 'pending'}">${u.total_projects || 0} projects</span></td>
         <td>${u.is_active ? '<span class="badge badge-completed">Active</span>' : '<span class="badge badge-cancelled">Inactive</span>'}</td>
         <td style="font-size:12px;color:var(--gray-400)">${u.last_login ? formatDate(u.last_login) : 'Never'}</td>
@@ -737,13 +738,14 @@ async function loadUsersTable() {
         </td>
       </tr>
     `;
-  }).join('') || '<tr><td colspan="8" class="text-center text-muted">No users yet</td></tr>';
+  }).join('') || '<tr><td colspan="9" class="text-center text-muted">No users yet</td></tr>';
 }
 
 function populateUserDropdowns() {
-  const opts = '<option value="">— Select User —</option>' + allUsers.filter(u => u.is_active).map(u => `<option value="${u.id}">${u.full_name}</option>`).join('');
+  const fieldUsers = allUsers.filter(u => u.is_active && u.role !== 'planner');
+  const opts = '<option value="">— Select User —</option>' + fieldUsers.map(u => `<option value="${u.id}">${u.full_name}</option>`).join('');
   document.getElementById('p-user1').innerHTML = opts;
-  document.getElementById('p-user2').innerHTML = '<option value="">— Optional —</option>' + allUsers.filter(u => u.is_active).map(u => `<option value="${u.id}">${u.full_name}</option>`).join('');
+  document.getElementById('p-user2').innerHTML = '<option value="">— Optional —</option>' + fieldUsers.map(u => `<option value="${u.id}">${u.full_name}</option>`).join('');
 }
 
 function openUserModal(userId) {
@@ -751,6 +753,7 @@ function openUserModal(userId) {
   document.getElementById('edit-user-id').value = userId || '';
   ['u-fullname','u-username','u-password','u-dept','u-phone','u-email'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('u-color').value = '#C0392B';
+  document.getElementById('u-role').value = 'user';
   document.getElementById('u-active-group').style.display = userId ? '' : 'none';
 
   if (userId) {
@@ -762,6 +765,7 @@ function openUserModal(userId) {
       document.getElementById('u-phone').value = user.phone || '';
       document.getElementById('u-email').value = user.email || '';
       document.getElementById('u-color').value = user.avatar_color || '#C0392B';
+      document.getElementById('u-role').value = user.role || 'user';
       document.getElementById('u-active').value = user.is_active ? '1' : '0';
       document.getElementById('u-password').placeholder = 'Leave blank to keep current';
     }
@@ -775,6 +779,7 @@ async function saveUser() {
     full_name: document.getElementById('u-fullname').value.trim(),
     username: document.getElementById('u-username').value.trim(),
     password: document.getElementById('u-password').value,
+    role: document.getElementById('u-role').value,
     department: document.getElementById('u-dept').value.trim(),
     phone: document.getElementById('u-phone').value.trim(),
     email: document.getElementById('u-email').value.trim(),

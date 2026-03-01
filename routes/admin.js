@@ -46,12 +46,15 @@ router.get('/users', async (req, res) => {
 
 router.post('/users', async (req, res) => {
   try {
-    const { username, password, full_name, department, phone, email, avatar_color } = req.body;
+    const { username, password, full_name, role, department, phone, email, avatar_color } = req.body;
     if (!username || !password || !full_name) {
       return res.status(400).json({ error: 'Username, password, and full name are required' });
     }
     const existing = await db.get('SELECT id FROM users WHERE username = ?', [username]);
     if (existing) return res.status(400).json({ error: 'Username already exists' });
+
+    const allowedRoles = ['user', 'planner'];
+    const assignedRole = allowedRoles.includes(role) ? role : 'user';
 
     const hashed = bcrypt.hashSync(password, 10);
     const colors = ['#c0392b', '#e74c3c', '#8B0000', '#922B21', '#CB4335', '#A93226'];
@@ -59,8 +62,8 @@ router.post('/users', async (req, res) => {
 
     const result = await db.run(
       `INSERT INTO users (username, password, full_name, role, department, phone, email, avatar_color)
-       VALUES (?, ?, ?, 'user', ?, ?, ?, ?)`,
-      [username, hashed, full_name, department, phone, email, color]
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [username, hashed, full_name, assignedRole, department, phone, email, color]
     );
 
     res.json({ success: true, id: result.lastInsertRowid, message: 'User created successfully' });
@@ -72,7 +75,7 @@ router.post('/users', async (req, res) => {
 
 router.put('/users/:id', async (req, res) => {
   try {
-    const { full_name, department, phone, email, avatar_color, is_active, password } = req.body;
+    const { full_name, role, department, phone, email, avatar_color, is_active, password } = req.body;
     const user = await db.get('SELECT id FROM users WHERE id = ? AND role != ?', [req.params.id, 'admin']);
     if (!user) return res.status(404).json({ error: 'User not found' });
 
@@ -81,10 +84,18 @@ router.put('/users/:id', async (req, res) => {
       await db.run('UPDATE users SET password = ? WHERE id = ?', [hashed, req.params.id]);
     }
 
+    const allowedRoles = ['user', 'planner'];
+    const assignedRole = role && allowedRoles.includes(role) ? role : undefined;
+
+    const roleClause = assignedRole ? ', role=?' : '';
+    const vals = [full_name, department, phone, email, avatar_color, is_active ?? 1];
+    if (assignedRole) vals.push(assignedRole);
+    vals.push(req.params.id);
+
     await db.run(
-      `UPDATE users SET full_name=?, department=?, phone=?, email=?, avatar_color=?, is_active=?
+      `UPDATE users SET full_name=?, department=?, phone=?, email=?, avatar_color=?, is_active=?${roleClause}
        WHERE id = ?`,
-      [full_name, department, phone, email, avatar_color, is_active ?? 1, req.params.id]
+      vals
     );
 
     res.json({ success: true, message: 'User updated successfully' });

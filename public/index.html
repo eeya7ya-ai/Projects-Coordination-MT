@@ -104,6 +104,8 @@ form.addEventListener('submit', async (e) => {
     setTimeout(() => {
       if (data.user.role === 'admin') {
         window.location.href = '/admin';
+      } else if (data.user.role === 'planner') {
+        window.location.href = '/planner';
       } else {
         window.location.href = '/dashboard';
       }
