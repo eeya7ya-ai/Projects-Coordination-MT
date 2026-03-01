@@ -1208,3 +1208,36 @@ tbody tr:last-child td { border-bottom: none; }
   from { opacity: 1; transform: translateX(0); }
   to   { opacity: 0; transform: translateX(60px); }
 }
+
+/* eSpark Brand Footer */
+.espark-footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(255,255,255,0.92);
+  border-top: 1px solid var(--gray-200);
+  padding: 5px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  z-index: 999;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.espark-footer img {
+  height: 22px;
+  width: auto;
+  object-fit: contain;
+  border-radius: 3px;
+}
+.espark-footer span {
+  font-size: 11px;
+  color: var(--gray-500);
+  font-family: 'Inter', sans-serif;
+  letter-spacing: 0.02em;
+}
+/* Add bottom padding to main content so footer doesn't overlap */
+.main-content { padding-bottom: 44px !important; }
+.login-page   { padding-bottom: 44px; }
