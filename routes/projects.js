@@ -104,6 +104,41 @@ router.get('/', verifyToken, async (req, res) => {
   }
 });
 
+// ── Daily Summary ────────────────────────────────────────
+router.get('/daily-summary', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    const date = req.query.date || new Date().toISOString().slice(0, 10);
+
+    // Projects where start_date <= date AND (end_date >= date OR end_date IS NULL)
+    // AND status is not cancelled
+    const projects = await db.all(`
+      SELECT p.id, p.project_name, p.client_name_1, p.client_name_2, p.client_number,
+             p.location_name, p.status, p.priority, p.start_date, p.end_date,
+             u1.full_name as user1_name, u2.full_name as user2_name
+      FROM projects p
+      LEFT JOIN users u1 ON u1.id = p.user_id_1
+      LEFT JOIN users u2 ON u2.id = p.user_id_2
+      WHERE p.status != 'cancelled'
+        AND (p.start_date IS NULL OR p.start_date <= ?)
+        AND (p.end_date IS NULL OR p.end_date >= ?)
+      ORDER BY p.priority DESC, p.project_name ASC
+    `, [date, date]);
+
+    for (const proj of projects) {
+      proj.modules = await db.all(
+        `SELECT id, module_type, status, progress, scope_of_work
+         FROM project_modules WHERE project_id = ? ORDER BY id`,
+        [proj.id]
+      );
+    }
+
+    res.json({ date, projects });
+  } catch (err) {
+    console.error('Daily summary error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // ── Get single project with modules ────────────────────
 router.get('/:id', verifyToken, async (req, res) => {
   try {
@@ -461,90 +496,90 @@ router.post('/excel-parse', verifyToken, upload.single('file'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
   try {
     const workbook = xlsx.read(req.file.buffer, { type: 'buffer' });
-    const sheetName = workbook.SheetNames[0];
-    const sheet = workbook.Sheets[sheetName];
 
-    // Get raw rows (array of arrays) so we can find the real header row
-    const rawRows = xlsx.utils.sheet_to_json(sheet, { header: 1, defval: '' });
-
-    // Helper: test if a cell value looks like a header keyword
-    const MODEL_RE   = /model|device|item|product|equipment|part|unit|name|description/i;
-    const QTY_RE     = /qty|quantity|count|pcs|pieces|no\.|number|amount/i;
-    const DESC_RE    = /desc|description|spec|detail|remark|note|type/i;
-    const SN_RE      = /serial|sn|s\/n|barcode/i;
-    const SCOPE_RE   = /scope|work|task|activity|service/i;
-
-    // Find the first row that looks like a header (has at least a model-ish column)
-    let headerRowIdx = 0;
-    for (let i = 0; i < Math.min(10, rawRows.length); i++) {
-      const row = rawRows[i].map(c => String(c));
-      if (row.some(c => MODEL_RE.test(c)) || row.some(c => QTY_RE.test(c))) {
-        headerRowIdx = i;
-        break;
-      }
-    }
-
-    const headers = rawRows[headerRowIdx].map(c => String(c));
-
-    // Map column indices
-    const modelIdx = headers.findIndex(h => MODEL_RE.test(h));
-    const qtyIdx   = headers.findIndex(h => QTY_RE.test(h));
-    const descIdx  = headers.findIndex(h => DESC_RE.test(h) && !MODEL_RE.test(h));
-    const snIdx    = headers.findIndex(h => SN_RE.test(h));
-    const scopeIdx = headers.findIndex(h => SCOPE_RE.test(h));
+    const MODEL_RE = /model|device|item|product|equipment|part|unit|name|description/i;
+    const QTY_RE   = /qty|quantity|count|pcs|pieces|no\.|number|amount/i;
+    const DESC_RE  = /desc|description|spec|detail|remark|note|type/i;
+    const SN_RE    = /serial|sn|s\/n|barcode/i;
+    const SCOPE_RE = /scope|work|task|activity|service/i;
 
     const devices = [];
     const scopeLines = [];
 
-    const dataRows = rawRows.slice(headerRowIdx + 1);
-    for (const row of dataRows) {
-      // Skip totally empty rows
-      if (row.every(c => c === '' || c == null)) continue;
+    for (const sheetName of workbook.SheetNames) {
+      const sheet = workbook.Sheets[sheetName];
 
-      const modelVal = modelIdx >= 0 ? String(row[modelIdx] ?? '').trim() : '';
-      if (modelVal && modelVal !== 'undefined') {
-        const qtyRaw = qtyIdx >= 0 ? row[qtyIdx] : '';
-        const qty = Number(qtyRaw) || 1;
-        const desc = descIdx >= 0 ? String(row[descIdx] ?? '').trim() : '';
-        const serial = snIdx >= 0 ? String(row[snIdx] ?? '').trim() : '';
-        devices.push({ model: modelVal, qty, description: desc, serial });
-      }
+      // Get raw rows (array of arrays) so we can find the real header row
+      const rawRows = xlsx.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+      if (!rawRows.length) continue;
 
-      if (scopeIdx >= 0) {
-        const scopeVal = String(row[scopeIdx] ?? '').trim();
-        if (scopeVal && scopeVal !== 'undefined') scopeLines.push(scopeVal);
-      }
-    }
-
-    // Fallback: if column-header strategy found nothing, use key-value JSON parse
-    if (!devices.length) {
-      const jsonRows = xlsx.utils.sheet_to_json(sheet, { defval: '' });
-      for (const row of jsonRows) {
-        const keys = Object.keys(row);
-        const modelKey = keys.find(k => MODEL_RE.test(k));
-        const qtyKey   = keys.find(k => QTY_RE.test(k));
-        const descKey  = keys.find(k => DESC_RE.test(k));
-        const snKey    = keys.find(k => SN_RE.test(k));
-        if (modelKey && row[modelKey]) {
-          devices.push({
-            model: String(row[modelKey]).trim(),
-            qty: qtyKey ? Number(row[qtyKey]) || 1 : 1,
-            description: descKey ? String(row[descKey]).trim() : '',
-            serial: snKey ? String(row[snKey]).trim() : ''
-          });
+      // Find the first row that looks like a header (has at least a model-ish or qty column)
+      let headerRowIdx = 0;
+      for (let i = 0; i < Math.min(10, rawRows.length); i++) {
+        const row = rawRows[i].map(c => String(c));
+        if (row.some(c => MODEL_RE.test(c)) || row.some(c => QTY_RE.test(c))) {
+          headerRowIdx = i;
+          break;
         }
-        const scopeKey = keys.find(k => SCOPE_RE.test(k));
-        if (scopeKey && row[scopeKey]) scopeLines.push(String(row[scopeKey]).trim());
       }
+
+      const headers = rawRows[headerRowIdx].map(c => String(c));
+      const modelIdx = headers.findIndex(h => MODEL_RE.test(h));
+      const qtyIdx   = headers.findIndex(h => QTY_RE.test(h));
+      const descIdx  = headers.findIndex(h => DESC_RE.test(h) && !MODEL_RE.test(h));
+      const snIdx    = headers.findIndex(h => SN_RE.test(h));
+      const scopeIdx = headers.findIndex(h => SCOPE_RE.test(h));
+
+      const sheetDevices = [];
+      const dataRows = rawRows.slice(headerRowIdx + 1);
+      for (const row of dataRows) {
+        if (row.every(c => c === '' || c == null)) continue;
+
+        const modelVal = modelIdx >= 0 ? String(row[modelIdx] ?? '').trim() : '';
+        if (modelVal && modelVal !== 'undefined') {
+          const qtyRaw = qtyIdx >= 0 ? row[qtyIdx] : '';
+          const qty = Number(qtyRaw) || 1;
+          const desc = descIdx >= 0 ? String(row[descIdx] ?? '').trim() : '';
+          const serial = snIdx >= 0 ? String(row[snIdx] ?? '').trim() : '';
+          sheetDevices.push({ model: modelVal, qty, description: desc, serial });
+        }
+
+        if (scopeIdx >= 0) {
+          const scopeVal = String(row[scopeIdx] ?? '').trim();
+          if (scopeVal && scopeVal !== 'undefined') scopeLines.push(scopeVal);
+        }
+      }
+
+      // Fallback: if column-header strategy found nothing for this sheet, use key-value JSON parse
+      if (!sheetDevices.length) {
+        const jsonRows = xlsx.utils.sheet_to_json(sheet, { defval: '' });
+        for (const row of jsonRows) {
+          const keys = Object.keys(row);
+          const modelKey = keys.find(k => MODEL_RE.test(k));
+          const qtyKey   = keys.find(k => QTY_RE.test(k));
+          const descKey  = keys.find(k => DESC_RE.test(k));
+          const snKey    = keys.find(k => SN_RE.test(k));
+          if (modelKey && row[modelKey]) {
+            sheetDevices.push({
+              model: String(row[modelKey]).trim(),
+              qty: qtyKey ? Number(row[qtyKey]) || 1 : 1,
+              description: descKey ? String(row[descKey]).trim() : '',
+              serial: snKey ? String(row[snKey]).trim() : ''
+            });
+          }
+          const scopeKey = keys.find(k => SCOPE_RE.test(k));
+          if (scopeKey && row[scopeKey]) scopeLines.push(String(row[scopeKey]).trim());
+        }
+      }
+
+      devices.push(...sheetDevices);
     }
 
     res.json({
       success: true,
       devices,
       scope_of_work: scopeLines.join('\n'),
-      raw_rows: rawRows.length,
-      header_row: headerRowIdx,
-      columns_detected: { model: headers[modelIdx] || null, qty: headers[qtyIdx] || null, desc: headers[descIdx] || null, serial: headers[snIdx] || null },
+      sheets_parsed: workbook.SheetNames.length,
       file_name: req.file.originalname
     });
   } catch (err) {
@@ -569,41 +604,6 @@ router.get('/reports/all', verifyToken, requireAdmin, async (req, res) => {
     res.json(reports);
   } catch (err) {
     console.error('All reports error:', err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// ── Daily Summary ────────────────────────────────────────
-router.get('/daily-summary', verifyToken, requireAdmin, async (req, res) => {
-  try {
-    const date = req.query.date || new Date().toISOString().slice(0, 10);
-
-    // Projects where start_date <= date AND (end_date >= date OR end_date IS NULL)
-    // AND status is not cancelled
-    const projects = await db.all(`
-      SELECT p.id, p.project_name, p.client_name_1, p.client_name_2, p.client_number,
-             p.location_name, p.status, p.priority, p.start_date, p.end_date,
-             u1.full_name as user1_name, u2.full_name as user2_name
-      FROM projects p
-      LEFT JOIN users u1 ON u1.id = p.user_id_1
-      LEFT JOIN users u2 ON u2.id = p.user_id_2
-      WHERE p.status != 'cancelled'
-        AND (p.start_date IS NULL OR p.start_date <= ?)
-        AND (p.end_date IS NULL OR p.end_date >= ?)
-      ORDER BY p.priority DESC, p.project_name ASC
-    `, [date, date]);
-
-    for (const proj of projects) {
-      proj.modules = await db.all(
-        `SELECT id, module_type, status, progress, scope_of_work
-         FROM project_modules WHERE project_id = ? ORDER BY id`,
-        [proj.id]
-      );
-    }
-
-    res.json({ date, projects });
-  } catch (err) {
-    console.error('Daily summary error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
