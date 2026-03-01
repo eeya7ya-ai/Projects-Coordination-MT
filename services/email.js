@@ -182,4 +182,59 @@ async function sendProjectAssignmentEmail({ userEmail, userName, projectName, cl
   });
 }
 
-module.exports = { sendMail, sendProjectAssignmentEmail };
+/**
+ * Notify a user that their report has been reviewed (approved or needs revision).
+ */
+async function sendReportReviewEmail({ userEmail, userName, projectName, moduleName, reviewStatus, reviewNotes }) {
+  if (!userEmail) return false;
+
+  const isApproved = reviewStatus === 'approved';
+  const statusColor  = isApproved ? '#27AE60' : '#F39C12';
+  const statusLabel  = isApproved ? 'Approved' : 'Needs Revision';
+  const statusIcon   = isApproved ? '✓' : '!';
+
+  const body = `
+    <h2 style="margin:0 0 8px;color:#1a1a2e;font-size:22px;">Work Report ${statusLabel}</h2>
+    <p style="margin:0 0 24px;color:#555;font-size:15px;">
+      Hello <strong>${userName || 'Team Member'}</strong>, your work report has been reviewed.
+    </p>
+
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8f9fa;border-radius:8px;margin-bottom:24px;border:1px solid #e9ecef;">
+      <tr>
+        <td colspan="2" style="padding:14px 16px;background:${statusColor};border-radius:8px 8px 0 0;">
+          <span style="color:#fff;font-size:16px;font-weight:700;">${statusIcon} Report ${statusLabel}</span>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:10px 16px;font-size:13px;color:#888;width:140px;">Project</td>
+        <td style="padding:10px 16px;font-size:14px;color:#333;font-weight:600;">${projectName}</td>
+      </tr>
+      ${moduleName ? `<tr>
+        <td style="padding:10px 16px;font-size:13px;color:#888;">Module</td>
+        <td style="padding:10px 16px;font-size:14px;color:#333;">${moduleName}</td>
+      </tr>` : ''}
+      <tr>
+        <td style="padding:10px 16px;font-size:13px;color:#888;">Status</td>
+        <td style="padding:10px 16px;">
+          <span style="display:inline-block;padding:3px 10px;background:${statusColor};color:#fff;border-radius:4px;font-size:12px;font-weight:600;text-transform:uppercase;">${statusLabel}</span>
+        </td>
+      </tr>
+      ${reviewNotes ? `<tr>
+        <td style="padding:10px 16px;font-size:13px;color:#888;vertical-align:top;">Notes</td>
+        <td style="padding:10px 16px;font-size:14px;color:#333;">${reviewNotes}</td>
+      </tr>` : ''}
+    </table>
+
+    <p style="margin:0;font-size:14px;color:#555;">
+      Please log in to the <strong>ELV Project Coordinator</strong> to view the full review details.
+    </p>
+  `;
+
+  return sendMail({
+    to: userEmail,
+    subject: `[ELV] Report ${statusLabel}: ${projectName}`,
+    html: wrapEmail(body)
+  });
+}
+
+module.exports = { sendMail, sendProjectAssignmentEmail, sendReportReviewEmail };
