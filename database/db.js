@@ -1,18 +1,24 @@
-const { Pool, types } = require('pg');
+const { Pool, neonConfig, types } = require('@neondatabase/serverless');
+const ws = require('ws');
 const bcrypt = require('bcryptjs');
+
+// Enable WebSocket support for Neon in Node.js environments
+neonConfig.webSocketConstructor = ws;
 
 // Parse COUNT/BIGINT (type 20) as JavaScript numbers instead of strings
 types.setTypeParser(20, val => parseInt(val, 10));
 
-// ── PostgreSQL connection (Supabase via Vercel) ───────
-// Vercel's Supabase integration sets POSTGRES_URL (pooled connection)
-const connectionString = process.env.POSTGRES_URL
-  || process.env.POSTGRES_URL_NON_POOLING
-  || process.env.DATABASE_URL;
+// ── PostgreSQL connection (Neon) ───────────────────────
+// Set DATABASE_URL in your .env file with your Neon connection string
+const connectionString = process.env.DATABASE_URL;
+
+if (!connectionString) {
+  throw new Error('DATABASE_URL environment variable is required. Set it to your Neon connection string.');
+}
 
 const pool = new Pool({
   connectionString,
-  ssl: { rejectUnauthorized: false },
+  ssl: true,
   max: 3,
   idleTimeoutMillis: 20000,
   connectionTimeoutMillis: 10000

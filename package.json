@@ -19,6 +19,7 @@
     "cors": "^2.8.5",
     "express-session": "^1.17.3",
     "dotenv": "^16.4.1",
-    "pg": "^8.13.1"
+    "@neondatabase/serverless": "^0.10.4",
+    "ws": "^8.18.0"
   }
 }
