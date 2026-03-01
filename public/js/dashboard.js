@@ -24,11 +24,23 @@ async function apiFetch(path, opts = {}) {
 
 // ── Init ──────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', async () => {
+  // Sidebar (desktop)
   document.getElementById('sidebar-name').textContent = currentUser.full_name || 'User';
   document.getElementById('sidebar-dept').textContent = currentUser.department || 'ELV Team';
   const av = document.getElementById('sidebar-avatar');
   av.textContent = (currentUser.full_name || 'U')[0].toUpperCase();
   av.style.background = currentUser.avatar_color || '#8B0000';
+
+  // Mobile profile sheet
+  const mobAv = document.getElementById('mob-profile-avatar');
+  if (mobAv) {
+    mobAv.textContent = (currentUser.full_name || 'U')[0].toUpperCase();
+    mobAv.style.background = currentUser.avatar_color || '#8B0000';
+  }
+  const mobName = document.getElementById('mob-profile-name');
+  const mobDept = document.getElementById('mob-profile-dept');
+  if (mobName) mobName.textContent = currentUser.full_name || 'User';
+  if (mobDept) mobDept.textContent = currentUser.department || 'ELV Team';
 
   await loadMyProjects();
   loadNotifications();
@@ -42,14 +54,16 @@ window.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('app').style.display = 'flex';
 });
 
-// ── Mobile Sidebar ─────────────────────────────────────
-function toggleSidebar() {
-  document.getElementById('sidebar').classList.toggle('open');
-  document.getElementById('sidebar-overlay').classList.toggle('active');
+// ── Mobile Sidebar (desktop legacy, no-op on mobile) ──
+function toggleSidebar() {}
+function closeSidebar()  {}
+
+// ── Mobile Profile Sheet ───────────────────────────────
+function openMobProfile() {
+  document.getElementById('mob-profile-overlay').classList.add('open');
 }
-function closeSidebar() {
-  document.getElementById('sidebar').classList.remove('open');
-  document.getElementById('sidebar-overlay').classList.remove('active');
+function closeMobProfile() {
+  document.getElementById('mob-profile-overlay').classList.remove('open');
 }
 
 // ── Navigation ────────────────────────────────────────
