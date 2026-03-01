@@ -31,6 +31,15 @@ window.addEventListener('DOMContentLoaded', async () => {
   av.textContent = (currentUser.full_name || 'A')[0].toUpperCase();
   av.style.background = currentUser.avatar_color || '#8B0000';
 
+  // Mobile more-sheet avatar
+  const mobAv = document.getElementById('mob-more-avatar');
+  if (mobAv) {
+    mobAv.textContent = (currentUser.full_name || 'A')[0].toUpperCase();
+    mobAv.style.background = currentUser.avatar_color || '#8B0000';
+  }
+  const mobName = document.getElementById('mob-more-name');
+  if (mobName) mobName.textContent = currentUser.full_name || 'Administrator';
+
   initMap();
 
   // Load users first (needed for dropdowns), then load the rest in parallel
@@ -80,14 +89,16 @@ window.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('app').style.display = 'flex';
 });
 
-// ── Mobile Sidebar ─────────────────────────────────────
-function toggleSidebar() {
-  document.getElementById('sidebar').classList.toggle('open');
-  document.getElementById('sidebar-overlay').classList.toggle('active');
+// ── Mobile Sidebar (desktop legacy, no-op on mobile) ──
+function toggleSidebar() {}
+function closeSidebar()  {}
+
+// ── Mobile More Sheet ──────────────────────────────────
+function openMobMore() {
+  document.getElementById('mob-more-overlay').classList.add('open');
 }
-function closeSidebar() {
-  document.getElementById('sidebar').classList.remove('open');
-  document.getElementById('sidebar-overlay').classList.remove('active');
+function closeMobMore() {
+  document.getElementById('mob-more-overlay').classList.remove('open');
 }
 
 // ── Navigation ────────────────────────────────────────
@@ -165,7 +176,7 @@ async function loadDashboard() {
   if (data.stats.pending_reports > 0) {
     document.getElementById('report-badge').style.display = '';
     document.getElementById('report-badge').textContent = data.stats.pending_reports;
-    const mob = document.getElementById('mobile-report-badge');
+    const mob = document.getElementById('mob-report-badge');
     if (mob) { mob.classList.remove('hidden'); mob.textContent = data.stats.pending_reports; }
   }
 }
