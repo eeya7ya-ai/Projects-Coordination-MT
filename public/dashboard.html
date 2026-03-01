@@ -215,25 +215,35 @@
 <nav class="mobile-bottom-nav" aria-label="Mobile navigation">
   <div class="mobile-nav-bar">
     <button class="mobile-nav-tab active" data-page="my-projects" onclick="navigate('my-projects')" aria-label="My Projects">
-      <svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
-      <span>Projects</span>
+      <span class="nav-icon-wrap">
+        <svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+      </span>
+      <span class="nav-label">Projects</span>
     </button>
     <button class="mobile-nav-tab" data-page="active-tasks" onclick="navigate('active-tasks')" aria-label="Active Tasks">
-      <svg viewBox="0 0 24 24"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
-      <span>Tasks</span>
+      <span class="nav-icon-wrap">
+        <svg viewBox="0 0 24 24"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+      </span>
+      <span class="nav-label">Tasks</span>
     </button>
     <button class="mobile-nav-tab" data-page="my-reports" onclick="navigate('my-reports')" aria-label="My Reports">
-      <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-      <span>Reports</span>
+      <span class="nav-icon-wrap">
+        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      </span>
+      <span class="nav-label">Reports</span>
     </button>
     <button class="mobile-nav-tab" onclick="toggleNotifs()" aria-label="Notifications">
-      <svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/></svg>
-      <span>Alerts</span>
+      <span class="nav-icon-wrap">
+        <svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/></svg>
+      </span>
       <span class="mobile-nav-badge hidden" id="mobile-notif-badge">0</span>
+      <span class="nav-label">Alerts</span>
     </button>
     <button class="mobile-nav-tab" onclick="toggleSidebar()" aria-label="More options">
-      <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 10-16 0"/></svg>
-      <span>Profile</span>
+      <span class="nav-icon-wrap">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 10-16 0"/></svg>
+      </span>
+      <span class="nav-label">Profile</span>
     </button>
   </div>
 </nav>
