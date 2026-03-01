@@ -386,7 +386,42 @@
       <!-- ── SETTINGS PAGE ── -->
       <div class="page" id="page-settings">
         <div class="section-header">
-          <div class="section-title">Settings <span>Email &amp; notification configuration</span></div>
+          <div class="section-title">Settings <span>Admin profile &amp; notification configuration</span></div>
+        </div>
+
+        <!-- Admin Contact Information Card -->
+        <div class="card" style="margin-bottom:20px;">
+          <div class="card-header">
+            <h3 class="card-title">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px;"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              Admin Contact Information
+            </h3>
+          </div>
+          <div class="card-body">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+              <div class="form-group">
+                <label class="form-label">Full Name</label>
+                <input type="text" id="admin-full-name" class="form-control" placeholder="e.g. John Doe">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Department</label>
+                <input type="text" id="admin-department" class="form-control" placeholder="e.g. Engineering">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Email Address</label>
+                <input type="email" id="admin-email" class="form-control" placeholder="e.g. admin@company.com">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Phone Number</label>
+                <input type="text" id="admin-phone" class="form-control" placeholder="e.g. +1 555 000 0000">
+              </div>
+            </div>
+            <button class="btn btn-danger" onclick="saveAdminProfile()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+              Save Profile
+            </button>
+            <div id="admin-profile-alert" style="margin-top:14px;"></div>
+          </div>
         </div>
 
         <!-- Gmail Status Card -->
