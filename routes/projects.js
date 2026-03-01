@@ -1,24 +1,13 @@
 const express = require('express');
 const multer = require('multer');
 const xlsx = require('xlsx');
-const path = require('path');
-const fs = require('fs');
 const db = require('../database/db');
 const { verifyToken, requireAdmin } = require('../middleware/auth');
 
 const router = express.Router();
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadDir = path.join(__dirname, '../uploads');
-    if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    cb(null, `${Date.now()}-${file.originalname}`);
-  }
-});
-const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } });
+// Use memory storage so parsing works in serverless environments (Vercel /tmp is read-only)
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 const MODULE_CHECKLISTS = {
   'Maintenance': [
@@ -421,7 +410,7 @@ router.put('/:projectId/modules/:moduleId/reports/:reportId', verifyToken, requi
 router.post('/excel-parse', verifyToken, upload.single('file'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
   try {
-    const workbook = xlsx.readFile(req.file.path);
+    const workbook = xlsx.read(req.file.buffer, { type: 'buffer' });
     const sheetName = workbook.SheetNames[0];
     const sheet = workbook.Sheets[sheetName];
 
@@ -506,8 +495,7 @@ router.post('/excel-parse', verifyToken, upload.single('file'), (req, res) => {
       raw_rows: rawRows.length,
       header_row: headerRowIdx,
       columns_detected: { model: headers[modelIdx] || null, qty: headers[qtyIdx] || null, desc: headers[descIdx] || null, serial: headers[snIdx] || null },
-      file_name: req.file.originalname,
-      file_path: req.file.path
+      file_name: req.file.originalname
     });
   } catch (err) {
     res.status(500).json({ error: 'Failed to parse Excel file: ' + err.message });
