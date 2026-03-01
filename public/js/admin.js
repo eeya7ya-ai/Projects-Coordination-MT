@@ -93,7 +93,7 @@ function closeSidebar() {
 // ── Navigation ────────────────────────────────────────
 function navigate(page) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.nav-item, .mobile-nav-tab').forEach(n => n.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById(`page-${page}`).classList.add('active');
   // Activate all matching nav items (sidebar + mobile bottom nav)
   document.querySelectorAll(`[data-page="${page}"]`).forEach(n => n.classList.add('active'));
@@ -1252,7 +1252,7 @@ async function loadEmailSettings() {
       banner.style.background = '#fff3cd';
       banner.style.color = '#856404';
       banner.style.border = '1px solid #ffeeba';
-      banner.innerHTML = '&#9888; Gmail credentials not detected. Set <strong>GMAIL_USER</strong> and <strong>GMAIL_PASS</strong> in your Vercel environment variables.';
+      banner.innerHTML = '&#9888; SMTP credentials not detected. Set <strong>SMTP_HOST</strong>, <strong>SMTP_USER</strong>, and <strong>SMTP_PASSWORD</strong> in your Vercel environment variables.';
     }
 
     // Sender identity comes from the admin user account, not from env vars or a separate form field
@@ -1378,15 +1378,30 @@ async function loadDailySummary() {
       : (proj.modules || []).map(mod => {
           const icon = moduleIcons[mod.module_type] || '📋';
           const color = statusColors[mod.status] || '#999';
+          const devicesHtml = (mod.devices || []).length > 0
+            ? `<div style="margin-top:8px;padding:8px 10px;background:var(--gray-50);border-radius:6px;border-left:3px solid var(--gray-300)">
+                <div style="font-size:11px;font-weight:600;color:var(--gray-500);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">Devices</div>
+                ${mod.devices.map(d => `
+                  <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--gray-700);padding:2px 0">
+                    <span style="color:var(--gray-400)">▪</span>
+                    <span style="font-weight:600">${d.device_model}</span>
+                    <span style="background:var(--gray-200);color:var(--gray-600);padding:1px 7px;border-radius:10px;font-size:11px">×${d.device_qty}</span>
+                    ${d.device_description ? `<span style="color:var(--gray-500)">${d.device_description}</span>` : ''}
+                  </div>`).join('')}
+              </div>`
+            : '';
           return `
-            <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--gray-100)">
-              <span style="font-size:18px;flex-shrink:0">${icon}</span>
-              <div style="flex:1">
-                <div style="font-size:14px;font-weight:600;color:var(--gray-800)">${mod.module_type}</div>
-                ${mod.scope_of_work ? `<div style="font-size:12px;color:var(--gray-500);margin-top:2px">${mod.scope_of_work.substring(0,80)}${mod.scope_of_work.length>80?'…':''}</div>` : ''}
+            <div style="padding:10px 0;border-bottom:1px solid var(--gray-100)">
+              <div style="display:flex;align-items:center;gap:10px">
+                <span style="font-size:18px;flex-shrink:0">${icon}</span>
+                <div style="flex:1">
+                  <div style="font-size:14px;font-weight:600;color:var(--gray-800)">${mod.module_type}</div>
+                  ${mod.scope_of_work ? `<div style="font-size:12px;color:var(--gray-500);margin-top:2px">${mod.scope_of_work.substring(0,80)}${mod.scope_of_work.length>80?'…':''}</div>` : ''}
+                </div>
+                <span style="font-size:11px;font-weight:600;color:white;background:${color};padding:3px 9px;border-radius:20px;white-space:nowrap;flex-shrink:0">${(mod.status||'pending').replace('_',' ')}</span>
+                <span style="font-size:12px;color:var(--gray-500);min-width:35px;text-align:right">${mod.progress||0}%</span>
               </div>
-              <span style="font-size:11px;font-weight:600;color:white;background:${color};padding:3px 9px;border-radius:20px;white-space:nowrap;flex-shrink:0">${(mod.status||'pending').replace('_',' ')}</span>
-              <span style="font-size:12px;color:var(--gray-500);min-width:35px;text-align:right">${mod.progress||0}%</span>
+              ${devicesHtml}
             </div>`;
         }).join('');
 
@@ -1448,6 +1463,11 @@ function copySummaryText() {
         const icon = moduleIcons[mod.module_type] || '📋';
         const status = (mod.status || 'pending').replace('_', ' ');
         text += `   ${icon} ${mod.module_type} — ${status} (${mod.progress || 0}%)\n`;
+        if (mod.devices?.length) {
+          mod.devices.forEach(d => {
+            text += `      • ${d.device_model} ×${d.device_qty}${d.device_description ? ' — ' + d.device_description : ''}\n`;
+          });
+        }
       });
     } else {
       text += `   _(no modules)\n`;

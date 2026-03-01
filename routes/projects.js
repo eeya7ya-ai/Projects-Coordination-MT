@@ -129,6 +129,12 @@ router.get('/daily-summary', verifyToken, requireAdmin, async (req, res) => {
          FROM project_modules WHERE project_id = ? ORDER BY id`,
         [proj.id]
       );
+      for (const mod of proj.modules) {
+        mod.devices = await db.all(
+          `SELECT device_model, device_qty, device_description FROM module_devices WHERE module_id = ? ORDER BY id`,
+          [mod.id]
+        );
+      }
     }
 
     res.json({ date, projects });
@@ -258,20 +264,24 @@ router.post('/', verifyToken, requireAdmin, async (req, res) => {
     // Send email notifications (non-blocking — failures don't abort the response)
     const assignedUserIds = [user_id_1, user_id_2].filter(Boolean);
     if (assignedUserIds.length) {
-      const moduleList = modules.map(m => ({ module_type: m.module_type, scope_of_work: m.scope_of_work || '' }));
-      for (const uid of assignedUserIds) {
-        const usr = await db.get('SELECT full_name, email FROM users WHERE id=?', [uid]);
-        if (usr?.email) {
-          sendProjectAssignmentEmail({
-            userEmail: usr.email,
-            userName: usr.full_name,
-            projectName: project_name,
-            clientName: client_name_1,
-            startDate: start_date,
-            endDate: end_date,
-            priority,
-            modules: moduleList
-          }).catch(e => console.error('[Email] Assignment email error:', e.message));
+      const notifSetting = await db.get("SELECT value FROM app_settings WHERE key='email_notifications_enabled'");
+      const notifEnabled = !notifSetting || notifSetting.value !== 'false';
+      if (notifEnabled) {
+        const moduleList = modules.map(m => ({ module_type: m.module_type, scope_of_work: m.scope_of_work || '' }));
+        for (const uid of assignedUserIds) {
+          const usr = await db.get('SELECT full_name, email FROM users WHERE id=?', [uid]);
+          if (usr?.email) {
+            sendProjectAssignmentEmail({
+              userEmail: usr.email,
+              userName: usr.full_name,
+              projectName: project_name,
+              clientName: client_name_1,
+              startDate: start_date,
+              endDate: end_date,
+              priority,
+              modules: moduleList
+            }).catch(e => console.error('[Email] Assignment email error:', e.message));
+          }
         }
       }
     }
@@ -325,21 +335,25 @@ router.put('/:id', verifyToken, requireAdmin, async (req, res) => {
     const addedIds = newIds.filter(id => !prevIds.includes(id));
 
     if (addedIds.length) {
-      const pName = project_name ?? existing.project_name;
-      const mods  = await db.all('SELECT module_type, scope_of_work FROM project_modules WHERE project_id=?', [req.params.id]);
-      for (const uid of addedIds) {
-        const usr = await db.get('SELECT full_name, email FROM users WHERE id=?', [uid]);
-        if (usr?.email) {
-          sendProjectAssignmentEmail({
-            userEmail: usr.email,
-            userName: usr.full_name,
-            projectName: pName,
-            clientName: client_name_1 ?? existing.client_name_1,
-            startDate: start_date ?? existing.start_date,
-            endDate: end_date ?? existing.end_date,
-            priority: priority ?? existing.priority,
-            modules: mods
-          }).catch(e => console.error('[Email] Update assignment email error:', e.message));
+      const notifSetting = await db.get("SELECT value FROM app_settings WHERE key='email_notifications_enabled'");
+      const notifEnabled = !notifSetting || notifSetting.value !== 'false';
+      if (notifEnabled) {
+        const pName = project_name ?? existing.project_name;
+        const mods  = await db.all('SELECT module_type, scope_of_work FROM project_modules WHERE project_id=?', [req.params.id]);
+        for (const uid of addedIds) {
+          const usr = await db.get('SELECT full_name, email FROM users WHERE id=?', [uid]);
+          if (usr?.email) {
+            sendProjectAssignmentEmail({
+              userEmail: usr.email,
+              userName: usr.full_name,
+              projectName: pName,
+              clientName: client_name_1 ?? existing.client_name_1,
+              startDate: start_date ?? existing.start_date,
+              endDate: end_date ?? existing.end_date,
+              priority: priority ?? existing.priority,
+              modules: mods
+            }).catch(e => console.error('[Email] Update assignment email error:', e.message));
+          }
         }
       }
     }
