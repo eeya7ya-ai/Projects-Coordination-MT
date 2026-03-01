@@ -1026,10 +1026,19 @@ async function handleExcelUpload(input) {
   if (res.ok) {
     excelData = data;
     document.getElementById('excel-result').classList.remove('hidden');
-    const colInfo = data.columns_detected
-      ? `(Columns: model="${data.columns_detected.model || '?'}", qty="${data.columns_detected.qty || '?'}")`
+
+    // Build header summary — show sheet count when multiple sheets found
+    const sheetCount = data.sheets_parsed || 1;
+    const sheetInfo = sheetCount > 1
+      ? `<span style="background:#e8f4fd;color:#2980B9;border-radius:4px;padding:2px 7px;font-size:11px;font-weight:700;margin-left:6px">${sheetCount} sheets</span>`
       : '';
-    document.getElementById('excel-msg').textContent = `✓ Parsed ${data.raw_rows} rows — Found ${data.devices.length} device(s) ${colInfo}`;
+    const sheetNames = data.sheet_names?.length > 1
+      ? `<div style="font-size:11px;color:var(--gray-500);margin-top:3px">Sheets: ${data.sheet_names.map(s=>`<em>${s}</em>`).join(', ')}</div>`
+      : '';
+
+    document.getElementById('excel-msg').innerHTML =
+      `<span style="color:var(--success);font-weight:700">✓</span> Parsed <strong>${data.devices.length}</strong> device(s) from <strong>${data.raw_rows}</strong> rows${sheetInfo}${sheetNames}`;
+
     document.getElementById('excel-devices-preview').innerHTML = data.devices.length
       ? `<table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:8px">
           <thead><tr style="background:var(--gray-100)">
@@ -1038,7 +1047,7 @@ async function handleExcelUpload(input) {
             <th style="text-align:left;padding:6px 8px">Description</th>
             <th style="text-align:left;padding:6px 8px;border-radius:0 4px 4px 0">Serial</th>
           </tr></thead>
-          <tbody>${data.devices.slice(0,8).map(d => `
+          <tbody>${data.devices.slice(0, 10).map(d => `
             <tr style="border-bottom:1px solid var(--gray-100)">
               <td style="padding:5px 8px;font-weight:600">${d.model}</td>
               <td style="padding:5px 8px;text-align:center">${d.qty}</td>
@@ -1047,8 +1056,10 @@ async function handleExcelUpload(input) {
             </tr>`).join('')}
           </tbody>
         </table>
-        ${data.devices.length > 8 ? `<div style="font-size:11px;color:var(--gray-400);margin-top:4px">...and ${data.devices.length - 8} more</div>` : ''}`
-      : '<div style="color:var(--gray-400);font-size:12px;margin-top:6px">No devices detected. Check that your sheet has columns named "Model", "Qty", or "Description".</div>';
+        ${data.devices.length > 10 ? `<div style="font-size:11px;color:var(--gray-400);margin-top:4px">...and ${data.devices.length - 10} more devices</div>` : ''}`
+      : `<div style="color:var(--gray-400);font-size:12px;margin-top:6px">
+           No devices detected. Ensure column headers include words like <strong>Model</strong>, <strong>Device</strong>, <strong>Qty</strong>, or <strong>Quantity</strong>.
+         </div>`;
     renderModuleDetails();
   } else {
     showToast('Failed to parse file: ' + data.error, 'error');
