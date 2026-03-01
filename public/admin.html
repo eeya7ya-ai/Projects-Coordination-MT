@@ -17,8 +17,12 @@
 
 <div class="app-layout" id="app" style="display:none">
 
+  <!-- Mobile sidebar overlay -->
+  <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
+
   <!-- ═══ SIDEBAR ═══ -->
   <aside class="sidebar" id="sidebar">
+    <button class="sidebar-close" onclick="closeSidebar()" aria-label="Close menu">×</button>
     <div class="sidebar-header">
       <div class="sidebar-logo">
         <div class="logo-box">
@@ -62,6 +66,10 @@
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
         Users
       </a>
+      <a class="nav-item" data-page="daily-summary">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="14" x2="10" y2="14"/><line x1="8" y1="18" x2="14" y2="18"/></svg>
+        Daily Summary
+      </a>
       <a class="nav-item" data-page="settings">
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M4.93 19.07l1.41-1.41M19.07 19.07l-1.41-1.41M12 2v2M12 20v2M2 12h2M20 12h2"/></svg>
         Settings
@@ -87,7 +95,12 @@
   <!-- ═══ MAIN CONTENT ═══ -->
   <main class="main-content">
     <div class="topbar">
-      <div class="topbar-title" id="page-title">Dashboard</div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <button class="menu-toggle" id="menu-toggle" onclick="toggleSidebar()" aria-label="Open menu">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <div class="topbar-title" id="page-title">Dashboard</div>
+      </div>
       <div class="topbar-actions">
         <div class="search-input">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -491,6 +504,43 @@
           </div>
         </div>
 
+      </div>
+
+      <!-- ── DAILY SUMMARY PAGE ── -->
+      <div class="page" id="page-daily-summary">
+        <div class="section-header" style="margin-bottom:20px">
+          <div class="section-title">Daily Project Summary <span>All projects &amp; modules for a given date</span></div>
+        </div>
+
+        <!-- Date picker + controls -->
+        <div class="card" style="margin-bottom:20px">
+          <div class="card-body" style="padding:20px">
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+              <div class="form-group" style="margin-bottom:0;flex:1;min-width:200px">
+                <label class="form-label" style="font-size:13px;margin-bottom:6px;display:block">Select Date</label>
+                <input type="date" id="summary-date" class="form-control" style="max-width:220px">
+              </div>
+              <div style="display:flex;gap:8px;align-items:flex-end;padding-top:22px;flex-wrap:wrap">
+                <button class="btn btn-danger" onclick="loadDailySummary()">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                  Generate Summary
+                </button>
+                <button class="btn btn-secondary" id="btn-copy-summary" onclick="copySummaryText()" style="display:none">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                  Copy for WhatsApp
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Summary content -->
+        <div id="daily-summary-content">
+          <div class="text-center text-muted" style="padding:60px 20px">
+            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="var(--gray-300)" stroke-width="1.5" style="margin-bottom:16px"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            <p style="font-size:15px;color:var(--gray-500)">Select a date and click <strong>Generate Summary</strong></p>
+          </div>
+        </div>
       </div>
 
     </div><!-- /page-content -->
