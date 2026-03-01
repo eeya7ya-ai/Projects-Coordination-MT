@@ -457,6 +457,78 @@
   </div>
 </div>
 
+<!-- ═══ EDIT PROJECT MODAL ═══ -->
+<div class="modal-overlay" id="edit-project-modal">
+  <div class="modal" style="max-width:700px">
+    <div class="modal-header">
+      <h2>Edit Project</h2>
+      <button class="modal-close" onclick="closeModal('edit-project-modal')">×</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="edit-proj-id">
+      <div class="form-grid">
+        <div class="form-group form-full">
+          <label>Project Name *</label>
+          <input type="text" id="edit-proj-name" placeholder="Project name">
+        </div>
+        <div class="form-group">
+          <label>Primary Client</label>
+          <input type="text" id="edit-proj-client1" placeholder="Client name">
+        </div>
+        <div class="form-group">
+          <label>Secondary Client</label>
+          <input type="text" id="edit-proj-client2" placeholder="Optional">
+        </div>
+        <div class="form-group">
+          <label>Contact Number</label>
+          <input type="text" id="edit-proj-clientnum" placeholder="+962 XX XXX XXXX">
+        </div>
+        <div class="form-group">
+          <label>Location Name</label>
+          <input type="text" id="edit-proj-location" placeholder="Street, Area">
+        </div>
+        <div class="form-group">
+          <label>Primary User</label>
+          <select id="edit-proj-user1"></select>
+        </div>
+        <div class="form-group">
+          <label>Secondary User</label>
+          <select id="edit-proj-user2"></select>
+        </div>
+        <div class="form-group">
+          <label>Start Date</label>
+          <input type="date" id="edit-proj-start">
+        </div>
+        <div class="form-group">
+          <label>End Date (Est.)</label>
+          <input type="date" id="edit-proj-end">
+        </div>
+        <div class="form-group">
+          <label>Priority</label>
+          <select id="edit-proj-priority">
+            <option value="normal">Normal</option>
+            <option value="high">High</option>
+            <option value="urgent">Urgent</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Status</label>
+          <select id="edit-proj-status">
+            <option value="pending">Pending</option>
+            <option value="in_progress">In Progress</option>
+            <option value="completed">Completed</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('edit-project-modal')">Cancel</button>
+      <button class="btn btn-danger" onclick="saveEditProject()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
 <!-- ═══ CHANGE PASSWORD MODAL ═══ -->
 <div class="modal-overlay" id="pw-modal">
   <div class="modal" style="max-width:400px">
@@ -477,6 +549,7 @@
   </div>
 </div>
 
+<div id="toast-container"></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="/js/admin.js"></script>
 </body>
