@@ -1215,28 +1215,31 @@ tbody tr:last-child td { border-bottom: none; }
   bottom: 0;
   left: 0;
   right: 0;
-  background: rgba(255,255,255,0.92);
-  border-top: 1px solid var(--gray-200);
-  padding: 5px 20px;
+  background: transparent;
+  border-top: none;
+  padding: 0 16px 8px 0;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 6px;
   z-index: 999;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  pointer-events: none;
 }
 .espark-footer img {
-  height: 22px;
-  width: auto;
-  object-fit: contain;
-  border-radius: 3px;
+  /* The source JPEG is 1600×1600 — crop to show just the logo text */
+  height: 28px;
+  width: 96px;
+  object-fit: cover;
+  object-position: center center;
+  border-radius: 4px;
+  pointer-events: auto;
 }
 .espark-footer span {
-  font-size: 11px;
+  font-size: 10px;
   color: var(--gray-500);
   font-family: 'Inter', sans-serif;
   letter-spacing: 0.02em;
+  pointer-events: auto;
 }
 /* Add bottom padding to main content so footer doesn't overlap */
 .main-content { padding-bottom: 44px !important; }
