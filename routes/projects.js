@@ -261,7 +261,9 @@ router.post('/', verifyToken, requireAdmin, async (req, res) => {
       return projId;
     });
 
-    // Send email notifications (non-blocking — failures don't abort the response)
+    res.json({ success: true, id: projectId, message: 'Project created successfully' });
+
+    // Send email notifications to ALL assigned users (non-blocking — runs after response)
     const assignedUserIds = [user_id_1, user_id_2].filter(Boolean);
     if (assignedUserIds.length) {
       const notifSetting = await db.get("SELECT value FROM app_settings WHERE key='email_notifications_enabled'");
@@ -269,8 +271,16 @@ router.post('/', verifyToken, requireAdmin, async (req, res) => {
       if (notifEnabled) {
         const moduleList = modules.map(m => ({ module_type: m.module_type, scope_of_work: m.scope_of_work || '' }));
         for (const uid of assignedUserIds) {
-          const usr = await db.get('SELECT full_name, email FROM users WHERE id=?', [uid]);
-          if (usr?.email) {
+          try {
+            const usr = await db.get('SELECT full_name, email FROM users WHERE id=?', [uid]);
+            if (!usr) {
+              console.warn(`[Email] User id=${uid} not found — skipping assignment email`);
+              continue;
+            }
+            if (!usr.email) {
+              console.warn(`[Email] User "${usr.full_name}" (id=${uid}) has no email — skipping assignment email`);
+              continue;
+            }
             sendProjectAssignmentEmail({
               userEmail: usr.email,
               userName: usr.full_name,
@@ -280,13 +290,13 @@ router.post('/', verifyToken, requireAdmin, async (req, res) => {
               endDate: end_date,
               priority,
               modules: moduleList
-            }).catch(e => console.error('[Email] Assignment email error:', e.message));
+            }).catch(e => console.error(`[Email] Assignment email error for user id=${uid}:`, e.message));
+          } catch (e) {
+            console.error(`[Email] Failed to process assignment email for user id=${uid}:`, e.message);
           }
         }
       }
     }
-
-    res.json({ success: true, id: projectId, message: 'Project created successfully' });
   } catch (err) {
     console.error('Create project error:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -329,9 +339,11 @@ router.put('/:id', verifyToken, requireAdmin, async (req, res) => {
       ]
     );
 
-    // Email newly assigned users (those not previously assigned)
-    const prevIds = [existing.user_id_1, existing.user_id_2].filter(Boolean).map(Number);
-    const newIds  = [finalUserId1, finalUserId2].filter(Boolean).map(Number);
+    res.json({ success: true, message: 'Project updated' });
+
+    // Email newly assigned users (those not previously assigned) — non-blocking, runs after response
+    const prevIds  = [existing.user_id_1, existing.user_id_2].filter(Boolean).map(Number);
+    const newIds   = [finalUserId1, finalUserId2].filter(Boolean).map(Number);
     const addedIds = newIds.filter(id => !prevIds.includes(id));
 
     if (addedIds.length) {
@@ -341,8 +353,16 @@ router.put('/:id', verifyToken, requireAdmin, async (req, res) => {
         const pName = project_name ?? existing.project_name;
         const mods  = await db.all('SELECT module_type, scope_of_work FROM project_modules WHERE project_id=?', [req.params.id]);
         for (const uid of addedIds) {
-          const usr = await db.get('SELECT full_name, email FROM users WHERE id=?', [uid]);
-          if (usr?.email) {
+          try {
+            const usr = await db.get('SELECT full_name, email FROM users WHERE id=?', [uid]);
+            if (!usr) {
+              console.warn(`[Email] User id=${uid} not found — skipping assignment email`);
+              continue;
+            }
+            if (!usr.email) {
+              console.warn(`[Email] User "${usr.full_name}" (id=${uid}) has no email — skipping assignment email`);
+              continue;
+            }
             sendProjectAssignmentEmail({
               userEmail: usr.email,
               userName: usr.full_name,
@@ -352,13 +372,13 @@ router.put('/:id', verifyToken, requireAdmin, async (req, res) => {
               endDate: end_date ?? existing.end_date,
               priority: priority ?? existing.priority,
               modules: mods
-            }).catch(e => console.error('[Email] Update assignment email error:', e.message));
+            }).catch(e => console.error(`[Email] Update assignment email error for user id=${uid}:`, e.message));
+          } catch (e) {
+            console.error(`[Email] Failed to process update assignment email for user id=${uid}:`, e.message);
           }
         }
       }
     }
-
-    res.json({ success: true, message: 'Project updated' });
   } catch (err) {
     console.error('Update project error:', err);
     res.status(500).json({ error: 'Internal server error' });
