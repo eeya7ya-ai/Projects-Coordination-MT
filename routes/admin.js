@@ -7,6 +7,22 @@ const { sendMail } = require('../services/email');
 const router = express.Router();
 router.use(verifyToken, requireAdmin);
 
+// ── Admin self-profile update ───────────────────────────
+router.put('/profile', async (req, res) => {
+  try {
+    const { full_name, department, phone, email, avatar_color } = req.body;
+    await db.run(
+      `UPDATE users SET full_name=?, department=?, phone=?, email=?, avatar_color=?
+       WHERE id = ? AND role = 'admin'`,
+      [full_name, department, phone, email, avatar_color || '#8B0000', req.user.id]
+    );
+    res.json({ success: true, message: 'Profile saved successfully' });
+  } catch (err) {
+    console.error('Save admin profile error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // ── Users ──────────────────────────────────────────────
 router.get('/users', async (req, res) => {
   try {
@@ -158,9 +174,16 @@ router.get('/email-settings', async (req, res) => {
     const rows = await db.all("SELECT key, value FROM app_settings WHERE key LIKE 'email_%'");
     const settings = {};
     rows.forEach(r => { settings[r.key] = r.value; });
-    // Also expose whether Gmail credentials are configured (without revealing them)
+
+    // Pull sender identity from the admin user account
+    const admin = await db.get(
+      "SELECT full_name, email FROM users WHERE role = 'admin' LIMIT 1"
+    );
+    settings.admin_full_name = admin?.full_name || '';
+    settings.admin_email     = admin?.email     || '';
+
+    // Expose whether Gmail SMTP credentials are configured (never reveal the password)
     settings.gmail_configured = !!(process.env.GMAIL_USER && process.env.GMAIL_PASS);
-    settings.gmail_user = process.env.GMAIL_USER || '';
     res.json(settings);
   } catch (err) {
     console.error('Get email settings error:', err);
@@ -170,15 +193,17 @@ router.get('/email-settings', async (req, res) => {
 
 router.put('/email-settings', async (req, res) => {
   try {
-    const allowed = ['email_from_name', 'email_notifications_enabled'];
-    for (const key of allowed) {
-      if (req.body[key] !== undefined) {
-        await db.run(
-          `INSERT INTO app_settings (key, value, updated_at) VALUES (?, ?, NOW())
-           ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
-          [key, String(req.body[key])]
-        );
-      }
+    // Only email_notifications_enabled is user-controlled.
+    // Sender name/address come from the admin profile, not this form.
+    if (req.body.email_notifications_enabled !== undefined) {
+      // app_settings has key TEXT PRIMARY KEY (no id column) — must include RETURNING key
+      // so db.run() does not append "RETURNING id" and cause a column-not-found error.
+      await db.run(
+        `INSERT INTO app_settings (key, value, updated_at) VALUES (?, ?, NOW())
+         ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
+         RETURNING key`,
+        ['email_notifications_enabled', String(req.body.email_notifications_enabled)]
+      );
     }
     res.json({ success: true, message: 'Email settings saved' });
   } catch (err) {
