@@ -184,8 +184,10 @@ router.get('/email-settings', async (req, res) => {
     settings.admin_full_name = admin?.full_name || '';
     settings.admin_email     = admin?.email     || '';
 
-    // Expose whether Gmail SMTP credentials are configured (never reveal the password)
-    settings.gmail_configured = !!(process.env.GMAIL_USER && process.env.GMAIL_PASS);
+    // Expose whether SMTP credentials are configured (never reveal the password)
+    settings.smtp_configured = !!(process.env.SMTP_USER && process.env.SMTP_PASSWORD);
+    // Keep legacy key for UI compatibility
+    settings.gmail_configured = settings.smtp_configured;
     res.json(settings);
   } catch (err) {
     console.error('Get email settings error:', err);
@@ -232,7 +234,7 @@ router.post('/email-settings/test', async (req, res) => {
     if (ok) {
       res.json({ success: true, message: `Test email sent to ${test_email}` });
     } else {
-      res.status(500).json({ error: 'Failed to send test email. Check GMAIL_USER and GMAIL_PASS environment variables.' });
+      res.status(500).json({ error: 'Failed to send test email. Check SMTP_HOST, SMTP_USER, and SMTP_PASSWORD environment variables.' });
     }
   } catch (err) {
     console.error('Test email error:', err);

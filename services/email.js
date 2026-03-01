@@ -1,12 +1,15 @@
 const nodemailer = require('nodemailer');
 const db = require('../database/db');
 
-// Gmail transporter — credentials come from Vercel env vars
+// Generic SMTP transporter — credentials come from Vercel env vars:
+// SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_SECURE (true/false), SMTP_FROM
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: process.env.SMTP_HOST,
+  port: parseInt(process.env.SMTP_PORT || '587', 10),
+  secure: process.env.SMTP_SECURE === 'true',
   auth: {
-    user: process.env.GMAIL_USER,
-    pass: process.env.GMAIL_PASS
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASSWORD
   }
 });
 
@@ -77,15 +80,16 @@ function wrapEmail(bodyHtml) {
  * The "from" display name is taken from the admin user account in the database.
  */
 async function sendMail({ to, subject, html }) {
-  if (!process.env.GMAIL_USER || !process.env.GMAIL_PASS) {
-    console.warn('[Email] GMAIL_USER / GMAIL_PASS not configured — skipping email to', to);
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASSWORD) {
+    console.warn('[Email] SMTP_USER / SMTP_PASSWORD not configured — skipping email to', to);
     return false;
   }
   if (!to) return false;
   try {
     const displayName = await getAdminDisplayName();
+    const fromAddress = process.env.SMTP_FROM || process.env.SMTP_USER;
     await transporter.sendMail({
-      from: `"${displayName}" <${process.env.GMAIL_USER}>`,
+      from: `"${displayName}" <${fromAddress}>`,
       to,
       subject,
       html

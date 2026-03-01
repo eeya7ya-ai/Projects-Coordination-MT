@@ -93,9 +93,10 @@ function closeSidebar() {
 // ── Navigation ────────────────────────────────────────
 function navigate(page) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.querySelectorAll('.nav-item, .mobile-nav-tab').forEach(n => n.classList.remove('active'));
   document.getElementById(`page-${page}`).classList.add('active');
-  document.querySelector(`[data-page="${page}"]`)?.classList.add('active');
+  // Activate all matching nav items (sidebar + mobile bottom nav)
+  document.querySelectorAll(`[data-page="${page}"]`).forEach(n => n.classList.add('active'));
 
   const titles = {
     'dashboard': 'Dashboard', 'analytics': 'Analytics', 'projects': 'Projects',
@@ -160,10 +161,12 @@ async function loadDashboard() {
     </div>
   `).join('') || '<p class="text-muted text-small">No modules yet</p>';
 
-  // Update report badge
+  // Update report badge (sidebar + mobile bottom nav)
   if (data.stats.pending_reports > 0) {
     document.getElementById('report-badge').style.display = '';
     document.getElementById('report-badge').textContent = data.stats.pending_reports;
+    const mob = document.getElementById('mobile-report-badge');
+    if (mob) { mob.classList.remove('hidden'); mob.textContent = data.stats.pending_reports; }
   }
 }
 
