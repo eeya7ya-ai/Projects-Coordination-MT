@@ -212,6 +212,15 @@ async function initializeDB() {
       value TEXT,
       updated_at TIMESTAMP DEFAULT NOW()
     );
+
+    CREATE TABLE IF NOT EXISTS module_preparations (
+      id SERIAL PRIMARY KEY,
+      module_id INTEGER NOT NULL REFERENCES project_modules(id) ON DELETE CASCADE,
+      prepared_date TEXT NOT NULL,
+      prepared_by INTEGER NOT NULL REFERENCES users(id),
+      created_at TIMESTAMP DEFAULT NOW(),
+      UNIQUE(module_id, prepared_date, prepared_by)
+    );
   `);
 
   // ── Admin user ────────────────────────────────────────
