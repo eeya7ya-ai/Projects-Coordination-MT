@@ -3,6 +3,7 @@ const multer = require('multer');
 const xlsx = require('xlsx');
 const db = require('../database/db');
 const { verifyToken, requireAdmin } = require('../middleware/auth');
+const { sendProjectAssignmentEmail } = require('../services/email');
 
 const router = express.Router();
 
@@ -207,7 +208,7 @@ router.post('/', verifyToken, requireAdmin, async (req, res) => {
         }
       }
 
-      // Notify assigned users
+      // Notify assigned users (in-app)
       const userIds = [user_id_1, user_id_2].filter(Boolean);
       for (const uid of userIds) {
         await tx.run(
@@ -219,6 +220,27 @@ router.post('/', verifyToken, requireAdmin, async (req, res) => {
 
       return projId;
     });
+
+    // Send email notifications (non-blocking — failures don't abort the response)
+    const assignedUserIds = [user_id_1, user_id_2].filter(Boolean);
+    if (assignedUserIds.length) {
+      const moduleList = modules.map(m => ({ module_type: m.module_type, scope_of_work: m.scope_of_work || '' }));
+      for (const uid of assignedUserIds) {
+        const usr = await db.get('SELECT full_name, email FROM users WHERE id=?', [uid]);
+        if (usr?.email) {
+          sendProjectAssignmentEmail({
+            userEmail: usr.email,
+            userName: usr.full_name,
+            projectName: project_name,
+            clientName: client_name_1,
+            startDate: start_date,
+            endDate: end_date,
+            priority,
+            modules: moduleList
+          }).catch(e => console.error('[Email] Assignment email error:', e.message));
+        }
+      }
+    }
 
     res.json({ success: true, id: projectId, message: 'Project created successfully' });
   } catch (err) {
@@ -237,6 +259,9 @@ router.put('/:id', verifyToken, requireAdmin, async (req, res) => {
       location_name, location_lat, location_lng, user_id_1, user_id_2,
       start_date, end_date, status, priority } = req.body;
 
+    const finalUserId1 = user_id_1 ?? existing.user_id_1;
+    const finalUserId2 = user_id_2 ?? existing.user_id_2;
+
     await db.run(
       `UPDATE projects SET project_name=?, client_name_1=?, client_name_2=?, client_number=?,
         location_name=?, location_lat=?, location_lng=?, user_id_1=?, user_id_2=?,
@@ -250,8 +275,8 @@ router.put('/:id', verifyToken, requireAdmin, async (req, res) => {
         location_name ?? existing.location_name,
         location_lat ?? existing.location_lat,
         location_lng ?? existing.location_lng,
-        user_id_1 ?? existing.user_id_1,
-        user_id_2 ?? existing.user_id_2,
+        finalUserId1,
+        finalUserId2,
         start_date ?? existing.start_date,
         end_date ?? existing.end_date,
         status ?? existing.status,
@@ -259,6 +284,31 @@ router.put('/:id', verifyToken, requireAdmin, async (req, res) => {
         req.params.id
       ]
     );
+
+    // Email newly assigned users (those not previously assigned)
+    const prevIds = [existing.user_id_1, existing.user_id_2].filter(Boolean).map(Number);
+    const newIds  = [finalUserId1, finalUserId2].filter(Boolean).map(Number);
+    const addedIds = newIds.filter(id => !prevIds.includes(id));
+
+    if (addedIds.length) {
+      const pName = project_name ?? existing.project_name;
+      const mods  = await db.all('SELECT module_type, scope_of_work FROM project_modules WHERE project_id=?', [req.params.id]);
+      for (const uid of addedIds) {
+        const usr = await db.get('SELECT full_name, email FROM users WHERE id=?', [uid]);
+        if (usr?.email) {
+          sendProjectAssignmentEmail({
+            userEmail: usr.email,
+            userName: usr.full_name,
+            projectName: pName,
+            clientName: client_name_1 ?? existing.client_name_1,
+            startDate: start_date ?? existing.start_date,
+            endDate: end_date ?? existing.end_date,
+            priority: priority ?? existing.priority,
+            modules: mods
+          }).catch(e => console.error('[Email] Update assignment email error:', e.message));
+        }
+      }
+    }
 
     res.json({ success: true, message: 'Project updated' });
   } catch (err) {

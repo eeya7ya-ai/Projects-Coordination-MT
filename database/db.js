@@ -206,6 +206,12 @@ async function initializeDB() {
       is_read INTEGER DEFAULT 0,
       created_at TIMESTAMP DEFAULT NOW()
     );
+
+    CREATE TABLE IF NOT EXISTS app_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT,
+      updated_at TIMESTAMP DEFAULT NOW()
+    );
   `);
 
   // ── Admin user ────────────────────────────────────────
