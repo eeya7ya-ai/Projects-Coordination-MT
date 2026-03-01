@@ -2,6 +2,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const db = require('../database/db');
 const { verifyToken, requireAdmin } = require('../middleware/auth');
+const { sendMail } = require('../services/email');
 
 const router = express.Router();
 router.use(verifyToken, requireAdmin);
@@ -147,6 +148,67 @@ router.get('/analytics', async (req, res) => {
     res.json({ stats, user_achievements, module_breakdown, recent_projects, project_timeline });
   } catch (err) {
     console.error('Analytics error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ── Email Settings ──────────────────────────────────────
+router.get('/email-settings', async (req, res) => {
+  try {
+    const rows = await db.all("SELECT key, value FROM app_settings WHERE key LIKE 'email_%'");
+    const settings = {};
+    rows.forEach(r => { settings[r.key] = r.value; });
+    // Also expose whether Gmail credentials are configured (without revealing them)
+    settings.gmail_configured = !!(process.env.GMAIL_USER && process.env.GMAIL_PASS);
+    settings.gmail_user = process.env.GMAIL_USER || '';
+    res.json(settings);
+  } catch (err) {
+    console.error('Get email settings error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.put('/email-settings', async (req, res) => {
+  try {
+    const allowed = ['email_from_name', 'email_notifications_enabled'];
+    for (const key of allowed) {
+      if (req.body[key] !== undefined) {
+        await db.run(
+          `INSERT INTO app_settings (key, value, updated_at) VALUES (?, ?, NOW())
+           ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
+          [key, String(req.body[key])]
+        );
+      }
+    }
+    res.json({ success: true, message: 'Email settings saved' });
+  } catch (err) {
+    console.error('Save email settings error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/email-settings/test', async (req, res) => {
+  try {
+    const { test_email } = req.body;
+    if (!test_email) return res.status(400).json({ error: 'test_email is required' });
+
+    const ok = await sendMail({
+      to: test_email,
+      subject: '[ELV] Email Configuration Test',
+      html: `<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;padding:32px;">
+        <h2 style="color:#C0392B;">Email Test Successful</h2>
+        <p>Your Gmail SMTP configuration is working correctly.</p>
+        <p style="color:#888;font-size:13px;">Sent from ELV Project Coordinator — <span style="color:#C0392B;font-weight:700;">eSpark</span> Developers</p>
+      </body></html>`
+    });
+
+    if (ok) {
+      res.json({ success: true, message: `Test email sent to ${test_email}` });
+    } else {
+      res.status(500).json({ error: 'Failed to send test email. Check GMAIL_USER and GMAIL_PASS environment variables.' });
+    }
+  } catch (err) {
+    console.error('Test email error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

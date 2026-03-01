@@ -89,7 +89,7 @@ function navigate(page) {
 
   const titles = {
     'dashboard': 'Dashboard', 'analytics': 'Analytics', 'projects': 'Projects',
-    'new-project': 'New Project', 'reports': 'Reports', 'users': 'Users'
+    'new-project': 'New Project', 'reports': 'Reports', 'users': 'Users', 'settings': 'Settings'
   };
   document.getElementById('page-title').textContent = titles[page] || page;
 
@@ -97,6 +97,7 @@ function navigate(page) {
   if (page === 'projects') loadProjects();
   if (page === 'reports') loadReports();
   if (page === 'users') loadUsersTable();
+  if (page === 'settings') loadEmailSettings();
   if (page === 'new-project') {
     resetProjectForm();
     populateUserDropdowns();
@@ -1153,3 +1154,74 @@ document.addEventListener('click', e => {
   const btn = document.querySelector('.notif-btn');
   if (!panel.contains(e.target) && !btn.contains(e.target)) panel.classList.remove('open');
 });
+
+// ── Email Settings ─────────────────────────────────────
+async function loadEmailSettings() {
+  try {
+    const res = await apiFetch('/admin/email-settings');
+    const data = await res.json();
+
+    const banner = document.getElementById('gmail-status-banner');
+    if (data.gmail_configured) {
+      banner.style.background = '#d4edda';
+      banner.style.color = '#155724';
+      banner.style.border = '1px solid #c3e6cb';
+      banner.innerHTML = '&#10003; Gmail SMTP is configured and ready to send emails.';
+    } else {
+      banner.style.background = '#fff3cd';
+      banner.style.color = '#856404';
+      banner.style.border = '1px solid #ffeeba';
+      banner.innerHTML = '&#9888; Gmail credentials not detected. Set <strong>GMAIL_USER</strong> and <strong>GMAIL_PASS</strong> in your Vercel environment variables.';
+    }
+
+    document.getElementById('settings-gmail-user').value = data.gmail_user || '';
+    document.getElementById('settings-from-name').value = data.email_from_name || 'ELV Project Coordinator';
+    document.getElementById('settings-notif-enabled').checked = data.email_notifications_enabled !== 'false';
+  } catch (err) {
+    console.error('Load email settings error:', err);
+  }
+}
+
+async function saveEmailSettings() {
+  const fromName = document.getElementById('settings-from-name').value.trim();
+  const notifEnabled = document.getElementById('settings-notif-enabled').checked;
+  const alertEl = document.getElementById('settings-alert');
+
+  try {
+    const res = await apiFetch('/admin/email-settings', {
+      method: 'PUT',
+      body: JSON.stringify({ email_from_name: fromName, email_notifications_enabled: notifEnabled })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      alertEl.innerHTML = '<div class="alert alert-success">Settings saved successfully.</div>';
+    } else {
+      alertEl.innerHTML = `<div class="alert alert-error">${data.error || 'Failed to save settings'}</div>`;
+    }
+  } catch (err) {
+    alertEl.innerHTML = '<div class="alert alert-error">Network error. Please try again.</div>';
+  }
+  setTimeout(() => { alertEl.innerHTML = ''; }, 4000);
+}
+
+async function sendTestEmail() {
+  const email = document.getElementById('settings-test-email').value.trim();
+  const alertEl = document.getElementById('settings-alert');
+  if (!email) { alertEl.innerHTML = '<div class="alert alert-error">Enter a recipient email address.</div>'; return; }
+
+  try {
+    const res = await apiFetch('/admin/email-settings/test', {
+      method: 'POST',
+      body: JSON.stringify({ test_email: email })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      alertEl.innerHTML = `<div class="alert alert-success">${data.message}</div>`;
+    } else {
+      alertEl.innerHTML = `<div class="alert alert-error">${data.error || 'Test failed'}</div>`;
+    }
+  } catch (err) {
+    alertEl.innerHTML = '<div class="alert alert-error">Network error. Please try again.</div>';
+  }
+  setTimeout(() => { alertEl.innerHTML = ''; }, 5000);
+}
