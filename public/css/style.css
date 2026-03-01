@@ -1306,6 +1306,126 @@ tbody tr:last-child td { border-bottom: none; }
   #filter-status { width: 100% !important; }
 }
 
+/* ══════════════════════════════════════════════════════
+   MOBILE BOTTOM NAVIGATION BAR
+══════════════════════════════════════════════════════ */
+.mobile-bottom-nav {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 64px;
+  background: #fff;
+  border-top: 1px solid var(--gray-200);
+  box-shadow: 0 -4px 20px rgba(0,0,0,0.08);
+  z-index: 300;
+  padding: 0 4px;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.mobile-nav-bar {
+  display: flex;
+  align-items: stretch;
+  height: 100%;
+}
+
+.mobile-nav-tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 4px 2px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--gray-500);
+  font-size: 10px;
+  font-weight: 500;
+  font-family: 'Inter', sans-serif;
+  letter-spacing: 0.01em;
+  border-radius: var(--radius-sm);
+  transition: color 0.2s ease, background 0.2s ease;
+  position: relative;
+  -webkit-tap-highlight-color: transparent;
+  text-decoration: none;
+}
+
+.mobile-nav-tab svg {
+  width: 22px;
+  height: 22px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+  flex-shrink: 0;
+}
+
+.mobile-nav-tab span {
+  display: block;
+  line-height: 1;
+}
+
+.mobile-nav-tab.active {
+  color: var(--red);
+}
+
+.mobile-nav-tab.active svg {
+  stroke: var(--red);
+}
+
+/* Red indicator dot above active tab */
+.mobile-nav-tab.active::before {
+  content: '';
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 20px;
+  height: 3px;
+  background: var(--red);
+  border-radius: 0 0 3px 3px;
+}
+
+/* Notification badge on mobile nav */
+.mobile-nav-badge {
+  position: absolute;
+  top: 6px;
+  right: calc(50% - 18px);
+  background: var(--red);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 3px;
+  border: 2px solid #fff;
+}
+
+.mobile-nav-badge.hidden { display: none; }
+
+@media (max-width: 768px) {
+  .mobile-bottom-nav { display: flex; align-items: stretch; }
+
+  /* Push page content above the bottom nav */
+  .main-content { padding-bottom: 80px !important; }
+
+  /* Hide hamburger toggle — bottom nav replaces it */
+  .menu-toggle { display: none !important; }
+
+  /* Hide the espark footer on mobile (bottom nav occupies that space) */
+  .espark-footer { display: none; }
+
+  /* Move toasts above the bottom nav on mobile */
+  #toast-container { bottom: 72px; right: 12px; left: 12px; }
+  .toast { min-width: unset; max-width: 100%; }
+}
+
 /* ── Decorative hex pattern on cards ─────────────────── */
 .hex-pattern {
   position: absolute;

@@ -55,9 +55,10 @@ function closeSidebar() {
 // ── Navigation ────────────────────────────────────────
 function navigate(page) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.querySelectorAll('.nav-item, .mobile-nav-tab').forEach(n => n.classList.remove('active'));
   document.getElementById(`page-${page}`).classList.add('active');
-  document.querySelector(`[data-page="${page}"]`)?.classList.add('active');
+  // Activate all matching nav items (sidebar + mobile bottom nav)
+  document.querySelectorAll(`[data-page="${page}"]`).forEach(n => n.classList.add('active'));
 
   const titles = { 'my-projects': 'My Projects', 'active-tasks': 'Active Tasks', 'my-reports': 'My Reports' };
   document.getElementById('page-title').textContent = titles[page] || page;
@@ -515,6 +516,8 @@ async function loadNotifications() {
   const notes = await res.json();
   const unread = notes.filter(n => !n.is_read);
   document.getElementById('notif-dot').classList.toggle('hidden', unread.length === 0);
+  const mobNotif = document.getElementById('mobile-notif-badge');
+  if (mobNotif) { mobNotif.classList.toggle('hidden', unread.length === 0); if (unread.length) mobNotif.textContent = unread.length; }
 
   document.getElementById('notif-list').innerHTML = notes.map(n => `
     <div class="notif-item ${n.is_read ? '' : 'unread'}" onclick="markRead(${n.id})">
