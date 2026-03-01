@@ -3,7 +3,7 @@ const multer = require('multer');
 const xlsx = require('xlsx');
 const db = require('../database/db');
 const { verifyToken, requireAdmin } = require('../middleware/auth');
-const { sendProjectAssignmentEmail } = require('../services/email');
+const { sendProjectAssignmentEmail, sendReportReviewEmail } = require('../services/email');
 
 const router = express.Router();
 
@@ -445,10 +445,37 @@ router.post('/:projectId/modules/:moduleId/reports', verifyToken, async (req, re
 router.put('/:projectId/modules/:moduleId/reports/:reportId', verifyToken, requireAdmin, async (req, res) => {
   try {
     const { review_status, review_notes } = req.body;
+
+    // Fetch report + submitter + project + module info before updating (for email)
+    const reportInfo = await db.get(
+      `SELECT mr.submitted_by, mr.id,
+              u.full_name AS user_name, u.email AS user_email,
+              p.project_name, pm.module_type
+       FROM module_reports mr
+       JOIN users u ON u.id = mr.submitted_by
+       JOIN project_modules pm ON pm.id = mr.module_id
+       JOIN projects p ON p.id = pm.project_id
+       WHERE mr.id = ?`,
+      [req.params.reportId]
+    );
+
     await db.run(
       'UPDATE module_reports SET review_status=?, review_notes=?, reviewed_by=?, reviewed_at=NOW() WHERE id=?',
       [review_status, review_notes, req.user.id, req.params.reportId]
     );
+
+    // Notify the report submitter by email (non-blocking)
+    if (reportInfo?.user_email && (review_status === 'approved' || review_status === 'needs_revision')) {
+      sendReportReviewEmail({
+        userEmail: reportInfo.user_email,
+        userName: reportInfo.user_name,
+        projectName: reportInfo.project_name,
+        moduleName: reportInfo.module_type,
+        reviewStatus: review_status,
+        reviewNotes: review_notes || ''
+      }).catch(e => console.error('[Email] Report review email error:', e.message));
+    }
+
     res.json({ success: true });
   } catch (err) {
     console.error('Review report error:', err);
@@ -461,90 +488,113 @@ router.post('/excel-parse', verifyToken, upload.single('file'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
   try {
     const workbook = xlsx.read(req.file.buffer, { type: 'buffer' });
-    const sheetName = workbook.SheetNames[0];
-    const sheet = workbook.Sheets[sheetName];
 
-    // Get raw rows (array of arrays) so we can find the real header row
-    const rawRows = xlsx.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+    // Helper regexes — shared across all sheets
+    const MODEL_RE = /model|device|item|product|equipment|part|unit|name|description/i;
+    const QTY_RE   = /qty|quantity|count|pcs|pieces|no\.|number|amount/i;
+    const DESC_RE  = /desc|description|spec|detail|remark|note|type/i;
+    const SN_RE    = /serial|sn|s\/n|barcode/i;
+    const SCOPE_RE = /scope|work|task|activity|service/i;
 
-    // Helper: test if a cell value looks like a header keyword
-    const MODEL_RE   = /model|device|item|product|equipment|part|unit|name|description/i;
-    const QTY_RE     = /qty|quantity|count|pcs|pieces|no\.|number|amount/i;
-    const DESC_RE    = /desc|description|spec|detail|remark|note|type/i;
-    const SN_RE      = /serial|sn|s\/n|barcode/i;
-    const SCOPE_RE   = /scope|work|task|activity|service/i;
+    // Parse a single sheet, return { devices, scopeLines, rawRowCount, headerRowIdx, headers }
+    function parseSheet(sheet) {
+      const rawRows = xlsx.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+      if (!rawRows.length) return { devices: [], scopeLines: [], rawRowCount: 0, headerRowIdx: 0, headers: [] };
 
-    // Find the first row that looks like a header (has at least a model-ish column)
-    let headerRowIdx = 0;
-    for (let i = 0; i < Math.min(10, rawRows.length); i++) {
-      const row = rawRows[i].map(c => String(c));
-      if (row.some(c => MODEL_RE.test(c)) || row.some(c => QTY_RE.test(c))) {
-        headerRowIdx = i;
-        break;
-      }
-    }
-
-    const headers = rawRows[headerRowIdx].map(c => String(c));
-
-    // Map column indices
-    const modelIdx = headers.findIndex(h => MODEL_RE.test(h));
-    const qtyIdx   = headers.findIndex(h => QTY_RE.test(h));
-    const descIdx  = headers.findIndex(h => DESC_RE.test(h) && !MODEL_RE.test(h));
-    const snIdx    = headers.findIndex(h => SN_RE.test(h));
-    const scopeIdx = headers.findIndex(h => SCOPE_RE.test(h));
-
-    const devices = [];
-    const scopeLines = [];
-
-    const dataRows = rawRows.slice(headerRowIdx + 1);
-    for (const row of dataRows) {
-      // Skip totally empty rows
-      if (row.every(c => c === '' || c == null)) continue;
-
-      const modelVal = modelIdx >= 0 ? String(row[modelIdx] ?? '').trim() : '';
-      if (modelVal && modelVal !== 'undefined') {
-        const qtyRaw = qtyIdx >= 0 ? row[qtyIdx] : '';
-        const qty = Number(qtyRaw) || 1;
-        const desc = descIdx >= 0 ? String(row[descIdx] ?? '').trim() : '';
-        const serial = snIdx >= 0 ? String(row[snIdx] ?? '').trim() : '';
-        devices.push({ model: modelVal, qty, description: desc, serial });
-      }
-
-      if (scopeIdx >= 0) {
-        const scopeVal = String(row[scopeIdx] ?? '').trim();
-        if (scopeVal && scopeVal !== 'undefined') scopeLines.push(scopeVal);
-      }
-    }
-
-    // Fallback: if column-header strategy found nothing, use key-value JSON parse
-    if (!devices.length) {
-      const jsonRows = xlsx.utils.sheet_to_json(sheet, { defval: '' });
-      for (const row of jsonRows) {
-        const keys = Object.keys(row);
-        const modelKey = keys.find(k => MODEL_RE.test(k));
-        const qtyKey   = keys.find(k => QTY_RE.test(k));
-        const descKey  = keys.find(k => DESC_RE.test(k));
-        const snKey    = keys.find(k => SN_RE.test(k));
-        if (modelKey && row[modelKey]) {
-          devices.push({
-            model: String(row[modelKey]).trim(),
-            qty: qtyKey ? Number(row[qtyKey]) || 1 : 1,
-            description: descKey ? String(row[descKey]).trim() : '',
-            serial: snKey ? String(row[snKey]).trim() : ''
-          });
+      // Find the first row that looks like a header
+      let headerRowIdx = 0;
+      for (let i = 0; i < Math.min(10, rawRows.length); i++) {
+        const row = rawRows[i].map(c => String(c));
+        if (row.some(c => MODEL_RE.test(c)) || row.some(c => QTY_RE.test(c))) {
+          headerRowIdx = i;
+          break;
         }
-        const scopeKey = keys.find(k => SCOPE_RE.test(k));
-        if (scopeKey && row[scopeKey]) scopeLines.push(String(row[scopeKey]).trim());
       }
+
+      const headers = rawRows[headerRowIdx].map(c => String(c));
+      const modelIdx = headers.findIndex(h => MODEL_RE.test(h));
+      const qtyIdx   = headers.findIndex(h => QTY_RE.test(h));
+      const descIdx  = headers.findIndex(h => DESC_RE.test(h) && !MODEL_RE.test(h));
+      const snIdx    = headers.findIndex(h => SN_RE.test(h));
+      const scopeIdx = headers.findIndex(h => SCOPE_RE.test(h));
+
+      const devices = [];
+      const scopeLines = [];
+
+      const dataRows = rawRows.slice(headerRowIdx + 1);
+      for (const row of dataRows) {
+        if (row.every(c => c === '' || c == null)) continue;
+
+        const modelVal = modelIdx >= 0 ? String(row[modelIdx] ?? '').trim() : '';
+        if (modelVal && modelVal !== 'undefined') {
+          const qty = Number(qtyIdx >= 0 ? row[qtyIdx] : '') || 1;
+          const desc = descIdx >= 0 ? String(row[descIdx] ?? '').trim() : '';
+          const serial = snIdx >= 0 ? String(row[snIdx] ?? '').trim() : '';
+          devices.push({ model: modelVal, qty, description: desc, serial });
+        }
+
+        if (scopeIdx >= 0) {
+          const scopeVal = String(row[scopeIdx] ?? '').trim();
+          if (scopeVal && scopeVal !== 'undefined') scopeLines.push(scopeVal);
+        }
+      }
+
+      // Fallback: key-value JSON parse if header strategy found nothing
+      if (!devices.length) {
+        const jsonRows = xlsx.utils.sheet_to_json(sheet, { defval: '' });
+        for (const row of jsonRows) {
+          const keys = Object.keys(row);
+          const modelKey = keys.find(k => MODEL_RE.test(k));
+          const qtyKey   = keys.find(k => QTY_RE.test(k));
+          const descKey  = keys.find(k => DESC_RE.test(k));
+          const snKey    = keys.find(k => SN_RE.test(k));
+          if (modelKey && row[modelKey]) {
+            devices.push({
+              model: String(row[modelKey]).trim(),
+              qty: qtyKey ? Number(row[qtyKey]) || 1 : 1,
+              description: descKey ? String(row[descKey]).trim() : '',
+              serial: snKey ? String(row[snKey]).trim() : ''
+            });
+          }
+          const scopeKey = keys.find(k => SCOPE_RE.test(k));
+          if (scopeKey && row[scopeKey]) scopeLines.push(String(row[scopeKey]).trim());
+        }
+      }
+
+      return { devices, scopeLines, rawRowCount: rawRows.length, headerRowIdx, headers, modelIdx, qtyIdx, descIdx, snIdx };
     }
+
+    // ── Iterate ALL sheets and combine results ───────────
+    const allDevices = [];
+    const allScopeLines = [];
+    let totalRawRows = 0;
+    let firstSheetResult = null;
+
+    for (const sheetName of workbook.SheetNames) {
+      const sheet = workbook.Sheets[sheetName];
+      const result = parseSheet(sheet);
+      if (!firstSheetResult) firstSheetResult = { ...result, sheetName };
+      allDevices.push(...result.devices);
+      allScopeLines.push(...result.scopeLines);
+      totalRawRows += result.rawRowCount;
+    }
+
+    const ref = firstSheetResult || { headers: [], modelIdx: -1, qtyIdx: -1, descIdx: -1, snIdx: -1, headerRowIdx: 0 };
 
     res.json({
       success: true,
-      devices,
-      scope_of_work: scopeLines.join('\n'),
-      raw_rows: rawRows.length,
-      header_row: headerRowIdx,
-      columns_detected: { model: headers[modelIdx] || null, qty: headers[qtyIdx] || null, desc: headers[descIdx] || null, serial: headers[snIdx] || null },
+      devices: allDevices,
+      scope_of_work: allScopeLines.join('\n'),
+      sheets_parsed: workbook.SheetNames.length,
+      sheet_names: workbook.SheetNames,
+      raw_rows: totalRawRows,
+      header_row: ref.headerRowIdx,
+      columns_detected: {
+        model: ref.headers[ref.modelIdx] || null,
+        qty: ref.headers[ref.qtyIdx] || null,
+        desc: ref.headers[ref.descIdx] || null,
+        serial: ref.headers[ref.snIdx] || null
+      },
       file_name: req.file.originalname
     });
   } catch (err) {

@@ -1315,19 +1315,20 @@ tbody tr:last-child td { border-bottom: none; }
   bottom: 0;
   left: 0;
   right: 0;
-  height: 64px;
+  height: 68px;
   background: #fff;
-  border-top: 1px solid var(--gray-200);
-  box-shadow: 0 -4px 20px rgba(0,0,0,0.08);
+  border-top: 2px solid var(--gray-200);
+  box-shadow: 0 -4px 24px rgba(0,0,0,0.12);
   z-index: 300;
-  padding: 0 4px;
+  padding: 0 6px;
   padding-bottom: env(safe-area-inset-bottom);
 }
 
 .mobile-nav-bar {
   display: flex;
-  align-items: stretch;
+  align-items: center;
   height: 100%;
+  gap: 2px;
 }
 
 .mobile-nav-tab {
@@ -1336,75 +1337,87 @@ tbody tr:last-child td { border-bottom: none; }
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 3px;
-  padding: 4px 2px;
+  gap: 4px;
+  padding: 6px 4px;
   border: none;
   background: transparent;
   cursor: pointer;
-  color: var(--gray-500);
+  color: #9ca3af;
   font-size: 10px;
-  font-weight: 500;
+  font-weight: 600;
   font-family: 'Inter', sans-serif;
-  letter-spacing: 0.01em;
-  border-radius: var(--radius-sm);
-  transition: color 0.2s ease, background 0.2s ease;
+  letter-spacing: 0.02em;
+  border-radius: 12px;
+  transition: color 0.18s ease, background 0.18s ease;
   position: relative;
   -webkit-tap-highlight-color: transparent;
   text-decoration: none;
+  min-height: 52px;
 }
 
 .mobile-nav-tab svg {
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   stroke: currentColor;
   fill: none;
   stroke-width: 2;
   flex-shrink: 0;
+  transition: stroke 0.18s ease, transform 0.18s ease;
 }
 
 .mobile-nav-tab span {
   display: block;
   line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
+/* ── Active tab: bold pill background + red icon ── */
 .mobile-nav-tab.active {
   color: var(--red);
+  background: rgba(192, 57, 43, 0.10);
 }
 
 .mobile-nav-tab.active svg {
   stroke: var(--red);
+  transform: translateY(-1px);
 }
 
-/* Red indicator dot above active tab */
+.mobile-nav-tab.active span {
+  font-weight: 700;
+}
+
+/* Remove the old subtle top bar indicator */
 .mobile-nav-tab.active::before {
-  content: '';
-  position: absolute;
-  top: 4px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 20px;
-  height: 3px;
-  background: var(--red);
-  border-radius: 0 0 3px 3px;
+  display: none;
+}
+
+/* Tap feedback for non-active tabs */
+.mobile-nav-tab:not(.active):active {
+  background: var(--gray-100);
+  color: var(--gray-700);
 }
 
 /* Notification badge on mobile nav */
 .mobile-nav-badge {
   position: absolute;
-  top: 6px;
-  right: calc(50% - 18px);
+  top: 4px;
+  right: calc(50% - 20px);
   background: var(--red);
   color: #fff;
   font-size: 9px;
   font-weight: 700;
-  min-width: 16px;
-  height: 16px;
-  border-radius: 8px;
+  min-width: 17px;
+  height: 17px;
+  border-radius: 9px;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0 3px;
+  padding: 0 4px;
   border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(192,57,43,0.4);
 }
 
 .mobile-nav-badge.hidden { display: none; }
@@ -1413,7 +1426,7 @@ tbody tr:last-child td { border-bottom: none; }
   .mobile-bottom-nav { display: flex; align-items: stretch; }
 
   /* Push page content above the bottom nav */
-  .main-content { padding-bottom: 80px !important; }
+  .main-content { padding-bottom: 84px !important; }
 
   /* Hide hamburger toggle — bottom nav replaces it */
   .menu-toggle { display: none !important; }
@@ -1422,8 +1435,13 @@ tbody tr:last-child td { border-bottom: none; }
   .espark-footer { display: none; }
 
   /* Move toasts above the bottom nav on mobile */
-  #toast-container { bottom: 72px; right: 12px; left: 12px; }
+  #toast-container { bottom: 76px; right: 12px; left: 12px; }
   .toast { min-width: unset; max-width: 100%; }
+}
+
+@media (max-width: 360px) {
+  .mobile-nav-tab { font-size: 9px; gap: 3px; padding: 5px 2px; }
+  .mobile-nav-tab svg { width: 22px; height: 22px; }
 }
 
 /* ── Decorative hex pattern on cards ─────────────────── */
