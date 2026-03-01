@@ -1148,6 +1148,189 @@ tbody tr:last-child td { border-bottom: none; }
 .search-input svg { width: 16px; height: 16px; color: var(--gray-400); flex-shrink: 0; }
 .search-input input { border: none; background: transparent; outline: none; font-size: 14px; font-family: inherit; width: 200px; }
 
+/* ══════════════════════════════════════════════════════
+   DASHBOARD — WELCOME BANNER
+══════════════════════════════════════════════════════ */
+.welcome-banner {
+  background: linear-gradient(135deg, var(--red-deep) 0%, var(--red-dark) 50%, var(--red) 100%);
+  border-radius: var(--radius);
+  padding: 28px 32px;
+  margin-bottom: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: white;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 8px 32px var(--red-glow);
+}
+
+.welcome-banner::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  pointer-events: none;
+}
+
+.welcome-content {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  position: relative;
+}
+
+.welcome-icon-wrap {
+  width: 60px;
+  height: 60px;
+  background: rgba(255,255,255,0.15);
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255,255,255,0.25);
+  flex-shrink: 0;
+}
+
+.welcome-icon-wrap svg { width: 30px; height: 30px; fill: white; }
+
+.welcome-greeting {
+  font-size: 13px;
+  color: rgba(255,255,255,0.7);
+  margin-bottom: 2px;
+}
+
+.welcome-name {
+  font-size: 26px;
+  font-weight: 700;
+  font-family: 'Rajdhani', sans-serif;
+  letter-spacing: 0.5px;
+  line-height: 1.1;
+}
+
+.welcome-sub {
+  font-size: 13px;
+  color: rgba(255,255,255,0.6);
+  margin-top: 6px;
+}
+
+.welcome-actions {
+  display: flex;
+  gap: 10px;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.btn-banner-outline {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 18px;
+  border: 1.5px solid rgba(255,255,255,0.5);
+  border-radius: var(--radius-sm);
+  background: rgba(255,255,255,0.1);
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.btn-banner-outline:hover {
+  background: rgba(255,255,255,0.2);
+  border-color: white;
+}
+
+.btn-banner-solid {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 18px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: white;
+  color: var(--red-dark);
+  font-size: 14px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  transition: var(--transition);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+.btn-banner-solid:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.2);
+}
+
+/* ══════════════════════════════════════════════════════
+   DASHBOARD — QUICK ACTIONS
+══════════════════════════════════════════════════════ */
+.quick-actions-section { margin-bottom: 28px; }
+
+.qa-section-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: var(--gray-500);
+  margin-bottom: 12px;
+}
+
+.quick-actions-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+
+.qa-btn {
+  background: white;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius);
+  padding: 18px 16px;
+  cursor: pointer;
+  transition: var(--transition);
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-shadow: var(--shadow-sm);
+}
+
+.qa-btn:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow);
+  border-color: var(--red);
+}
+
+.qa-btn-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 6px;
+}
+
+.qa-btn-text {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--gray-800);
+  font-family: 'Rajdhani', sans-serif;
+}
+
+.qa-btn-sub {
+  font-size: 12px;
+  color: var(--gray-500);
+}
+
+@media (max-width: 768px) {
+  .welcome-banner { flex-direction: column; gap: 20px; align-items: flex-start; }
+  .quick-actions-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
 /* Report card */
 .report-card {
   background: var(--gray-50);

@@ -31,6 +31,14 @@ window.addEventListener('DOMContentLoaded', async () => {
   av.textContent = (currentUser.full_name || 'A')[0].toUpperCase();
   av.style.background = currentUser.avatar_color || '#8B0000';
 
+  // Dashboard welcome banner
+  const dashName = document.getElementById('dash-admin-name');
+  if (dashName) dashName.textContent = currentUser.full_name || 'Administrator';
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good morning,' : hour < 17 ? 'Good afternoon,' : 'Good evening,';
+  const dashGreeting = document.getElementById('dash-greeting');
+  if (dashGreeting) dashGreeting.textContent = greeting;
+
   initMap();
 
   // Load users first (needed for dropdowns), then load the rest in parallel
