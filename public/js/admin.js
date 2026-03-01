@@ -80,6 +80,16 @@ window.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('app').style.display = 'flex';
 });
 
+// ── Mobile Sidebar ─────────────────────────────────────
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('sidebar-overlay').classList.toggle('active');
+}
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebar-overlay').classList.remove('active');
+}
+
 // ── Navigation ────────────────────────────────────────
 function navigate(page) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -89,7 +99,8 @@ function navigate(page) {
 
   const titles = {
     'dashboard': 'Dashboard', 'analytics': 'Analytics', 'projects': 'Projects',
-    'new-project': 'New Project', 'reports': 'Reports', 'users': 'Users', 'settings': 'Settings'
+    'new-project': 'New Project', 'reports': 'Reports', 'users': 'Users',
+    'daily-summary': 'Daily Summary', 'settings': 'Settings'
   };
   document.getElementById('page-title').textContent = titles[page] || page;
 
@@ -98,11 +109,15 @@ function navigate(page) {
   if (page === 'reports') loadReports();
   if (page === 'users') loadUsersTable();
   if (page === 'settings') { loadAdminProfile(); loadEmailSettings(); }
+  if (page === 'daily-summary') initDailySummary();
   if (page === 'new-project') {
     resetProjectForm();
     populateUserDropdowns();
     setTimeout(() => map?.invalidateSize(), 200);
   }
+
+  // Close sidebar on mobile after navigation
+  closeSidebar();
 }
 
 // ── Dashboard ─────────────────────────────────────────
@@ -1159,10 +1174,16 @@ document.addEventListener('click', e => {
 let _adminProfileId = null;
 
 async function loadAdminProfile() {
+  const alertEl = document.getElementById('admin-profile-alert');
   try {
     const res = await apiFetch('/auth/me');
+    if (!res) return; // 401 — apiFetch already called logout()
     const data = await res.json();
-    if (!res.ok) return;
+    if (!res.ok) {
+      alertEl.innerHTML = `<div class="alert alert-error">${data.error || 'Failed to load profile'} — <a href="#" onclick="logout()" style="color:inherit;text-decoration:underline">Log out and re-login</a></div>`;
+      return;
+    }
+    alertEl.innerHTML = '';
     _adminProfileId = data.id;
     document.getElementById('admin-full-name').value  = data.full_name  || '';
     document.getElementById('admin-department').value = data.department || '';
@@ -1170,6 +1191,7 @@ async function loadAdminProfile() {
     document.getElementById('admin-phone').value      = data.phone      || '';
   } catch (err) {
     console.error('Load admin profile error:', err);
+    alertEl.innerHTML = '<div class="alert alert-error">Failed to load profile. Please refresh the page.</div>';
   }
 }
 
@@ -1269,4 +1291,170 @@ async function sendTestEmail() {
     alertEl.innerHTML = '<div class="alert alert-error">Network error. Please try again.</div>';
   }
   setTimeout(() => { alertEl.innerHTML = ''; }, 5000);
+}
+
+// ── Daily Summary ─────────────────────────────────────
+let _lastSummaryData = null;
+
+function initDailySummary() {
+  const dateEl = document.getElementById('summary-date');
+  if (!dateEl.value) {
+    dateEl.value = new Date().toISOString().slice(0, 10);
+  }
+}
+
+async function loadDailySummary() {
+  const dateVal = document.getElementById('summary-date').value;
+  if (!dateVal) { showToast('Please select a date', 'error'); return; }
+
+  const container = document.getElementById('daily-summary-content');
+  container.innerHTML = '<div style="text-align:center;padding:40px"><div class="spinner" style="margin:auto"></div></div>';
+  document.getElementById('btn-copy-summary').style.display = 'none';
+
+  const res = await apiFetch(`/projects/daily-summary?date=${encodeURIComponent(dateVal)}`);
+  if (!res?.ok) {
+    container.innerHTML = '<div class="alert alert-error" style="margin-top:16px">Failed to load summary. Please try again.</div>';
+    return;
+  }
+
+  const data = await res.json();
+  _lastSummaryData = data;
+
+  if (!data.projects || data.projects.length === 0) {
+    container.innerHTML = `
+      <div class="card" style="text-align:center;padding:48px 24px">
+        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="var(--gray-300)" stroke-width="1.5" style="margin:0 auto 16px"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        <h3 style="font-size:18px;color:var(--gray-600);margin-bottom:8px">No projects found</h3>
+        <p style="font-size:14px;color:var(--gray-400)">No active projects for ${formatSummaryDate(dateVal)}.</p>
+      </div>`;
+    return;
+  }
+
+  const moduleIcons = {
+    'Maintenance': '🔧', 'Handover': '🤝', 'Installation and Wiring': '⚡',
+    'Programming and Trouble Shooting': '💻', 'Delivering': '📦', 'Site Survey': '🗺️', 'POC': '🔬'
+  };
+  const statusColors = { pending: '#F39C12', in_progress: '#2980B9', completed: '#27AE60', cancelled: '#95A5A6' };
+
+  const totalModules = data.projects.reduce((sum, p) => sum + (p.modules?.length || 0), 0);
+
+  let html = `
+    <div class="card" style="margin-bottom:20px">
+      <div class="card-body" style="padding:20px">
+        <div style="display:flex;gap:24px;flex-wrap:wrap">
+          <div style="text-align:center;min-width:80px">
+            <div style="font-size:32px;font-weight:800;color:var(--red);font-family:'Rajdhani',sans-serif">${data.projects.length}</div>
+            <div style="font-size:12px;color:var(--gray-500);font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Projects</div>
+          </div>
+          <div style="text-align:center;min-width:80px">
+            <div style="font-size:32px;font-weight:800;color:var(--info);font-family:'Rajdhani',sans-serif">${totalModules}</div>
+            <div style="font-size:12px;color:var(--gray-500);font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Total Modules</div>
+          </div>
+          <div style="text-align:center;min-width:100px">
+            <div style="font-size:20px;font-weight:700;color:var(--gray-700);font-family:'Rajdhani',sans-serif">${formatSummaryDate(dateVal)}</div>
+            <div style="font-size:12px;color:var(--gray-500);font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Summary Date</div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+  html += data.projects.map((proj, idx) => {
+    const modulesHtml = (proj.modules || []).length === 0
+      ? '<p style="font-size:13px;color:var(--gray-400);padding:8px 0">No modules assigned</p>'
+      : (proj.modules || []).map(mod => {
+          const icon = moduleIcons[mod.module_type] || '📋';
+          const color = statusColors[mod.status] || '#999';
+          return `
+            <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--gray-100)">
+              <span style="font-size:18px;flex-shrink:0">${icon}</span>
+              <div style="flex:1">
+                <div style="font-size:14px;font-weight:600;color:var(--gray-800)">${mod.module_type}</div>
+                ${mod.scope_of_work ? `<div style="font-size:12px;color:var(--gray-500);margin-top:2px">${mod.scope_of_work.substring(0,80)}${mod.scope_of_work.length>80?'…':''}</div>` : ''}
+              </div>
+              <span style="font-size:11px;font-weight:600;color:white;background:${color};padding:3px 9px;border-radius:20px;white-space:nowrap;flex-shrink:0">${(mod.status||'pending').replace('_',' ')}</span>
+              <span style="font-size:12px;color:var(--gray-500);min-width:35px;text-align:right">${mod.progress||0}%</span>
+            </div>`;
+        }).join('');
+
+    return `
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-header" style="background:linear-gradient(135deg,var(--red-deep),var(--red));color:white;border-radius:var(--radius) var(--radius) 0 0">
+          <div>
+            <div style="font-size:16px;font-weight:700">${idx + 1}. ${proj.project_name}</div>
+            <div style="font-size:12px;opacity:0.8;margin-top:2px">${[proj.client_name_1, proj.location_name].filter(Boolean).join(' · ') || 'No client / location'}</div>
+          </div>
+          <div style="text-align:right">
+            <span style="font-size:11px;background:rgba(255,255,255,0.2);padding:4px 10px;border-radius:12px">${(proj.status||'pending').replace('_',' ')}</span>
+            <div style="font-size:11px;opacity:0.7;margin-top:4px">${proj.modules?.length || 0} module${proj.modules?.length !== 1 ? 's' : ''}</div>
+          </div>
+        </div>
+        <div class="card-body" style="padding:0 20px">
+          ${modulesHtml}
+        </div>
+        ${proj.user1_name || proj.user2_name ? `
+          <div style="padding:10px 20px;border-top:1px solid var(--gray-100);font-size:12px;color:var(--gray-500)">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+            Assigned: ${[proj.user1_name, proj.user2_name].filter(Boolean).join(' & ')}
+          </div>` : ''}
+      </div>`;
+  }).join('');
+
+  container.innerHTML = html;
+  document.getElementById('btn-copy-summary').style.display = '';
+}
+
+function formatSummaryDate(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  return d.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+}
+
+function copySummaryText() {
+  if (!_lastSummaryData) return;
+  const d = _lastSummaryData;
+  const moduleIcons = {
+    'Maintenance': '🔧', 'Handover': '🤝', 'Installation and Wiring': '⚡',
+    'Programming and Trouble Shooting': '💻', 'Delivering': '📦', 'Site Survey': '🗺️', 'POC': '🔬'
+  };
+
+  let text = `📅 *Daily Project Summary — ${formatSummaryDate(document.getElementById('summary-date').value)}*\n`;
+  text += `📊 ${d.projects.length} project${d.projects.length !== 1 ? 's' : ''} | `;
+  const totalMods = d.projects.reduce((s, p) => s + (p.modules?.length || 0), 0);
+  text += `${totalMods} module${totalMods !== 1 ? 's' : ''}\n`;
+  text += '─'.repeat(35) + '\n\n';
+
+  d.projects.forEach((proj, idx) => {
+    text += `📁 *${idx + 1}. ${proj.project_name}*\n`;
+    if (proj.client_name_1) text += `   👤 Client: ${proj.client_name_1}\n`;
+    if (proj.location_name) text += `   📍 ${proj.location_name}\n`;
+    if (proj.user1_name || proj.user2_name) {
+      text += `   👷 ${[proj.user1_name, proj.user2_name].filter(Boolean).join(' & ')}\n`;
+    }
+    if (proj.modules?.length) {
+      proj.modules.forEach(mod => {
+        const icon = moduleIcons[mod.module_type] || '📋';
+        const status = (mod.status || 'pending').replace('_', ' ');
+        text += `   ${icon} ${mod.module_type} — ${status} (${mod.progress || 0}%)\n`;
+      });
+    } else {
+      text += `   _(no modules)\n`;
+    }
+    text += '\n';
+  });
+
+  text += `Generated by ELV Project Coordinator`;
+
+  navigator.clipboard.writeText(text).then(() => {
+    showToast('Summary copied to clipboard!', 'success');
+  }).catch(() => {
+    // Fallback for older browsers
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    showToast('Summary copied to clipboard!', 'success');
+  });
 }

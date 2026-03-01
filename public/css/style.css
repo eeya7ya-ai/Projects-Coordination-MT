@@ -1094,15 +1094,216 @@ tbody tr:last-child td { border-bottom: none; }
 }
 
 /* ══════════════════════════════════════════════════════
-   RESPONSIVE
+   MOBILE MENU TOGGLE BUTTON
+══════════════════════════════════════════════════════ */
+.menu-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: var(--gray-100);
+  border-radius: 10px;
+  cursor: pointer;
+  color: var(--gray-700);
+  transition: var(--transition);
+  flex-shrink: 0;
+}
+.menu-toggle:hover { background: var(--gray-200); }
+.menu-toggle svg { width: 20px; height: 20px; }
+
+/* Sidebar overlay backdrop */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 99;
+  backdrop-filter: blur(2px);
+}
+.sidebar-overlay.active { display: block; }
+
+/* Mobile sidebar close button */
+.sidebar-close {
+  display: none;
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: rgba(255,255,255,0.15);
+  border-radius: 8px;
+  color: white;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  line-height: 1;
+  transition: var(--transition);
+}
+.sidebar-close:hover { background: rgba(255,255,255,0.25); }
+
+/* ══════════════════════════════════════════════════════
+   RESPONSIVE — TABLET (≤ 1024px)
+══════════════════════════════════════════════════════ */
+@media (max-width: 1024px) {
+  .sidebar { width: 240px; min-width: 240px; }
+  .main-content { margin-left: 240px; }
+  .stats-grid { grid-template-columns: repeat(3, 1fr); }
+}
+
+/* ══════════════════════════════════════════════════════
+   RESPONSIVE — MOBILE (≤ 768px)
 ══════════════════════════════════════════════════════ */
 @media (max-width: 768px) {
-  .sidebar { transform: translateX(-100%); }
+  /* Sidebar off-canvas */
+  .sidebar {
+    transform: translateX(-100%);
+    width: 280px;
+    min-width: 280px;
+    z-index: 200;
+  }
   .sidebar.open { transform: translateX(0); }
+  .sidebar-close { display: flex; }
+
+  /* Main content full width */
   .main-content { margin-left: 0; }
+
+  /* Topbar */
+  .topbar { padding: 0 16px; }
+  .menu-toggle { display: flex; }
+  .topbar-title { font-size: 16px; }
+
+  /* Hide search on mobile – accessible via page content */
+  .search-input { display: none; }
+
+  /* Grids */
   .grid-2, .form-grid { grid-template-columns: 1fr; }
-  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 20px; }
   .projects-grid { grid-template-columns: 1fr; }
+  .stat-card { padding: 16px; }
+  .stat-value { font-size: 28px; }
+
+  /* New Project page — stack the two-column layout */
+  #page-new-project > div[style*="grid-template-columns"] {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 16px !important;
+  }
+  /* Excel sidebar — remove sticky positioning */
+  #page-new-project .card[style*="position:sticky"] {
+    position: relative !important;
+    top: auto !important;
+  }
+
+  /* Page content padding */
+  .page-content { padding: 16px; }
+
+  /* Cards */
+  .card-body { padding: 16px; }
+  .card-header { padding: 14px 16px; }
+
+  /* Section headers */
+  .section-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .section-header > div[style*="display:flex"] {
+    width: 100%;
+  }
+
+  /* Tables — horizontal scroll */
+  .table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  table { min-width: 520px; }
+
+  /* Modals */
+  .modal {
+    margin: 10px;
+    max-height: calc(100vh - 20px);
+    overflow-y: auto;
+    border-radius: var(--radius);
+  }
+  .modal-overlay { align-items: flex-end; padding: 0; }
+  .modal-overlay .modal {
+    margin: 0;
+    border-radius: var(--radius) var(--radius) 0 0;
+    max-height: 92vh;
+  }
+  .modal-xl { max-width: 100% !important; }
+  .modal-lg { max-width: 100% !important; }
+  .modal-body { padding: 16px; }
+  .modal-header { padding: 16px; }
+  .modal-footer { padding: 12px 16px; flex-wrap: wrap; gap: 8px; }
+
+  /* Form grids in modals */
+  .modal .form-grid { grid-template-columns: 1fr; }
+  .modal .form-full { grid-column: 1; }
+
+  /* Admin settings grid */
+  #page-settings > .card .card-body > div[style*="grid-template-columns"] {
+    grid-template-columns: 1fr !important;
+  }
+  #page-settings .card .card-body > div[style*="display:flex"][style*="gap"] {
+    flex-direction: column;
+  }
+
+  /* Map height reduction */
+  #map-picker { height: 200px !important; }
+
+  /* Notification panel */
+  .notif-panel { width: 100%; right: 0; left: 0; border-radius: 0; }
+
+  /* Achievement cards */
+  #achievements-grid { grid-template-columns: 1fr !important; }
+
+  /* Footer */
+  .espark-footer { padding: 10px 16px; font-size: 11px; }
+
+  /* Project card detail table */
+  #proj-detail-body > div[style*="grid-template-columns:1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* ══════════════════════════════════════════════════════
+   RESPONSIVE — SMALL PHONES (≤ 480px)
+══════════════════════════════════════════════════════ */
+@media (max-width: 480px) {
+  .stats-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .stat-card { padding: 14px 12px; }
+  .stat-value { font-size: 24px; }
+  .stat-label { font-size: 11px; }
+  .stat-icon { width: 36px; height: 36px; margin-bottom: 10px; }
+  .stat-icon svg { width: 18px; height: 18px; }
+
+  .topbar { height: 56px; }
+  .topbar-title { font-size: 14px; }
+
+  .page-content { padding: 12px; }
+
+  /* Buttons in section headers stack */
+  .section-header { gap: 8px; }
+  .btn { font-size: 13px; padding: 8px 14px; }
+
+  /* Module selector grid */
+  .module-selector { grid-template-columns: repeat(2, 1fr) !important; }
+
+  /* Project cards */
+  .proj-name { font-size: 15px; }
+  .project-card-footer { flex-direction: column; gap: 8px; align-items: flex-start; }
+
+  /* Form controls */
+  .form-control, input, select, textarea { font-size: 16px !important; } /* Prevent iOS zoom */
+
+  /* Filter row on projects page */
+  #page-projects .section-header > div {
+    flex-direction: column;
+    width: 100%;
+  }
+  #filter-status { width: 100% !important; }
 }
 
 /* ── Decorative hex pattern on cards ─────────────────── */

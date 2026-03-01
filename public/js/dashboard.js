@@ -42,6 +42,16 @@ window.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('app').style.display = 'flex';
 });
 
+// ── Mobile Sidebar ─────────────────────────────────────
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('sidebar-overlay').classList.toggle('active');
+}
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebar-overlay').classList.remove('active');
+}
+
 // ── Navigation ────────────────────────────────────────
 function navigate(page) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -54,6 +64,9 @@ function navigate(page) {
 
   if (page === 'active-tasks') renderActiveTasks();
   if (page === 'my-reports') loadMyReports();
+
+  // Close sidebar on mobile after navigation
+  closeSidebar();
 }
 
 // ── My Projects ───────────────────────────────────────

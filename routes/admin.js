@@ -11,6 +11,8 @@ router.use(verifyToken, requireAdmin);
 router.put('/profile', async (req, res) => {
   try {
     const { full_name, department, phone, email, avatar_color } = req.body;
+    const existing = await db.get('SELECT id FROM users WHERE id = ? AND role = ?', [req.user.id, 'admin']);
+    if (!existing) return res.status(404).json({ error: 'Admin profile not found. Please log out and log back in.' });
     await db.run(
       `UPDATE users SET full_name=?, department=?, phone=?, email=?, avatar_color=?
        WHERE id = ? AND role = 'admin'`,
