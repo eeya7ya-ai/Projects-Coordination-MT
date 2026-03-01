@@ -13,19 +13,18 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-// Fetch the admin account's display name to use as the email sender name.
+// Cached admin display name — fetched once and reused to avoid per-email DB roundtrip.
+let _cachedAdminName = null;
 async function getAdminDisplayName() {
+  if (_cachedAdminName) return _cachedAdminName;
   try {
     const admin = await db.get("SELECT full_name FROM users WHERE role = 'admin' LIMIT 1");
-    return admin?.full_name || 'ELV Project Coordinator';
+    _cachedAdminName = admin?.full_name || 'MagicTech Projects Coordination';
+    return _cachedAdminName;
   } catch {
-    return 'ELV Project Coordinator';
+    return 'MagicTech Projects Coordination';
   }
 }
-
-// Absolute base URL used to embed the logo in emails
-const APP_URL = process.env.APP_URL || 'https://projects-coordination-mt.vercel.app';
-const LOGO_URL = `${APP_URL}/company-logo.jpg`;
 
 /**
  * Build the shared HTML wrapper that every email uses.
@@ -37,7 +36,7 @@ function wrapEmail(bodyHtml) {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ELV Project Coordinator</title>
+  <title>MagicTech Projects Coordination</title>
 </head>
 <body style="margin:0;padding:0;background-color:#eef0f4;font-family:'Segoe UI',Helvetica,Arial,sans-serif;">
 
@@ -51,14 +50,19 @@ function wrapEmail(bodyHtml) {
 
         <!-- ── HEADER ── -->
         <tr>
-          <td style="background-color:#0f0f1a;padding:36px 40px 28px;text-align:center;
+          <td style="background-color:#0f0f1a;padding:32px 40px 24px;text-align:center;
                      border-radius:14px 14px 0 0;">
-            <img src="${LOGO_URL}" alt="eSpark Developers"
-                 style="display:block;margin:0 auto 14px;max-height:80px;max-width:260px;
-                        width:auto;height:auto;object-fit:contain;" />
+            <div style="display:inline-block;margin-bottom:10px;">
+              <span style="font-family:'Segoe UI',Helvetica,Arial,sans-serif;
+                           font-size:30px;font-weight:800;letter-spacing:-0.5px;
+                           color:#ffffff;">Magic</span><span
+                   style="font-family:'Segoe UI',Helvetica,Arial,sans-serif;
+                           font-size:30px;font-weight:800;letter-spacing:-0.5px;
+                           color:#E74C3C;">Tech</span>
+            </div>
             <p style="margin:0;font-size:11px;color:rgba(255,255,255,0.45);
                       letter-spacing:3px;text-transform:uppercase;font-weight:600;">
-              ELV Project Coordinator
+              Projects Coordination
             </p>
           </td>
         </tr>
@@ -82,7 +86,7 @@ function wrapEmail(bodyHtml) {
                      border-radius:0 0 14px 14px;">
             <p style="margin:0 0 6px;font-size:12px;color:rgba(255,255,255,0.45);line-height:1.6;">
               This is an automated message from
-              <strong style="color:rgba(255,255,255,0.7);">ELV Project Coordinator</strong>.
+              <strong style="color:rgba(255,255,255,0.7);">MagicTech Projects Coordination</strong>.
               Please do not reply to this email.
             </p>
             <p style="margin:0;font-size:11px;color:rgba(255,255,255,0.25);">
@@ -244,7 +248,7 @@ async function sendProjectAssignmentEmail({ userEmail, userName, projectName, cl
       <tr>
         <td style="background-color:#f8f9fa;border-radius:8px;padding:18px 20px;border-left:4px solid #C0392B;">
           <p style="margin:0;font-size:14px;color:#555;line-height:1.6;">
-            Log in to <strong style="color:#1a1a2e;">ELV Project Coordinator</strong> to view your full
+            Log in to <strong style="color:#1a1a2e;">MagicTech Projects Coordination</strong> to view your full
             task list, complete checklist items, and submit work reports.
           </p>
         </td>
@@ -330,8 +334,8 @@ async function sendReportReviewEmail({ userEmail, userName, projectName, moduleN
                    border-left:4px solid ${statusColor};">
           <p style="margin:0;font-size:14px;color:#555;line-height:1.6;">
             ${isApproved
-              ? 'Thank you for your effort. Log in to <strong style="color:#1a1a2e;">ELV Project Coordinator</strong> to continue with your other tasks.'
-              : 'Please log in to <strong style="color:#1a1a2e;">ELV Project Coordinator</strong>, review the notes above, and submit a revised report.'}
+              ? 'Thank you for your effort. Log in to <strong style="color:#1a1a2e;">MagicTech Projects Coordination</strong> to continue with your other tasks.'
+              : 'Please log in to <strong style="color:#1a1a2e;">MagicTech Projects Coordination</strong>, review the notes above, and submit a revised report.'}
           </p>
         </td>
       </tr>
