@@ -1175,10 +1175,6 @@ async function loadAdminProfile() {
 
 async function saveAdminProfile() {
   const alertEl = document.getElementById('admin-profile-alert');
-  if (!_adminProfileId) {
-    alertEl.innerHTML = '<div class="alert alert-error">Profile not loaded. Please refresh.</div>';
-    return;
-  }
   const body = {
     full_name:   document.getElementById('admin-full-name').value.trim(),
     department:  document.getElementById('admin-department').value.trim(),
@@ -1186,13 +1182,15 @@ async function saveAdminProfile() {
     phone:       document.getElementById('admin-phone').value.trim()
   };
   try {
-    const res = await apiFetch(`/admin/users/${_adminProfileId}`, {
+    const res = await apiFetch('/admin/profile', {
       method: 'PUT',
       body: JSON.stringify(body)
     });
     const data = await res.json();
     if (res.ok) {
       alertEl.innerHTML = '<div class="alert alert-success">Profile saved successfully.</div>';
+      // Refresh the SMTP panel so the sender name/email reflect the updated profile
+      loadEmailSettings();
     } else {
       alertEl.innerHTML = `<div class="alert alert-error">${data.error || 'Failed to save profile'}</div>`;
     }
@@ -1221,8 +1219,9 @@ async function loadEmailSettings() {
       banner.innerHTML = '&#9888; Gmail credentials not detected. Set <strong>GMAIL_USER</strong> and <strong>GMAIL_PASS</strong> in your Vercel environment variables.';
     }
 
-    document.getElementById('settings-gmail-user').value = data.gmail_user || '';
-    document.getElementById('settings-from-name').value = data.email_from_name || 'ELV Project Coordinator';
+    // Sender identity comes from the admin user account, not from env vars or a separate form field
+    document.getElementById('settings-gmail-user').value = data.admin_email     || '';
+    document.getElementById('settings-from-name').value  = data.admin_full_name || '';
     document.getElementById('settings-notif-enabled').checked = data.email_notifications_enabled !== 'false';
   } catch (err) {
     console.error('Load email settings error:', err);
@@ -1230,14 +1229,13 @@ async function loadEmailSettings() {
 }
 
 async function saveEmailSettings() {
-  const fromName = document.getElementById('settings-from-name').value.trim();
   const notifEnabled = document.getElementById('settings-notif-enabled').checked;
   const alertEl = document.getElementById('settings-alert');
 
   try {
     const res = await apiFetch('/admin/email-settings', {
       method: 'PUT',
-      body: JSON.stringify({ email_from_name: fromName, email_notifications_enabled: notifEnabled })
+      body: JSON.stringify({ email_notifications_enabled: notifEnabled })
     });
     const data = await res.json();
     if (res.ok) {

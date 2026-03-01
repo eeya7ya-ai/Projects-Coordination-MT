@@ -1,4 +1,5 @@
 const nodemailer = require('nodemailer');
+const db = require('../database/db');
 
 // Gmail transporter — credentials come from Vercel env vars
 const transporter = nodemailer.createTransport({
@@ -8,6 +9,16 @@ const transporter = nodemailer.createTransport({
     pass: process.env.GMAIL_PASS
   }
 });
+
+// Fetch the admin account's display name to use as the email sender name.
+async function getAdminDisplayName() {
+  try {
+    const admin = await db.get("SELECT full_name FROM users WHERE role = 'admin' LIMIT 1");
+    return admin?.full_name || 'ELV Project Coordinator';
+  } catch {
+    return 'ELV Project Coordinator';
+  }
+}
 
 // Absolute base URL used to embed the logo in emails
 const APP_URL = process.env.APP_URL || 'https://projects-coordination-mt.vercel.app';
@@ -63,6 +74,7 @@ function wrapEmail(bodyHtml) {
 
 /**
  * Send an email. Returns true on success, false on failure (non-blocking).
+ * The "from" display name is taken from the admin user account in the database.
  */
 async function sendMail({ to, subject, html }) {
   if (!process.env.GMAIL_USER || !process.env.GMAIL_PASS) {
@@ -71,8 +83,9 @@ async function sendMail({ to, subject, html }) {
   }
   if (!to) return false;
   try {
+    const displayName = await getAdminDisplayName();
     await transporter.sendMail({
-      from: `"ELV Project Coordinator" <${process.env.GMAIL_USER}>`,
+      from: `"${displayName}" <${process.env.GMAIL_USER}>`,
       to,
       subject,
       html

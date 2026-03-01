@@ -435,14 +435,19 @@
           <div class="card-body">
             <div id="gmail-status-banner" style="padding:12px 16px;border-radius:8px;margin-bottom:20px;font-size:14px;"></div>
 
+            <div style="background:#f0f4ff;border:1px solid #c7d4f0;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:#2c3e7a;">
+              <strong>&#8505; Sender identity is taken from the Admin Contact Information above.</strong>
+              To change the sender name or email address, update the fields in the <a href="#" onclick="showPage('settings');return false;" style="color:#C0392B;text-decoration:underline;">Admin Contact Information</a> card and click Save Profile.
+            </div>
+
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
               <div class="form-group">
-                <label class="form-label">Gmail Account (from Vercel env)</label>
-                <input type="text" id="settings-gmail-user" class="form-control" readonly style="background:#f8f9fa;cursor:default;" placeholder="GMAIL_USER not set">
+                <label class="form-label">Sender Email (from Admin Profile)</label>
+                <input type="text" id="settings-gmail-user" class="form-control" readonly style="background:#f8f9fa;cursor:default;color:#555;" placeholder="Set email in Admin Profile above">
               </div>
               <div class="form-group">
-                <label class="form-label">From Display Name</label>
-                <input type="text" id="settings-from-name" class="form-control" placeholder="e.g. ELV Project Coordinator">
+                <label class="form-label">Sender Name (from Admin Profile)</label>
+                <input type="text" id="settings-from-name" class="form-control" readonly style="background:#f8f9fa;cursor:default;color:#555;" placeholder="Set full name in Admin Profile above">
               </div>
             </div>
 
