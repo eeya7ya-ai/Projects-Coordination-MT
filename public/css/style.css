@@ -1208,3 +1208,33 @@ tbody tr:last-child td { border-bottom: none; }
   from { opacity: 1; transform: translateX(0); }
   to   { opacity: 0; transform: translateX(60px); }
 }
+
+/* ═══ eSpark Footer ═══ */
+.espark-footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 4px 16px;
+  background: rgba(255,255,255,0.92);
+  backdrop-filter: blur(6px);
+  border-top: 1px solid rgba(0,0,0,0.08);
+  font-size: 11px;
+  color: var(--gray-500);
+  pointer-events: none;
+}
+
+.espark-footer strong { color: var(--gray-700); }
+
+.espark-footer-logo {
+  height: 22px;
+  width: auto;
+  object-fit: contain;
+  border-radius: 3px;
+  opacity: 0.85;
+}
