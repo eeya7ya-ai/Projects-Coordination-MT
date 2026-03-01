@@ -1309,28 +1309,38 @@ tbody tr:last-child td { border-bottom: none; }
 /* ══════════════════════════════════════════════════════
    MOBILE BOTTOM NAVIGATION BAR
 ══════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════
+   MODERN MOBILE BOTTOM NAVIGATION
+   Design: Material You / iOS 17 hybrid
+   ─ Solid-color active pill behind icon
+   ─ Bold label + red tint on active
+   ─ Rounded top, glass shadow
+═══════════════════════════════════════════════ */
 .mobile-bottom-nav {
   display: none;
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
-  height: 68px;
-  background: #fff;
-  border-top: 2px solid var(--gray-200);
-  box-shadow: 0 -4px 24px rgba(0,0,0,0.12);
-  z-index: 300;
-  padding: 0 6px;
-  padding-bottom: env(safe-area-inset-bottom);
+  z-index: 900;
+  background: rgba(255, 255, 255, 0.97);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 20px 20px 0 0;
+  box-shadow: 0 -6px 40px rgba(0, 0, 0, 0.14), 0 -1px 0 rgba(0,0,0,0.04);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 .mobile-nav-bar {
   display: flex;
-  align-items: center;
-  height: 100%;
-  gap: 2px;
+  align-items: stretch;
+  height: 64px;
+  padding: 0 4px;
+  gap: 0;
 }
 
+/* ── Each tab ── */
 .mobile-nav-tab {
   flex: 1;
   display: flex;
@@ -1338,110 +1348,128 @@ tbody tr:last-child td { border-bottom: none; }
   align-items: center;
   justify-content: center;
   gap: 4px;
-  padding: 6px 4px;
+  padding: 6px 2px 8px;
   border: none;
   background: transparent;
   cursor: pointer;
-  color: #9ca3af;
+  color: #94a3b8;
   font-size: 10px;
-  font-weight: 600;
+  font-weight: 500;
   font-family: 'Inter', sans-serif;
-  letter-spacing: 0.02em;
-  border-radius: 12px;
-  transition: color 0.18s ease, background 0.18s ease;
+  letter-spacing: 0.01em;
   position: relative;
   -webkit-tap-highlight-color: transparent;
-  text-decoration: none;
-  min-height: 52px;
+  outline: none;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: color 0.2s ease;
+}
+
+/* Icon wrapper — this gets the pill background on active */
+.mobile-nav-tab .nav-icon-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 30px;
+  border-radius: 15px;
+  transition: background 0.25s cubic-bezier(0.34, 1.4, 0.64, 1),
+              transform 0.25s cubic-bezier(0.34, 1.4, 0.64, 1);
 }
 
 .mobile-nav-tab svg {
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   stroke: currentColor;
   fill: none;
   stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
   flex-shrink: 0;
-  transition: stroke 0.18s ease, transform 0.18s ease;
+  display: block;
+  transition: stroke 0.2s ease;
 }
 
-.mobile-nav-tab span {
+.mobile-nav-tab .nav-label {
   display: block;
   line-height: 1;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
+  font-size: 10px;
+  transition: color 0.2s ease, font-weight 0.1s;
 }
 
-/* ── Active tab: bold pill background + red icon ── */
+/* ── ACTIVE STATE ── solid pill + red icon + bold label ── */
 .mobile-nav-tab.active {
   color: var(--red);
-  background: rgba(192, 57, 43, 0.10);
+}
+
+.mobile-nav-tab.active .nav-icon-wrap {
+  background: #C0392B;          /* solid red pill */
+  transform: translateY(-2px);  /* slight lift */
 }
 
 .mobile-nav-tab.active svg {
-  stroke: var(--red);
-  transform: translateY(-1px);
+  stroke: #ffffff;              /* white icon on red pill */
 }
 
-.mobile-nav-tab.active span {
+.mobile-nav-tab.active .nav-label {
+  color: var(--red);
   font-weight: 700;
 }
 
-/* Remove the old subtle top bar indicator */
-.mobile-nav-tab.active::before {
-  display: none;
+/* ── Tap press feedback ── */
+.mobile-nav-tab:active .nav-icon-wrap {
+  transform: scale(0.90) translateY(-1px);
 }
 
-/* Tap feedback for non-active tabs */
-.mobile-nav-tab:not(.active):active {
-  background: var(--gray-100);
-  color: var(--gray-700);
-}
-
-/* Notification badge on mobile nav */
+/* ── Notification badge ── */
 .mobile-nav-badge {
   position: absolute;
-  top: 4px;
-  right: calc(50% - 20px);
-  background: var(--red);
+  top: 3px;
+  right: calc(50% - 26px);
+  background: #e74c3c;
   color: #fff;
   font-size: 9px;
-  font-weight: 700;
-  min-width: 17px;
-  height: 17px;
+  font-weight: 800;
+  min-width: 18px;
+  height: 18px;
   border-radius: 9px;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 0 4px;
-  border: 2px solid #fff;
-  box-shadow: 0 1px 4px rgba(192,57,43,0.4);
+  border: 2px solid rgba(255,255,255,0.97);
+  box-shadow: 0 2px 6px rgba(231, 76, 60, 0.5);
+  letter-spacing: 0;
+  pointer-events: none;
 }
 
 .mobile-nav-badge.hidden { display: none; }
 
+/* ── Show on mobile ── */
 @media (max-width: 768px) {
-  .mobile-bottom-nav { display: flex; align-items: stretch; }
+  .mobile-bottom-nav { display: block; }
 
   /* Push page content above the bottom nav */
-  .main-content { padding-bottom: 84px !important; }
+  .main-content { padding-bottom: 88px !important; }
 
   /* Hide hamburger toggle — bottom nav replaces it */
   .menu-toggle { display: none !important; }
 
-  /* Hide the espark footer on mobile (bottom nav occupies that space) */
+  /* Hide the espark footer on mobile */
   .espark-footer { display: none; }
 
-  /* Move toasts above the bottom nav on mobile */
-  #toast-container { bottom: 76px; right: 12px; left: 12px; }
+  /* Lift toasts above nav */
+  #toast-container { bottom: 80px; right: 12px; left: 12px; }
   .toast { min-width: unset; max-width: 100%; }
 }
 
+/* ── Very small phones ── */
 @media (max-width: 360px) {
-  .mobile-nav-tab { font-size: 9px; gap: 3px; padding: 5px 2px; }
-  .mobile-nav-tab svg { width: 22px; height: 22px; }
+  .mobile-nav-bar { height: 58px; }
+  .mobile-nav-tab .nav-icon-wrap { width: 42px; height: 28px; }
+  .mobile-nav-tab svg { width: 20px; height: 20px; }
+  .mobile-nav-tab .nav-label { font-size: 9px; }
 }
 
 /* ── Decorative hex pattern on cards ─────────────────── */
