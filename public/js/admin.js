@@ -97,7 +97,7 @@ function navigate(page) {
   if (page === 'projects') loadProjects();
   if (page === 'reports') loadReports();
   if (page === 'users') loadUsersTable();
-  if (page === 'settings') loadEmailSettings();
+  if (page === 'settings') { loadAdminProfile(); loadEmailSettings(); }
   if (page === 'new-project') {
     resetProjectForm();
     populateUserDropdowns();
@@ -1154,6 +1154,53 @@ document.addEventListener('click', e => {
   const btn = document.querySelector('.notif-btn');
   if (!panel.contains(e.target) && !btn.contains(e.target)) panel.classList.remove('open');
 });
+
+// ── Admin Profile (Contact Settings) ───────────────────
+let _adminProfileId = null;
+
+async function loadAdminProfile() {
+  try {
+    const res = await apiFetch('/auth/me');
+    const data = await res.json();
+    if (!res.ok) return;
+    _adminProfileId = data.id;
+    document.getElementById('admin-full-name').value  = data.full_name  || '';
+    document.getElementById('admin-department').value = data.department || '';
+    document.getElementById('admin-email').value      = data.email      || '';
+    document.getElementById('admin-phone').value      = data.phone      || '';
+  } catch (err) {
+    console.error('Load admin profile error:', err);
+  }
+}
+
+async function saveAdminProfile() {
+  const alertEl = document.getElementById('admin-profile-alert');
+  if (!_adminProfileId) {
+    alertEl.innerHTML = '<div class="alert alert-error">Profile not loaded. Please refresh.</div>';
+    return;
+  }
+  const body = {
+    full_name:   document.getElementById('admin-full-name').value.trim(),
+    department:  document.getElementById('admin-department').value.trim(),
+    email:       document.getElementById('admin-email').value.trim(),
+    phone:       document.getElementById('admin-phone').value.trim()
+  };
+  try {
+    const res = await apiFetch(`/admin/users/${_adminProfileId}`, {
+      method: 'PUT',
+      body: JSON.stringify(body)
+    });
+    const data = await res.json();
+    if (res.ok) {
+      alertEl.innerHTML = '<div class="alert alert-success">Profile saved successfully.</div>';
+    } else {
+      alertEl.innerHTML = `<div class="alert alert-error">${data.error || 'Failed to save profile'}</div>`;
+    }
+  } catch (err) {
+    alertEl.innerHTML = '<div class="alert alert-error">Network error. Please try again.</div>';
+  }
+  setTimeout(() => { alertEl.innerHTML = ''; }, 4000);
+}
 
 // ── Email Settings ─────────────────────────────────────
 async function loadEmailSettings() {
