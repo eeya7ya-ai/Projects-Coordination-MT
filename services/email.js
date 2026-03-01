@@ -39,31 +39,54 @@ function wrapEmail(bodyHtml) {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ELV Project Coordinator</title>
 </head>
-<body style="margin:0;padding:0;background:#f4f6f8;font-family:'Segoe UI',Arial,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f8;padding:32px 16px;">
-    <tr><td align="center">
-      <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+<body style="margin:0;padding:0;background-color:#eef0f4;font-family:'Segoe UI',Helvetica,Arial,sans-serif;">
 
-        <!-- Header with company logo -->
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+         style="background-color:#eef0f4;padding:40px 16px;">
+    <tr><td align="center">
+
+      <!-- ── Card container ── -->
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0"
+             style="width:600px;max-width:100%;">
+
+        <!-- ── HEADER ── -->
         <tr>
-          <td style="background:#ffffff;padding:28px 40px 20px;text-align:center;border-bottom:3px solid #C0392B;">
-            <img src="${LOGO_URL}" alt="Magic Tech" style="max-height:72px;max-width:280px;object-fit:contain;" />
+          <td style="background-color:#0f0f1a;padding:36px 40px 28px;text-align:center;
+                     border-radius:14px 14px 0 0;">
+            <img src="${LOGO_URL}" alt="eSpark Developers"
+                 style="display:block;margin:0 auto 14px;max-height:80px;max-width:260px;
+                        width:auto;height:auto;object-fit:contain;" />
+            <p style="margin:0;font-size:11px;color:rgba(255,255,255,0.45);
+                      letter-spacing:3px;text-transform:uppercase;font-weight:600;">
+              ELV Project Coordinator
+            </p>
           </td>
         </tr>
 
-        <!-- Body -->
+        <!-- ── RED ACCENT BAR ── -->
         <tr>
-          <td style="padding:32px 40px;">
+          <td style="background-color:#C0392B;height:4px;font-size:0;line-height:0;">&nbsp;</td>
+        </tr>
+
+        <!-- ── BODY ── -->
+        <tr>
+          <td style="background-color:#ffffff;padding:40px 40px 36px;
+                     border-left:1px solid #dde1e7;border-right:1px solid #dde1e7;">
             ${bodyHtml}
           </td>
         </tr>
 
-        <!-- Footer -->
+        <!-- ── FOOTER ── -->
         <tr>
-          <td style="background:#f8f9fa;padding:20px 40px;text-align:center;border-top:1px solid #e9ecef;">
-            <p style="margin:0;font-size:12px;color:#6c757d;">
-              This is an automated notification from the <strong>ELV Project Coordinator</strong> system.<br>
-              Created by <span style="color:#C0392B;font-weight:700;">eSpark</span> Developers
+          <td style="background-color:#1a1a2e;padding:22px 40px;text-align:center;
+                     border-radius:0 0 14px 14px;">
+            <p style="margin:0 0 6px;font-size:12px;color:rgba(255,255,255,0.45);line-height:1.6;">
+              This is an automated message from
+              <strong style="color:rgba(255,255,255,0.7);">ELV Project Coordinator</strong>.
+              Please do not reply to this email.
+            </p>
+            <p style="margin:0;font-size:11px;color:rgba(255,255,255,0.25);">
+              Developed by&nbsp;<span style="color:#E74C3C;font-weight:700;">eSpark</span>&nbsp;Developers
             </p>
           </td>
         </tr>
@@ -71,6 +94,7 @@ function wrapEmail(bodyHtml) {
       </table>
     </td></tr>
   </table>
+
 </body>
 </html>`;
 }
@@ -108,76 +132,129 @@ async function sendMail({ to, subject, html }) {
 async function sendProjectAssignmentEmail({ userEmail, userName, projectName, clientName, startDate, endDate, priority, modules = [] }) {
   if (!userEmail) return false;
 
-  const priorityColor = {
+  const priorityColors = {
     critical: '#8B0000',
-    high: '#C0392B',
-    urgent: '#C0392B',
-    medium: '#F39C12',
-    normal: '#2980B9',
-    low: '#27AE60'
-  }[priority?.toLowerCase()] || '#2980B9';
+    high:     '#C0392B',
+    urgent:   '#C0392B',
+    medium:   '#E67E22',
+    normal:   '#2980B9',
+    low:      '#27AE60'
+  };
+  const priorityColor = priorityColors[priority?.toLowerCase()] || '#2980B9';
+  const priorityLabel = (priority || 'Normal').charAt(0).toUpperCase() + (priority || 'Normal').slice(1).toLowerCase();
 
   const moduleRows = modules.length
-    ? modules.map(m => `
-        <tr>
-          <td style="padding:8px 12px;border-bottom:1px solid #f0f0f0;font-size:14px;color:#333;">${m.module_type}</td>
-          <td style="padding:8px 12px;border-bottom:1px solid #f0f0f0;font-size:13px;color:#555;">${m.scope_of_work || '—'}</td>
+    ? modules.map((m, i) => `
+        <tr style="background:${i % 2 === 0 ? '#ffffff' : '#f9fafb'};">
+          <td style="padding:11px 16px;font-size:13px;color:#1a1a2e;font-weight:600;
+                     border-bottom:1px solid #eaecef;white-space:nowrap;">
+            ${m.module_type}
+          </td>
+          <td style="padding:11px 16px;font-size:13px;color:#555;border-bottom:1px solid #eaecef;">
+            ${m.scope_of_work || '<em style="color:#aaa;">Not specified</em>'}
+          </td>
         </tr>`).join('')
-    : `<tr><td colspan="2" style="padding:8px 12px;font-size:13px;color:#888;">No modules listed</td></tr>`;
+    : `<tr><td colspan="2" style="padding:14px 16px;font-size:13px;color:#aaa;font-style:italic;">
+         No modules listed
+       </td></tr>`;
+
+  const formattedStart = startDate ? new Date(startDate).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' }) : null;
+  const formattedEnd   = endDate   ? new Date(endDate).toLocaleDateString('en-GB',   { day:'2-digit', month:'short', year:'numeric' }) : null;
 
   const body = `
-    <h2 style="margin:0 0 8px;color:#1a1a2e;font-size:22px;">New Project Assigned</h2>
-    <p style="margin:0 0 24px;color:#555;font-size:15px;">
-      Hello <strong>${userName || 'Team Member'}</strong>, you have been assigned to a new project. Please review the details below.
+    <!-- Greeting -->
+    <h2 style="margin:0 0 4px;color:#0f0f1a;font-size:26px;font-weight:700;letter-spacing:-0.5px;">
+      New Project Assigned
+    </h2>
+    <p style="margin:0 0 30px;color:#6c757d;font-size:15px;line-height:1.7;border-bottom:1px solid #f0f0f0;padding-bottom:26px;">
+      Hello <strong style="color:#1a1a2e;">${userName || 'Team Member'}</strong>,<br>
+      You have been assigned to a new project. Please review the details below and log in to begin your work.
     </p>
 
     <!-- Project Info Card -->
-    <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8f9fa;border-radius:8px;margin-bottom:24px;border:1px solid #e9ecef;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+           style="border-radius:10px;overflow:hidden;border:1px solid #dde1e7;margin-bottom:28px;">
+
+      <!-- Card header -->
       <tr>
-        <td colspan="2" style="padding:14px 16px;background:#C0392B;border-radius:8px 8px 0 0;">
-          <span style="color:#fff;font-size:16px;font-weight:700;">${projectName}</span>
+        <td colspan="2" style="background-color:#0f0f1a;padding:16px 20px;">
+          <span style="color:#ffffff;font-size:17px;font-weight:700;letter-spacing:-0.3px;">
+            ${projectName}
+          </span>
         </td>
       </tr>
+
+      <!-- Priority badge row -->
+      <tr style="background-color:#fff8f8;">
+        <td style="padding:12px 20px;font-size:12px;color:#888;font-weight:600;
+                   text-transform:uppercase;letter-spacing:0.8px;width:130px;">Priority</td>
+        <td style="padding:12px 20px;">
+          <span style="display:inline-block;padding:4px 14px;background-color:${priorityColor};
+                       color:#fff;border-radius:20px;font-size:12px;font-weight:700;
+                       text-transform:uppercase;letter-spacing:1px;">
+            ${priorityLabel}
+          </span>
+        </td>
+      </tr>
+
       ${clientName ? `<tr>
-        <td style="padding:10px 16px;font-size:13px;color:#888;width:140px;">Client</td>
-        <td style="padding:10px 16px;font-size:14px;color:#333;font-weight:600;">${clientName}</td>
+        <td style="padding:12px 20px;font-size:12px;color:#888;font-weight:600;
+                   text-transform:uppercase;letter-spacing:0.8px;border-top:1px solid #f2f2f2;">Client</td>
+        <td style="padding:12px 20px;font-size:14px;color:#1a1a2e;font-weight:600;
+                   border-top:1px solid #f2f2f2;">${clientName}</td>
       </tr>` : ''}
-      ${startDate ? `<tr>
-        <td style="padding:10px 16px;font-size:13px;color:#888;">Start Date</td>
-        <td style="padding:10px 16px;font-size:14px;color:#333;">${startDate}</td>
+
+      ${formattedStart ? `<tr>
+        <td style="padding:12px 20px;font-size:12px;color:#888;font-weight:600;
+                   text-transform:uppercase;letter-spacing:0.8px;border-top:1px solid #f2f2f2;">Start Date</td>
+        <td style="padding:12px 20px;font-size:14px;color:#333;border-top:1px solid #f2f2f2;">${formattedStart}</td>
       </tr>` : ''}
-      ${endDate ? `<tr>
-        <td style="padding:10px 16px;font-size:13px;color:#888;">End Date</td>
-        <td style="padding:10px 16px;font-size:14px;color:#333;">${endDate}</td>
+
+      ${formattedEnd ? `<tr>
+        <td style="padding:12px 20px;font-size:12px;color:#888;font-weight:600;
+                   text-transform:uppercase;letter-spacing:0.8px;border-top:1px solid #f2f2f2;">End Date</td>
+        <td style="padding:12px 20px;font-size:14px;color:#333;border-top:1px solid #f2f2f2;">${formattedEnd}</td>
       </tr>` : ''}
-      <tr>
-        <td style="padding:10px 16px;font-size:13px;color:#888;">Priority</td>
-        <td style="padding:10px 16px;">
-          <span style="display:inline-block;padding:3px 10px;background:${priorityColor};color:#fff;border-radius:4px;font-size:12px;font-weight:600;text-transform:uppercase;">${priority || 'Normal'}</span>
-        </td>
-      </tr>
     </table>
 
     <!-- Modules Table -->
-    <h3 style="margin:0 0 10px;color:#1a1a2e;font-size:15px;">Project Modules</h3>
-    <table width="100%" cellpadding="0" cellspacing="0" style="border-radius:8px;overflow:hidden;border:1px solid #e9ecef;margin-bottom:28px;">
+    <p style="margin:0 0 10px;font-size:13px;font-weight:700;color:#888;
+              text-transform:uppercase;letter-spacing:1px;">Assigned Modules</p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+           style="border-radius:10px;overflow:hidden;border:1px solid #dde1e7;margin-bottom:32px;">
       <thead>
-        <tr style="background:#1a1a2e;">
-          <th style="padding:10px 12px;text-align:left;font-size:13px;color:#fff;font-weight:600;">Module Type</th>
-          <th style="padding:10px 12px;text-align:left;font-size:13px;color:#fff;font-weight:600;">Scope of Work</th>
+        <tr style="background-color:#1a1a2e;">
+          <th style="padding:11px 16px;text-align:left;font-size:12px;color:rgba(255,255,255,0.8);
+                     font-weight:600;text-transform:uppercase;letter-spacing:0.8px;white-space:nowrap;">
+            Module Type
+          </th>
+          <th style="padding:11px 16px;text-align:left;font-size:12px;color:rgba(255,255,255,0.8);
+                     font-weight:600;text-transform:uppercase;letter-spacing:0.8px;">
+            Scope of Work
+          </th>
         </tr>
       </thead>
-      <tbody>${moduleRows}</tbody>
+      <tbody>
+        ${moduleRows}
+      </tbody>
     </table>
 
-    <p style="margin:0;font-size:14px;color:#555;">
-      Please log in to the <strong>ELV Project Coordinator</strong> to view your full task list and begin work.
-    </p>
+    <!-- CTA -->
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+      <tr>
+        <td style="background-color:#f8f9fa;border-radius:8px;padding:18px 20px;border-left:4px solid #C0392B;">
+          <p style="margin:0;font-size:14px;color:#555;line-height:1.6;">
+            Log in to <strong style="color:#1a1a2e;">ELV Project Coordinator</strong> to view your full
+            task list, complete checklist items, and submit work reports.
+          </p>
+        </td>
+      </tr>
+    </table>
   `;
 
   return sendMail({
     to: userEmail,
-    subject: `[ELV] New Project Assigned: ${projectName}`,
+    subject: `New Project Assigned: ${projectName}`,
     html: wrapEmail(body)
   });
 }
@@ -188,51 +265,82 @@ async function sendProjectAssignmentEmail({ userEmail, userName, projectName, cl
 async function sendReportReviewEmail({ userEmail, userName, projectName, moduleName, reviewStatus, reviewNotes }) {
   if (!userEmail) return false;
 
-  const isApproved = reviewStatus === 'approved';
-  const statusColor  = isApproved ? '#27AE60' : '#F39C12';
-  const statusLabel  = isApproved ? 'Approved' : 'Needs Revision';
-  const statusIcon   = isApproved ? '✓' : '!';
+  const isApproved  = reviewStatus === 'approved';
+  const statusColor = isApproved ? '#1e8449' : '#c0392b';
+  const statusBg    = isApproved ? '#eafaf1' : '#fdf2f2';
+  const statusLabel = isApproved ? 'Approved' : 'Needs Revision';
+  const statusDesc  = isApproved
+    ? 'Your work report has been reviewed and approved by the project administrator.'
+    : 'Your work report requires revision. Please review the notes below and resubmit.';
 
   const body = `
-    <h2 style="margin:0 0 8px;color:#1a1a2e;font-size:22px;">Work Report ${statusLabel}</h2>
-    <p style="margin:0 0 24px;color:#555;font-size:15px;">
-      Hello <strong>${userName || 'Team Member'}</strong>, your work report has been reviewed.
+    <!-- Heading -->
+    <h2 style="margin:0 0 4px;color:#0f0f1a;font-size:26px;font-weight:700;letter-spacing:-0.5px;">
+      Report Review Update
+    </h2>
+    <p style="margin:0 0 30px;color:#6c757d;font-size:15px;line-height:1.7;border-bottom:1px solid #f0f0f0;padding-bottom:26px;">
+      Hello <strong style="color:#1a1a2e;">${userName || 'Team Member'}</strong>,<br>
+      ${statusDesc}
     </p>
 
-    <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8f9fa;border-radius:8px;margin-bottom:24px;border:1px solid #e9ecef;">
+    <!-- Status Banner -->
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+           style="border-radius:10px;overflow:hidden;border:1px solid #dde1e7;margin-bottom:28px;">
       <tr>
-        <td colspan="2" style="padding:14px 16px;background:${statusColor};border-radius:8px 8px 0 0;">
-          <span style="color:#fff;font-size:16px;font-weight:700;">${statusIcon} Report ${statusLabel}</span>
+        <td colspan="2" style="background-color:${statusColor};padding:16px 20px;">
+          <span style="color:#ffffff;font-size:17px;font-weight:700;letter-spacing:-0.3px;">
+            ${isApproved ? 'Report Approved' : 'Revision Required'}
+          </span>
         </td>
       </tr>
       <tr>
-        <td style="padding:10px 16px;font-size:13px;color:#888;width:140px;">Project</td>
-        <td style="padding:10px 16px;font-size:14px;color:#333;font-weight:600;">${projectName}</td>
+        <td style="padding:12px 20px;font-size:12px;color:#888;font-weight:600;
+                   text-transform:uppercase;letter-spacing:0.8px;width:130px;">Project</td>
+        <td style="padding:12px 20px;font-size:14px;color:#1a1a2e;font-weight:600;">${projectName}</td>
       </tr>
       ${moduleName ? `<tr>
-        <td style="padding:10px 16px;font-size:13px;color:#888;">Module</td>
-        <td style="padding:10px 16px;font-size:14px;color:#333;">${moduleName}</td>
+        <td style="padding:12px 20px;font-size:12px;color:#888;font-weight:600;
+                   text-transform:uppercase;letter-spacing:0.8px;border-top:1px solid #f2f2f2;">Module</td>
+        <td style="padding:12px 20px;font-size:14px;color:#333;border-top:1px solid #f2f2f2;">${moduleName}</td>
       </tr>` : ''}
       <tr>
-        <td style="padding:10px 16px;font-size:13px;color:#888;">Status</td>
-        <td style="padding:10px 16px;">
-          <span style="display:inline-block;padding:3px 10px;background:${statusColor};color:#fff;border-radius:4px;font-size:12px;font-weight:600;text-transform:uppercase;">${statusLabel}</span>
+        <td style="padding:12px 20px;font-size:12px;color:#888;font-weight:600;
+                   text-transform:uppercase;letter-spacing:0.8px;border-top:1px solid #f2f2f2;">Status</td>
+        <td style="padding:12px 20px;border-top:1px solid #f2f2f2;">
+          <span style="display:inline-block;padding:4px 14px;background-color:${statusColor};
+                       color:#fff;border-radius:20px;font-size:12px;font-weight:700;
+                       text-transform:uppercase;letter-spacing:1px;">
+            ${statusLabel}
+          </span>
         </td>
       </tr>
       ${reviewNotes ? `<tr>
-        <td style="padding:10px 16px;font-size:13px;color:#888;vertical-align:top;">Notes</td>
-        <td style="padding:10px 16px;font-size:14px;color:#333;">${reviewNotes}</td>
+        <td style="padding:12px 20px;font-size:12px;color:#888;font-weight:600;
+                   text-transform:uppercase;letter-spacing:0.8px;border-top:1px solid #f2f2f2;
+                   vertical-align:top;">Notes</td>
+        <td style="padding:12px 20px;font-size:14px;color:#333;border-top:1px solid #f2f2f2;
+                   line-height:1.6;">${reviewNotes}</td>
       </tr>` : ''}
     </table>
 
-    <p style="margin:0;font-size:14px;color:#555;">
-      Please log in to the <strong>ELV Project Coordinator</strong> to view the full review details.
-    </p>
+    <!-- CTA -->
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+      <tr>
+        <td style="background-color:${statusBg};border-radius:8px;padding:18px 20px;
+                   border-left:4px solid ${statusColor};">
+          <p style="margin:0;font-size:14px;color:#555;line-height:1.6;">
+            ${isApproved
+              ? 'Thank you for your effort. Log in to <strong style="color:#1a1a2e;">ELV Project Coordinator</strong> to continue with your other tasks.'
+              : 'Please log in to <strong style="color:#1a1a2e;">ELV Project Coordinator</strong>, review the notes above, and submit a revised report.'}
+          </p>
+        </td>
+      </tr>
+    </table>
   `;
 
   return sendMail({
     to: userEmail,
-    subject: `[ELV] Report ${statusLabel}: ${projectName}`,
+    subject: `Report ${statusLabel}: ${projectName}`,
     html: wrapEmail(body)
   });
 }
