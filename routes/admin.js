@@ -2,7 +2,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const db = require('../database/db');
 const { verifyToken, requireAdmin } = require('../middleware/auth');
-const { sendMail } = require('../services/email');
+const { sendMail, clearAdminNameCache } = require('../services/email');
 
 const router = express.Router();
 router.use(verifyToken, requireAdmin);
@@ -18,6 +18,7 @@ router.put('/profile', async (req, res) => {
        WHERE id = ? AND role = 'admin'`,
       [full_name, department, phone, email, avatar_color || '#8B0000', req.user.id]
     );
+    clearAdminNameCache(); // Ensure next email picks up the updated display name
     res.json({ success: true, message: 'Profile saved successfully' });
   } catch (err) {
     console.error('Save admin profile error:', err);
