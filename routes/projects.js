@@ -75,8 +75,8 @@ const MODULE_CHECKLISTS = {
 router.get('/', verifyToken, async (req, res) => {
   try {
     let projects;
-    if (req.user.role === 'admin' || req.user.role === 'sales' || req.user.role === 'presales') {
-      // Admins and sales/presales see all projects
+    if (req.user.role === 'admin') {
+      // Admins see all projects
       projects = await db.all(`
         SELECT p.*, u1.full_name as user1_name, u1.avatar_color as user1_color,
                u2.full_name as user2_name, u2.avatar_color as user2_color,
@@ -199,7 +199,7 @@ router.get('/:id', verifyToken, async (req, res) => {
     `, [req.params.id]);
 
     if (!project) return res.status(404).json({ error: 'Project not found' });
-    if (req.user.role !== 'admin' && req.user.role !== 'sales' && req.user.role !== 'presales' && project.user_id_1 !== req.user.id && project.user_id_2 !== req.user.id) {
+    if (req.user.role !== 'admin' && project.user_id_1 !== req.user.id && project.user_id_2 !== req.user.id) {
       return res.status(403).json({ error: 'Access denied' });
     }
 
