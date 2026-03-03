@@ -20,7 +20,7 @@ function requireAdmin(req, res, next) {
 }
 
 function requireSalesOrAdmin(req, res, next) {
-  if (req.user?.role !== 'admin' && req.user?.role !== 'sales') {
+  if (req.user?.role !== 'admin' && req.user?.role !== 'sales' && req.user?.role !== 'presales') {
     return res.status(403).json({ error: 'Access restricted to sales or admin users' });
   }
   next();
