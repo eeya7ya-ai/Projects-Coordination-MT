@@ -11,7 +11,7 @@ let selectedModules = new Set();
 let excelData = null;
 
 // ── Auth check ────────────────────────────────────────
-if (!token || (currentUser.role !== 'sales' && currentUser.role !== 'admin')) {
+if (!token || (currentUser.role !== 'sales' && currentUser.role !== 'presales' && currentUser.role !== 'admin')) {
   window.location.href = '/';
 }
 
