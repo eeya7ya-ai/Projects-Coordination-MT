@@ -4,11 +4,20 @@ const db = require('../database/db');
 // Generic SMTP transporter — credentials come from Vercel env vars:
 // SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_SECURE (true/false), SMTP_FROM
 //
-// IMPORTANT: The transporter is built fresh on every sendMail() call so that:
-//   1. Changes to Vercel env vars are always picked up without a server restart.
-//   2. Serverless cold-start timing issues cannot cause a stale (undefined-host) transporter.
+// The transporter is a singleton with connection pooling so that repeated sends
+// reuse the same TCP connection instead of opening a new one each time.
+// Call resetTransporter() after SMTP credentials are changed (e.g. settings update).
+let _transporter = null;
+let _transporterKey = '';
+
 function _buildTransporter() {
-  return nodemailer.createTransport({
+  const key = `${process.env.SMTP_HOST}|${process.env.SMTP_PORT}|${process.env.SMTP_USER}|${process.env.SMTP_SECURE}`;
+  if (_transporter && _transporterKey === key) return _transporter;
+  if (_transporter) { try { _transporter.close(); } catch (_) {} }
+  _transporter = nodemailer.createTransport({
+    pool: true,
+    maxConnections: 3,
+    maxMessages: 100,
     host: process.env.SMTP_HOST,
     port: parseInt(process.env.SMTP_PORT || '587', 10),
     secure: process.env.SMTP_SECURE === 'true',
@@ -18,6 +27,14 @@ function _buildTransporter() {
     },
     tls: { rejectUnauthorized: false }
   });
+  _transporterKey = key;
+  return _transporter;
+}
+
+function resetTransporter() {
+  if (_transporter) { try { _transporter.close(); } catch (_) {} }
+  _transporter = null;
+  _transporterKey = '';
 }
 
 // Cached admin display name — fetched once and reused to avoid per-email DB roundtrip.
@@ -127,7 +144,7 @@ async function sendMail({ to, subject, html }) {
   }
   if (!to) return false;
   try {
-    const transporter = _buildTransporter();
+    const transporter = _buildTransporter(); // reuses pooled connection
     const displayName = await getAdminDisplayName();
     const fromAddress = process.env.SMTP_FROM || process.env.SMTP_USER;
     await transporter.sendMail({
@@ -363,4 +380,4 @@ async function sendReportReviewEmail({ userEmail, userName, projectName, moduleN
   });
 }
 
-module.exports = { sendMail, sendProjectAssignmentEmail, sendReportReviewEmail, clearAdminNameCache };
+module.exports = { sendMail, sendProjectAssignmentEmail, sendReportReviewEmail, clearAdminNameCache, resetTransporter };

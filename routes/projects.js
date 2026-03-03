@@ -2,7 +2,7 @@ const express = require('express');
 const multer = require('multer');
 const xlsx = require('xlsx');
 const db = require('../database/db');
-const { verifyToken, requireAdmin } = require('../middleware/auth');
+const { verifyToken, requireAdmin, requireSalesOrAdmin } = require('../middleware/auth');
 const { sendProjectAssignmentEmail, sendReportReviewEmail } = require('../services/email');
 
 const router = express.Router();
@@ -75,7 +75,8 @@ const MODULE_CHECKLISTS = {
 router.get('/', verifyToken, async (req, res) => {
   try {
     let projects;
-    if (req.user.role === 'admin') {
+    if (req.user.role === 'admin' || req.user.role === 'sales') {
+      // Admins and sales/presales see all projects
       projects = await db.all(`
         SELECT p.*, u1.full_name as user1_name, u1.avatar_color as user1_color,
                u2.full_name as user2_name, u2.avatar_color as user2_color,
@@ -198,7 +199,7 @@ router.get('/:id', verifyToken, async (req, res) => {
     `, [req.params.id]);
 
     if (!project) return res.status(404).json({ error: 'Project not found' });
-    if (req.user.role !== 'admin' && project.user_id_1 !== req.user.id && project.user_id_2 !== req.user.id) {
+    if (req.user.role !== 'admin' && req.user.role !== 'sales' && project.user_id_1 !== req.user.id && project.user_id_2 !== req.user.id) {
       return res.status(403).json({ error: 'Access denied' });
     }
 
@@ -223,8 +224,8 @@ router.get('/:id', verifyToken, async (req, res) => {
   }
 });
 
-// ── Create project (admin only) ─────────────────────────
-router.post('/', verifyToken, requireAdmin, async (req, res) => {
+// ── Create project (admin or sales) ────────────────────
+router.post('/', verifyToken, requireSalesOrAdmin, async (req, res) => {
   try {
     const {
       project_name, client_name_1, client_name_2, client_number,
@@ -422,6 +423,75 @@ router.put('/:id', verifyToken, requireAdmin, async (req, res) => {
     }
   } catch (err) {
     console.error('Update project error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ── Assign team to project (admin only) ─────────────────
+// Dedicated endpoint so sales-created projects can have technicians assigned later
+router.put('/:id/assign', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    const existing = await db.get('SELECT * FROM projects WHERE id=?', [req.params.id]);
+    if (!existing) return res.status(404).json({ error: 'Project not found' });
+
+    const { user_id_1, user_id_2 } = req.body;
+    const finalUserId1 = user_id_1 !== undefined ? user_id_1 : existing.user_id_1;
+    const finalUserId2 = user_id_2 !== undefined ? user_id_2 : existing.user_id_2;
+
+    await db.run(
+      'UPDATE projects SET user_id_1=?, user_id_2=?, updated_at=NOW() WHERE id=?',
+      [finalUserId1 || null, finalUserId2 || null, req.params.id]
+    );
+
+    // Detect newly assigned users (not previously assigned) for notifications + email
+    const prevIds  = [existing.user_id_1, existing.user_id_2].filter(Boolean).map(Number);
+    const newIds   = [finalUserId1, finalUserId2].filter(Boolean).map(Number);
+    const addedIds = newIds.filter(id => !prevIds.includes(id));
+
+    // In-app notifications for newly assigned users
+    for (const uid of addedIds) {
+      await db.run(
+        "INSERT INTO notifications (user_id, title, message, type) VALUES (?, ?, ?, 'project')",
+        [uid, `New Project Assigned: ${existing.project_name}`,
+          `You have been assigned to project "${existing.project_name}". Please review your tasks.`]
+      );
+    }
+
+    res.json({ success: true, message: 'Team assigned successfully' });
+
+    // Send assignment emails to newly assigned users (non-blocking)
+    if (addedIds.length) {
+      const notifSetting = await db.get("SELECT value FROM app_settings WHERE key='email_notifications_enabled'");
+      const notifEnabled = !notifSetting || notifSetting.value !== 'false';
+      if (notifEnabled) {
+        const mods = await db.all('SELECT module_type, scope_of_work FROM project_modules WHERE project_id=?', [req.params.id]);
+        for (const uid of addedIds) {
+          try {
+            const usr = await db.get('SELECT full_name, email FROM users WHERE id=?', [uid]);
+            if (!usr) continue;
+            if (!usr.email) {
+              console.warn(`[Email] User "${usr.full_name}" (id=${uid}) has no email — skipping assignment email`);
+              continue;
+            }
+            const { sendProjectAssignmentEmail } = require('../services/email');
+            sendProjectAssignmentEmail({
+              userEmail: usr.email,
+              userName: usr.full_name,
+              projectName: existing.project_name,
+              clientName: existing.client_name_1,
+              startDate: existing.start_date,
+              endDate: existing.end_date,
+              priority: existing.priority,
+              modules: mods
+            }).catch(e => console.error(`[Email] Assign email error for user id=${uid}:`, e.message));
+          } catch (e) {
+            console.error(`[Email] Failed to process assign email for user id=${uid}:`, e.message);
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Assign team error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
