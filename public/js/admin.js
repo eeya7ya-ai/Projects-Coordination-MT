@@ -738,7 +738,7 @@ async function loadUsersTable() {
         <td><code style="background:var(--gray-100);padding:3px 8px;border-radius:5px;font-size:13px">${u.username}</code></td>
         <td>${u.department || '—'}</td>
         <td>${u.phone || '—'}</td>
-        <td><span class="badge" style="${u.role === 'planner' ? 'background:var(--info);color:#fff' : u.role === 'sales' ? 'background:#8E44AD;color:#fff' : u.role === 'admin' ? 'background:var(--red-dark);color:#fff' : 'background:var(--gray-200);color:var(--gray-700)'}">${u.role === 'planner' ? 'Planner' : u.role === 'sales' ? 'Sales/Presales' : u.role === 'admin' ? 'Admin' : 'Technician'}</span></td>
+        <td><span class="badge" style="${u.role === 'planner' ? 'background:var(--info);color:#fff' : u.role === 'sales' ? 'background:#8E44AD;color:#fff' : u.role === 'presales' ? 'background:#6C3483;color:#fff' : u.role === 'technical' ? 'background:#1A5276;color:#fff' : u.role === 'engineer' ? 'background:#117A65;color:#fff' : u.role === 'admin' ? 'background:var(--red-dark);color:#fff' : 'background:var(--gray-200);color:var(--gray-700)'}">${u.role === 'planner' ? 'Planner' : u.role === 'sales' ? 'Sales' : u.role === 'presales' ? 'Presales' : u.role === 'technical' ? 'Technical' : u.role === 'engineer' ? 'Engineer' : u.role === 'admin' ? 'Admin' : 'Technical'}</span></td>
         <td><span class="badge badge-${u.total_projects > 0 ? 'progress' : 'pending'}">${u.total_projects || 0} projects</span></td>
         <td>${u.is_active ? '<span class="badge badge-completed">Active</span>' : '<span class="badge badge-cancelled">Inactive</span>'}</td>
         <td style="font-size:12px;color:var(--gray-400)">${u.last_login ? formatDate(u.last_login) : 'Never'}</td>
