@@ -19,4 +19,11 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-module.exports = { verifyToken, requireAdmin, JWT_SECRET };
+function requireSalesOrAdmin(req, res, next) {
+  if (req.user?.role !== 'admin' && req.user?.role !== 'sales') {
+    return res.status(403).json({ error: 'Access restricted to sales or admin users' });
+  }
+  next();
+}
+
+module.exports = { verifyToken, requireAdmin, requireSalesOrAdmin, JWT_SECRET };

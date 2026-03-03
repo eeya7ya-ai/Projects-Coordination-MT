@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MagicTech Projects Coordination — Sales</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+</head>
+<body>
+
+<div id="loading-overlay" class="loading-overlay">
+  <div class="spinner"></div>
+  <span>Loading MagicTech...</span>
+</div>
+
+<div class="app-layout" id="app" style="display:none">
+
+  <!-- Mobile sidebar overlay -->
+  <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
+
+  <!-- ═══ SIDEBAR ═══ -->
+  <aside class="sidebar" id="sidebar">
+    <button class="sidebar-close" onclick="closeSidebar()" aria-label="Close menu">×</button>
+    <div class="sidebar-header">
+      <div class="sidebar-logo">
+        <div class="logo-box">
+          <svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+        </div>
+        <div>
+          <div class="brand-name">MagicTech</div>
+          <div class="brand-sub">Projects Coordination</div>
+        </div>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Projects</div>
+      <a class="nav-item active" data-page="projects">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+        All Projects
+      </a>
+      <a class="nav-item" data-page="new-project">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+        New Project
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="user-info" onclick="showChangePassword()">
+        <div class="user-avatar" id="sidebar-avatar" style="background:var(--red-dark)">S</div>
+        <div>
+          <div class="user-name" id="sidebar-name">Sales User</div>
+          <div class="user-role">Sales / Presales</div>
+        </div>
+        <svg style="margin-left:auto;opacity:0.5" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M4.93 19.07l1.41-1.41M19.07 19.07l-1.41-1.41M12 2v2M12 20v2M2 12h2M20 12h2"/></svg>
+      </div>
+      <button onclick="logout()" class="btn btn-secondary" style="width:100%;margin-top:8px;font-size:13px">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Logout
+      </button>
+    </div>
+  </aside>
+
+  <!-- ═══ MAIN CONTENT ═══ -->
+  <main class="main-content">
+    <div class="topbar">
+      <div class="topbar-title" id="page-title">All Projects</div>
+      <div class="topbar-actions">
+        <div class="search-input">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" placeholder="Search projects..." id="global-search" oninput="filterProjects()">
+        </div>
+        <button class="notif-btn" onclick="toggleNotifs()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/></svg>
+          <span class="notif-dot hidden" id="notif-dot"></span>
+        </button>
+      </div>
+    </div>
+
+    <div class="page-content">
+
+      <!-- ── ALL PROJECTS PAGE ── -->
+      <div class="page active" id="page-projects">
+        <div class="section-header">
+          <div class="section-title">All Projects <span id="projects-count">Loading...</span></div>
+          <div style="display:flex;gap:12px">
+            <select id="filter-status" class="form-control" style="width:140px;padding:9px 12px" onchange="filterProjects()">
+              <option value="">All Status</option>
+              <option value="pending">Pending</option>
+              <option value="in_progress">In Progress</option>
+              <option value="completed">Completed</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+            <button class="btn btn-danger" onclick="navigate('new-project')">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              New Project
+            </button>
+          </div>
+        </div>
+        <div class="projects-grid" id="projects-grid"></div>
+      </div>
+
+      <!-- ── NEW PROJECT PAGE ── -->
+      <div class="page" id="page-new-project">
+        <div class="section-header">
+          <div class="section-title">New Project <span>Submit a new project for execution</span></div>
+          <button class="btn btn-secondary" onclick="navigate('projects')">← Back to Projects</button>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 380px;gap:24px">
+
+          <!-- Left column: form -->
+          <div style="display:flex;flex-direction:column;gap:20px">
+
+            <!-- Project Basics -->
+            <div class="card">
+              <div class="card-header"><h3 class="card-title">📋 Project Information</h3></div>
+              <div class="card-body">
+                <div class="form-grid">
+                  <div class="form-group form-full">
+                    <label>Project Name *</label>
+                    <input type="text" id="p-name" placeholder="e.g. CCTV Installation – Block A">
+                  </div>
+                  <div class="form-group">
+                    <label>Client Name (Primary)</label>
+                    <input type="text" id="p-client1" placeholder="Primary client name">
+                  </div>
+                  <div class="form-group">
+                    <label>Client Name (Secondary)</label>
+                    <input type="text" id="p-client2" placeholder="Secondary contact (optional)">
+                  </div>
+                  <div class="form-group">
+                    <label>Client Number</label>
+                    <input type="text" id="p-client-num" placeholder="e.g. +971 50 123 4567">
+                  </div>
+                  <div class="form-group">
+                    <label>Priority</label>
+                    <select id="p-priority">
+                      <option value="normal">Normal</option>
+                      <option value="high">High</option>
+                      <option value="urgent">Urgent</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label>Start Date</label>
+                    <input type="date" id="p-start">
+                  </div>
+                  <div class="form-group">
+                    <label>Estimated End Date</label>
+                    <input type="date" id="p-end">
+                  </div>
+                </div>
+                <div class="alert" style="background:#FFF9F0;border:1px solid #F39C12;border-radius:8px;padding:12px 16px;font-size:13px;color:#7D5A00;margin-top:8px;">
+                  <strong>Note:</strong> Technician and engineer assignment will be done by the admin after project creation.
+                </div>
+              </div>
+            </div>
+
+            <!-- Location -->
+            <div class="card">
+              <div class="card-header"><h3 class="card-title">📍 Location</h3></div>
+              <div class="card-body">
+                <div class="form-group">
+                  <label>Location Name / Address</label>
+                  <input type="text" id="p-location-name" placeholder="Enter address or place name">
+                </div>
+                <div style="position:relative;margin-bottom:8px">
+                  <div style="display:flex;gap:6px">
+                    <input type="text" id="map-search-input" placeholder="Search street in Jordan (e.g. Queen Rania St, Mecca St...)"
+                      style="flex:1;padding:8px 12px;border:1px solid var(--gray-200);border-radius:8px;font-size:13px"
+                      onkeydown="if(event.key==='Enter'){event.preventDefault();searchMapLocation()}"
+                    >
+                    <button id="map-search-btn" type="button" onclick="searchMapLocation()"
+                      style="padding:8px 14px;background:var(--red);color:white;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600">
+                      🔍
+                    </button>
+                  </div>
+                  <div id="map-search-results" style="display:none;position:absolute;top:100%;left:0;right:0;background:white;border:1px solid var(--gray-200);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.1);z-index:9999;max-height:200px;overflow-y:auto;margin-top:4px"></div>
+                </div>
+                <div id="map-picker"></div>
+                <div class="map-coords" id="map-coords">Search for a location above or click on the map to pin</div>
+                <input type="hidden" id="p-lat">
+                <input type="hidden" id="p-lng">
+              </div>
+            </div>
+
+            <!-- Modules -->
+            <div class="card">
+              <div class="card-header"><h3 class="card-title">⚙️ Select Modules</h3></div>
+              <div class="card-body">
+                <p style="font-size:13px;color:var(--gray-500);margin-bottom:16px">Select one or more work modules for this project</p>
+                <div class="module-selector">
+                  <div class="module-option" data-module="Maintenance" onclick="toggleModule(this)">
+                    <div class="mod-icon">🔧</div>
+                    <div class="mod-name">Maintenance</div>
+                  </div>
+                  <div class="module-option" data-module="Handover" onclick="toggleModule(this)">
+                    <div class="mod-icon">🤝</div>
+                    <div class="mod-name">Handover</div>
+                  </div>
+                  <div class="module-option" data-module="Installation and Wiring" onclick="toggleModule(this)">
+                    <div class="mod-icon">⚡</div>
+                    <div class="mod-name">Installation & Wiring</div>
+                  </div>
+                  <div class="module-option" data-module="Programming and Trouble Shooting" onclick="toggleModule(this)">
+                    <div class="mod-icon">💻</div>
+                    <div class="mod-name">Programming & Troubleshooting</div>
+                  </div>
+                  <div class="module-option" data-module="Delivering" onclick="toggleModule(this)">
+                    <div class="mod-icon">📦</div>
+                    <div class="mod-name">Delivering</div>
+                  </div>
+                  <div class="module-option" data-module="Site Survey" onclick="toggleModule(this)">
+                    <div class="mod-icon">🗺️</div>
+                    <div class="mod-name">Site Survey</div>
+                  </div>
+                  <div class="module-option" data-module="POC" onclick="toggleModule(this)">
+                    <div class="mod-icon">🔬</div>
+                    <div class="mod-name">POC</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Module Details (dynamically shown) -->
+            <div id="module-details-container"></div>
+
+            <div style="display:flex;gap:12px;margin-bottom:20px">
+              <button class="btn btn-danger" style="flex:1;padding:16px" onclick="submitProject()">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v14a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                Submit Project
+              </button>
+              <button class="btn btn-secondary" onclick="resetProjectForm()">Reset</button>
+            </div>
+          </div>
+
+          <!-- Right sidebar: Excel upload -->
+          <div style="display:flex;flex-direction:column;gap:20px">
+            <div class="card" style="position:sticky;top:80px">
+              <div class="card-header"><h3 class="card-title">📊 Import from Excel</h3></div>
+              <div class="card-body">
+                <p style="font-size:13px;color:var(--gray-500);margin-bottom:16px">Upload an Excel file to auto-extract device models and scope of work.</p>
+                <div class="upload-area" id="excel-upload-area" onclick="document.getElementById('excel-file').click()">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                  <p><strong>Click to upload</strong> or drag & drop</p>
+                  <p style="font-size:12px;margin-top:4px">.xlsx, .xls files only</p>
+                </div>
+                <input type="file" id="excel-file" accept=".xlsx,.xls" style="display:none" onchange="handleExcelUpload(this)">
+                <div id="excel-result" class="hidden" style="margin-top:16px">
+                  <div class="alert alert-success" id="excel-msg"></div>
+                  <div id="excel-devices-preview"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-header"><h3 class="card-title">💡 Tips</h3></div>
+              <div class="card-body">
+                <ul style="font-size:13px;color:var(--gray-600);line-height:2;padding-left:16px">
+                  <li>Select modules first, then fill details</li>
+                  <li>Excel columns: Model, Qty, Description, SN</li>
+                  <li>Pin location on map for precision</li>
+                  <li>Admin will assign technicians after creation</li>
+                  <li>Default checklists are auto-generated</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /page-content -->
+  </main>
+</div><!-- /app-layout -->
+
+<!-- ═══ NOTIFICATION PANEL ═══ -->
+<div class="notif-panel" id="notif-panel">
+  <div class="notif-panel-header">
+    <h3 style="font-size:16px">Notifications</h3>
+    <button class="btn btn-sm btn-secondary" onclick="markAllRead()">Mark all read</button>
+  </div>
+  <div class="notif-list" id="notif-list"></div>
+</div>
+
+<!-- ═══ PROJECT DETAIL MODAL ═══ -->
+<div class="modal-overlay" id="project-detail-modal">
+  <div class="modal modal-xl">
+    <div class="modal-header">
+      <h2 id="proj-detail-title">Project Details</h2>
+      <button class="modal-close" onclick="closeModal('project-detail-modal')">×</button>
+    </div>
+    <div class="modal-body" id="proj-detail-body">Loading...</div>
+  </div>
+</div>
+
+<!-- ═══ CHANGE PASSWORD MODAL ═══ -->
+<div class="modal-overlay" id="pw-modal">
+  <div class="modal" style="max-width:400px">
+    <div class="modal-header">
+      <h2>Change Password</h2>
+      <button class="modal-close" onclick="closeModal('pw-modal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label>Current Password</label><input type="password" id="pw-current"></div>
+      <div class="form-group"><label>New Password</label><input type="password" id="pw-new"></div>
+      <div class="form-group"><label>Confirm New Password</label><input type="password" id="pw-confirm"></div>
+      <div id="pw-alert"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('pw-modal')">Cancel</button>
+      <button class="btn btn-danger" onclick="changePassword()">Update Password</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+<footer class="espark-footer">
+  <span>Created by <span class="espark-brand">eSpark</span> Developers</span>
+</footer>
+
+<!-- ═══ MOBILE BOTTOM NAV (Sales) ═══ -->
+<nav class="mobile-bottom-nav">
+  <div class="mobile-nav-items">
+    <button class="mobile-nav-tab active" data-page="projects" onclick="navigate('projects')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+      <span class="tab-label">Projects</span>
+    </button>
+    <button class="mobile-nav-tab" data-page="new-project" onclick="navigate('new-project')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+      <span class="tab-label">New</span>
+    </button>
+    <button class="mobile-nav-tab" onclick="showChangePassword()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      <span class="tab-label">Me</span>
+    </button>
+  </div>
+</nav>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="/js/sales.js"></script>
+</body>
+</html>

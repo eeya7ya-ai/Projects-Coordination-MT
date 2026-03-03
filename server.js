@@ -43,6 +43,10 @@ app.get('/planner', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'planner.html'));
 });
 
+app.get('/sales', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'sales.html'));
+});
+
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });

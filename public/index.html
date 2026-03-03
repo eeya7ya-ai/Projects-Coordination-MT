@@ -106,6 +106,8 @@ form.addEventListener('submit', async (e) => {
         window.location.href = '/admin';
       } else if (data.user.role === 'planner') {
         window.location.href = '/planner';
+      } else if (data.user.role === 'sales') {
+        window.location.href = '/sales';
       } else {
         window.location.href = '/dashboard';
       }
