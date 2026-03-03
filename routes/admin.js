@@ -54,8 +54,8 @@ router.post('/users', async (req, res) => {
     const existing = await db.get('SELECT id FROM users WHERE username = ?', [username]);
     if (existing) return res.status(400).json({ error: 'Username already exists' });
 
-    const allowedRoles = ['user', 'planner'];
-    const assignedRole = allowedRoles.includes(role) ? role : 'user';
+    const allowedRoles = ['user', 'technical', 'engineer', 'sales', 'presales', 'planner'];
+    const assignedRole = allowedRoles.includes(role) ? role : 'technical';
 
     const hashed = bcrypt.hashSync(password, 10);
     const colors = ['#c0392b', '#e74c3c', '#8B0000', '#922B21', '#CB4335', '#A93226'];
@@ -85,7 +85,7 @@ router.put('/users/:id', async (req, res) => {
       await db.run('UPDATE users SET password = ? WHERE id = ?', [hashed, req.params.id]);
     }
 
-    const allowedRoles = ['user', 'planner'];
+    const allowedRoles = ['user', 'technical', 'engineer', 'sales', 'presales', 'planner'];
     const assignedRole = role && allowedRoles.includes(role) ? role : undefined;
 
     const roleClause = assignedRole ? ', role=?' : '';
