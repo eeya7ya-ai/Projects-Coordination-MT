@@ -602,7 +602,7 @@ function openAssignTeam(projectId) {
 
   // Populate dropdowns
   populateUserDropdowns();
-  const techUsers = allUsers.filter(u => u.is_active && u.role === 'user');
+  const techUsers = allUsers.filter(u => u.is_active && ['user', 'technical', 'engineer'].includes(u.role));
   document.getElementById('assign-user1').innerHTML =
     '<option value="">— Select Technician —</option>' +
     techUsers.map(u => `<option value="${u.id}" data-color="${u.avatar_color || '#C0392B'}" data-dept="${u.department || ''}">${u.full_name}</option>`).join('');
@@ -884,8 +884,8 @@ async function loadUsersTable() {
 }
 
 function populateUserDropdowns() {
-  // Only technicians/engineers (role: user) can be assigned as executors
-  const fieldUsers = allUsers.filter(u => u.is_active && u.role === 'user');
+  // Technicians/engineers: roles that perform field work
+  const fieldUsers = allUsers.filter(u => u.is_active && ['user', 'technical', 'engineer'].includes(u.role));
   const opts = '<option value="">— Select Technician/Engineer —</option>' + fieldUsers.map(u => `<option value="${u.id}">${u.full_name}</option>`).join('');
   const el1 = document.getElementById('p-user1');
   const el2 = document.getElementById('p-user2');
@@ -896,6 +896,18 @@ function populateUserDropdowns() {
   const at2 = document.getElementById('at-user2');
   if (at1) at1.innerHTML = opts;
   if (at2) at2.innerHTML = '<option value="">— Optional —</option>' + fieldUsers.map(u => `<option value="${u.id}">${u.full_name}</option>`).join('');
+
+  // Populate Sales and Presales person dropdowns (New Project + Edit Project forms)
+  const salesUsers = allUsers.filter(u => u.is_active && u.role === 'sales');
+  const presalesUsers = allUsers.filter(u => u.is_active && u.role === 'presales');
+  ['p-sales-person', 'edit-proj-sales'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = '<option value="">— Select Sales Person —</option>' + salesUsers.map(u => `<option value="${u.id}">${u.full_name}</option>`).join('');
+  });
+  ['p-presales-person', 'edit-proj-presales'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = '<option value="">— Select Presales Person —</option>' + presalesUsers.map(u => `<option value="${u.id}">${u.full_name}</option>`).join('');
+  });
 }
 
 function openUserModal(userId) {
@@ -1489,6 +1501,7 @@ async function loadAssignTeam() {
   const res = await apiFetch('/projects');
   if (!res?.ok) return;
   _assignProjects = await res.json();
+  allProjects = _assignProjects; // keep in sync so openAssignTeam can find projects
   renderAssignTeamView();
 }
 
@@ -1557,7 +1570,7 @@ function renderAssignList(projects, container) {
                       Unassigned
                     </div>`}
               </div>
-              <button class="btn btn-sm btn-danger" onclick="openAssignModal(${p.id})">
+              <button class="btn btn-sm btn-danger" onclick="openAssignTeam(${p.id})">
                 ${isUnassigned ? 'Assign Team' : 'Reassign'}
               </button>
             </div>
@@ -1653,7 +1666,7 @@ async function openAssignModal(projectId) {
   const p = _assignProjects.find(x => x.id === projectId);
   if (!p) return;
 
-  const techUsers = allUsers.filter(u => u.is_active && u.role === 'user');
+  const techUsers = allUsers.filter(u => u.is_active && ['user', 'technical', 'engineer'].includes(u.role));
   const techOpts = '<option value="">— None —</option>' + techUsers.map(u => `<option value="${u.id}">${u.full_name}${u.department ? ' ('+u.department+')' : ''}</option>`).join('');
 
   // Build and show modal dynamically
@@ -1749,6 +1762,8 @@ async function loadDailySummary() {
   const container = document.getElementById('daily-summary-content');
   container.innerHTML = '<div style="text-align:center;padding:40px"><div class="spinner" style="margin:auto"></div></div>';
   document.getElementById('btn-copy-summary').style.display = 'none';
+  const fwdBtn = document.getElementById('btn-forward-planner');
+  if (fwdBtn) fwdBtn.style.display = 'none';
 
   const res = await apiFetch(`/projects/daily-summary?date=${encodeURIComponent(dateVal)}`);
   if (!res?.ok) {
@@ -1855,6 +1870,8 @@ async function loadDailySummary() {
 
   container.innerHTML = html;
   document.getElementById('btn-copy-summary').style.display = '';
+  const fwdBtnShow = document.getElementById('btn-forward-planner');
+  if (fwdBtnShow) fwdBtnShow.style.display = '';
 }
 
 function formatSummaryDate(dateStr) {
@@ -1916,4 +1933,33 @@ function copySummaryText() {
     document.body.removeChild(ta);
     showToast('Summary copied to clipboard!', 'success');
   });
+}
+
+async function forwardSummaryToPlanner() {
+  if (!_lastSummaryData) { showToast('Generate a summary first', 'error'); return; }
+  const dateVal = document.getElementById('summary-date').value;
+  const btn = document.getElementById('btn-forward-planner');
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+
+  try {
+    const res = await apiFetch('/projects/daily-summary/forward', {
+      method: 'POST',
+      body: JSON.stringify({ date: dateVal })
+    });
+    const data = await res?.json().catch(() => ({}));
+    if (res?.ok) {
+      if (data.sent === 0) {
+        showToast(data.message || 'No planner users with emails found', 'warning');
+      } else {
+        showToast(`Summary forwarded to ${data.sent} planner${data.sent !== 1 ? 's' : ''}${data.skipped ? ' (' + data.skipped + ' failed)' : ''}`, 'success');
+      }
+    } else {
+      showToast('Error: ' + (data.error || 'Failed to forward summary'), 'error');
+    }
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg> Forward to Planner';
+    }
+  }
 }

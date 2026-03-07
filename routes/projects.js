@@ -3,7 +3,7 @@ const multer = require('multer');
 const xlsx = require('xlsx');
 const db = require('../database/db');
 const { verifyToken, requireAdmin, requireSalesOrAdmin } = require('../middleware/auth');
-const { sendProjectAssignmentEmail, sendReportReviewEmail } = require('../services/email');
+const { sendProjectAssignmentEmail, sendReportReviewEmail, sendDailySummaryEmail } = require('../services/email');
 
 const router = express.Router();
 
@@ -156,6 +156,61 @@ router.get('/daily-summary', verifyToken, async (req, res) => {
     res.json({ date, projects });
   } catch (err) {
     console.error('Daily summary error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ── Forward daily summary to planner-role users via SMTP ─
+// Must be declared before /:id routes to avoid conflicts
+router.post('/daily-summary/forward', verifyToken, async (req, res) => {
+  if (req.user.role !== 'admin' && req.user.role !== 'planner') {
+    return res.status(403).json({ error: 'Access denied' });
+  }
+  try {
+    const date = req.body.date || new Date().toISOString().slice(0, 10);
+
+    // Fetch planner users who have email addresses
+    const planners = await db.all(
+      "SELECT id, full_name, email FROM users WHERE role='planner' AND is_active=1 AND email IS NOT NULL AND email != ''",
+      []
+    );
+    if (!planners.length) {
+      return res.json({ success: true, sent: 0, skipped: 0, message: 'No planner users with email addresses found' });
+    }
+
+    // Rebuild summary data (same query as GET /daily-summary)
+    const projects = await db.all(`
+      SELECT p.id, p.project_name, p.client_name_1, p.client_name_2, p.client_number,
+             p.location_name, p.status, p.priority, p.start_date, p.end_date,
+             u1.full_name as user1_name, u2.full_name as user2_name
+      FROM projects p
+      LEFT JOIN users u1 ON u1.id = p.user_id_1
+      LEFT JOIN users u2 ON u2.id = p.user_id_2
+      WHERE p.status != 'cancelled'
+        AND (p.start_date IS NULL OR p.start_date <= ?)
+        AND (p.end_date IS NULL OR p.end_date >= ?)
+      ORDER BY p.priority DESC, p.project_name ASC
+    `, [date, date]);
+
+    for (const proj of projects) {
+      proj.modules = await db.all(
+        'SELECT id, module_type, status, progress, scope_of_work FROM project_modules WHERE project_id = ? ORDER BY id',
+        [proj.id]
+      );
+      for (const mod of proj.modules) {
+        mod.devices = await db.all(
+          'SELECT device_model, device_qty, device_description FROM module_devices WHERE module_id = ? ORDER BY id',
+          [mod.id]
+        );
+      }
+    }
+
+    const plannerEmails = planners.map(p => p.email);
+    const { sent, skipped } = await sendDailySummaryEmail({ date, summaryData: { projects }, plannerEmails });
+
+    res.json({ success: true, sent, skipped, total: planners.length });
+  } catch (err) {
+    console.error('Forward daily summary error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

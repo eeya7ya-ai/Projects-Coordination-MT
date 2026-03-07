@@ -403,4 +403,95 @@ async function sendReportReviewEmail({ userEmail, userName, projectName, moduleN
   });
 }
 
-module.exports = { sendMail, sendProjectAssignmentEmail, sendReportReviewEmail, clearAdminNameCache, resetTransporter };
+/**
+ * Forward the daily project summary to all planner-role users with emails.
+ * @param {string} date - YYYY-MM-DD
+ * @param {object} summaryData - { projects: [...] } as returned by the daily-summary endpoint
+ */
+async function sendDailySummaryEmail({ date, summaryData, plannerEmails }) {
+  if (!plannerEmails || plannerEmails.length === 0) return { sent: 0, skipped: 0 };
+
+  const dateLabel = new Date(date + 'T00:00:00').toLocaleDateString('en-US', {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+  });
+
+  const statusColors = { pending: '#F39C12', in_progress: '#2980B9', completed: '#27AE60', cancelled: '#95A5A6' };
+  const moduleIcons  = {
+    'Maintenance': '🔧', 'Handover': '🤝', 'Installation and Wiring': '⚡',
+    'Programming and Trouble Shooting': '💻', 'Delivering': '📦', 'Site Survey': '🗺️', 'POC': '🔬'
+  };
+
+  const projects = summaryData.projects || [];
+  const totalModules = projects.reduce((s, p) => s + (p.modules?.length || 0), 0);
+
+  const projectsHtml = projects.map((proj, idx) => {
+    const modulesHtml = (proj.modules || []).map(mod => {
+      const color = statusColors[mod.status] || '#999';
+      const icon  = moduleIcons[mod.module_type] || '📋';
+      const devicesHtml = (mod.devices || []).length > 0
+        ? `<div style="margin-top:6px;padding:6px 10px;background:#f8f9fa;border-left:3px solid #dee2e6;font-size:12px">
+            ${mod.devices.map(d => `<div>▪ <strong>${d.device_model}</strong> ×${d.device_qty}${d.device_description ? ' — ' + d.device_description : ''}</div>`).join('')}
+           </div>`
+        : '';
+      return `
+        <tr>
+          <td style="padding:8px 0;border-bottom:1px solid #f1f3f5;vertical-align:top">
+            <span style="font-size:15px">${icon}</span>
+          </td>
+          <td style="padding:8px 8px;border-bottom:1px solid #f1f3f5">
+            <div style="font-size:13px;font-weight:600">${mod.module_type}</div>
+            ${mod.scope_of_work ? `<div style="font-size:12px;color:#6c757d">${mod.scope_of_work.substring(0, 80)}${mod.scope_of_work.length > 80 ? '…' : ''}</div>` : ''}
+            ${devicesHtml}
+          </td>
+          <td style="padding:8px 0;border-bottom:1px solid #f1f3f5;white-space:nowrap">
+            <span style="font-size:11px;font-weight:600;color:white;background:${color};padding:2px 8px;border-radius:12px">${(mod.status || 'pending').replace('_', ' ')}</span>
+            <div style="font-size:11px;color:#adb5bd;text-align:right;margin-top:2px">${mod.progress || 0}%</div>
+          </td>
+        </tr>`;
+    }).join('');
+
+    return `
+      <div style="border:1px solid #dee2e6;border-radius:8px;margin-bottom:16px;overflow:hidden">
+        <div style="background:linear-gradient(135deg,#6B0000,#C0392B);color:white;padding:12px 16px">
+          <div style="font-size:15px;font-weight:700">${idx + 1}. ${proj.project_name}</div>
+          <div style="font-size:12px;opacity:0.8">${[proj.client_name_1, proj.location_name].filter(Boolean).join(' · ') || 'No client / location'}</div>
+        </div>
+        <div style="padding:0 16px">
+          <table style="width:100%;border-collapse:collapse">${modulesHtml}</table>
+        </div>
+        ${proj.user1_name || proj.user2_name ? `
+          <div style="padding:8px 16px;border-top:1px solid #f1f3f5;font-size:12px;color:#6c757d;background:#f8f9fa">
+            👷 Assigned: ${[proj.user1_name, proj.user2_name].filter(Boolean).join(' & ')}
+          </div>` : ''}
+      </div>`;
+  }).join('');
+
+  const body = `
+    <h2 style="font-size:20px;font-weight:700;margin:0 0 4px">Daily Project Summary</h2>
+    <p style="font-size:14px;color:#6c757d;margin:0 0 20px">${dateLabel}</p>
+    <div style="display:flex;gap:24px;margin-bottom:20px;padding:16px;background:#f8f9fa;border-radius:8px">
+      <div style="text-align:center">
+        <div style="font-size:28px;font-weight:800;color:#C0392B">${projects.length}</div>
+        <div style="font-size:11px;color:#6c757d;text-transform:uppercase;letter-spacing:0.5px">Projects</div>
+      </div>
+      <div style="text-align:center">
+        <div style="font-size:28px;font-weight:800;color:#2980B9">${totalModules}</div>
+        <div style="font-size:11px;color:#6c757d;text-transform:uppercase;letter-spacing:0.5px">Total Modules</div>
+      </div>
+    </div>
+    ${projectsHtml}
+  `;
+
+  let sent = 0, skipped = 0;
+  for (const email of plannerEmails) {
+    const ok = await sendMail({
+      to: email,
+      subject: `📅 Daily Summary — ${dateLabel}`,
+      html: wrapEmail(body)
+    });
+    ok ? sent++ : skipped++;
+  }
+  return { sent, skipped };
+}
+
+module.exports = { sendMail, sendProjectAssignmentEmail, sendReportReviewEmail, sendDailySummaryEmail, clearAdminNameCache, resetTransporter };
