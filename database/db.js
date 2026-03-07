@@ -233,6 +233,8 @@ async function initializeDB() {
     ALTER TABLE project_modules ADD COLUMN IF NOT EXISTS reopen_reason TEXT;
     ALTER TABLE project_modules ADD COLUMN IF NOT EXISTS last_reopened_at TIMESTAMP;
     ALTER TABLE project_modules ADD COLUMN IF NOT EXISTS last_reopened_by INTEGER REFERENCES users(id);
+    ALTER TABLE notifications ADD COLUMN IF NOT EXISTS notif_key TEXT;
+    ALTER TABLE notifications ADD COLUMN IF NOT EXISTS notif_params TEXT;
   `);
 
   // ── Admin user ────────────────────────────────────────

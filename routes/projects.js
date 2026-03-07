@@ -362,9 +362,10 @@ router.post('/', verifyToken, requireSalesOrAdmin, async (req, res) => {
       const userIds = [user_id_1, user_id_2].filter(Boolean);
       for (const uid of userIds) {
         await tx.run(
-          "INSERT INTO notifications (user_id, title, message, type) VALUES (?, ?, ?, 'project')",
+          "INSERT INTO notifications (user_id, title, message, type, notif_key, notif_params) VALUES (?, ?, ?, 'project', ?, ?)",
           [uid, `New Project Assigned: ${project_name}`,
-            `You have been assigned to project "${project_name}". Please review your tasks.`]
+            `You have been assigned to project "${project_name}". Please review your tasks.`,
+            'project_assigned', JSON.stringify({ project: project_name })]
         );
       }
 
@@ -372,9 +373,10 @@ router.post('/', verifyToken, requireSalesOrAdmin, async (req, res) => {
       const salesIds = [sales_person_id, presales_person_id].filter(Boolean);
       for (const uid of salesIds) {
         await tx.run(
-          "INSERT INTO notifications (user_id, title, message, type) VALUES (?, ?, ?, 'project')",
+          "INSERT INTO notifications (user_id, title, message, type, notif_key, notif_params) VALUES (?, ?, ?, 'project', ?, ?)",
           [uid, `Project Created: ${project_name}`,
-            `The project "${project_name}" you are associated with has been created and assigned.`]
+            `The project "${project_name}" you are associated with has been created and assigned.`,
+            'project_created', JSON.stringify({ project: project_name })]
         );
       }
 
@@ -580,9 +582,10 @@ router.put('/:id/assign', verifyToken, requireAdmin, async (req, res) => {
     // In-app notifications for newly assigned users
     for (const uid of addedIds) {
       await db.run(
-        "INSERT INTO notifications (user_id, title, message, type) VALUES (?, ?, ?, 'project')",
+        "INSERT INTO notifications (user_id, title, message, type, notif_key, notif_params) VALUES (?, ?, ?, 'project', ?, ?)",
         [uid, `New Project Assigned: ${existing.project_name}`,
-          `You have been assigned to project "${existing.project_name}". Please review your tasks.`]
+          `You have been assigned to project "${existing.project_name}". Please review your tasks.`,
+          'project_assigned', JSON.stringify({ project: existing.project_name })]
       );
     }
 
@@ -736,9 +739,10 @@ router.post('/:projectId/modules/:moduleId/reports', verifyToken, async (req, re
     const proj = await db.get('SELECT project_name FROM projects WHERE id=?', [req.params.projectId]);
     for (const admin of admins) {
       await db.run(
-        "INSERT INTO notifications (user_id, title, message, type) VALUES (?, ?, ?, 'report')",
+        "INSERT INTO notifications (user_id, title, message, type, notif_key, notif_params) VALUES (?, ?, ?, 'report', ?, ?)",
         [admin.id, `Report Submitted: ${proj?.project_name}`,
-          `${req.user.full_name} submitted a report for module #${req.params.moduleId}`]
+          `${req.user.full_name} submitted a report for module #${req.params.moduleId}`,
+          'report_submitted', JSON.stringify({ project: proj?.project_name, user: req.user.full_name, module: req.params.moduleId })]
       );
     }
 
@@ -855,11 +859,13 @@ router.post('/:projectId/modules/:moduleId/reopen', verifyToken, requireAdmin, a
       const notifyIds = [...new Set([userId1, userId2].filter(Boolean))];
       for (const uid of notifyIds) {
         await tx.run(
-          "INSERT INTO notifications (user_id, title, message, type) VALUES (?, ?, ?, 'project')",
+          "INSERT INTO notifications (user_id, title, message, type, notif_key, notif_params) VALUES (?, ?, ?, 'project', ?, ?)",
           [
             uid,
             `Ticket Reopened: ${mod.project_name}`,
-            `Module "${mod.module_type}" has been reopened. Client reason: ${reason.trim()}`
+            `Module "${mod.module_type}" has been reopened. Client reason: ${reason.trim()}`,
+            'ticket_reopened',
+            JSON.stringify({ project: mod.project_name, module: mod.module_type, reason: reason.trim() })
           ]
         );
       }

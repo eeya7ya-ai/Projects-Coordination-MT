@@ -1315,13 +1315,15 @@ async function loadNotifications() {
   const dot = document.getElementById('notif-dot');
   dot.classList.toggle('hidden', unread.length === 0);
 
-  document.getElementById('notif-list').innerHTML = notes.map(n => `
+  document.getElementById('notif-list').innerHTML = notes.map(n => {
+    const tx = tNotif(n);
+    return `
     <div class="notif-item ${n.is_read ? '' : 'unread'}" onclick="markRead(${n.id})">
-      <div class="notif-title">${n.title}</div>
-      <div class="notif-msg">${n.message || ''}</div>
+      <div class="notif-title">${tx.title}</div>
+      <div class="notif-msg">${tx.message}</div>
       <div class="notif-time">${formatDate(n.created_at)}</div>
-    </div>
-  `).join('') || '<div style="padding:20px;text-align:center;color:var(--gray-400)">No notifications</div>';
+    </div>`;
+  }).join('') || `<div style="padding:20px;text-align:center;color:var(--gray-400)">${t('msg.no_notifications')}</div>`;
 }
 
 function toggleNotifs() {
@@ -2054,4 +2056,6 @@ function reRenderCurrentPage() {
   };
   const titleEl = document.getElementById('page-title');
   if (titleEl && pageTitleKeys[pageId]) titleEl.textContent = t(pageTitleKeys[pageId]);
+  // Re-render notifications panel so titles/messages reflect new language
+  loadNotifications();
 }

@@ -151,6 +151,15 @@ const TRANSLATIONS = {
     'module.delivering':    'Delivering',
     'module.site_survey':   'Site Survey',
     'module.poc':           'POC',
+    // ── Notifications ──
+    'notif.project_assigned.title': 'New Project Assigned: {project}',
+    'notif.project_assigned.msg':   'You have been assigned to project "{project}". Please review your tasks.',
+    'notif.project_created.title':  'Project Created: {project}',
+    'notif.project_created.msg':    'The project "{project}" you are associated with has been created and assigned.',
+    'notif.report_submitted.title': 'Report Submitted: {project}',
+    'notif.report_submitted.msg':   '{user} submitted a report for module #{module}',
+    'notif.ticket_reopened.title':  'Ticket Reopened: {project}',
+    'notif.ticket_reopened.msg':    'Module "{module}" has been reopened. Client reason: {reason}',
     // ── Misc ──
     'misc.lang_toggle':  'عربي',
     'misc.admin':        'Admin',
@@ -309,6 +318,15 @@ const TRANSLATIONS = {
     'module.delivering':    'توصيل',
     'module.site_survey':   'مسح موقع',
     'module.poc':           'إثبات المفهوم',
+    // ── Notifications ──
+    'notif.project_assigned.title': 'تم تعيين مشروع جديد: {project}',
+    'notif.project_assigned.msg':   'تم تعيينك في مشروع "{project}". يرجى مراجعة مهامك.',
+    'notif.project_created.title':  'تم إنشاء مشروع: {project}',
+    'notif.project_created.msg':    'تم إنشاء وتعيين مشروع "{project}" الذي ترتبط به.',
+    'notif.report_submitted.title': 'تم تقديم تقرير: {project}',
+    'notif.report_submitted.msg':   'قدّم {user} تقريراً للوحدة رقم #{module}',
+    'notif.ticket_reopened.title':  'تمت إعادة فتح التذكرة: {project}',
+    'notif.ticket_reopened.msg':    'تمت إعادة فتح الوحدة "{module}". سبب العميل: {reason}',
     // ── Misc ──
     'misc.lang_toggle':  'English',
     'misc.admin':        'مدير',
@@ -327,6 +345,25 @@ let currentLang = localStorage.getItem('elv_lang') || 'en';
 // ── Translate key ─────────────────────────────────────
 function t(key) {
   return (TRANSLATIONS[currentLang]?.[key]) || (TRANSLATIONS['en']?.[key]) || key;
+}
+
+// ── Translate notification using notif_key + notif_params ──
+// Falls back to raw title/message for old records without a key
+function tNotif(n) {
+  if (!n.notif_key) return { title: n.title, message: n.message || '' };
+  let params = {};
+  try { params = JSON.parse(n.notif_params || '{}'); } catch (e) { /* ignore */ }
+
+  const titleKey = `notif.${n.notif_key}.title`;
+  const msgKey   = `notif.${n.notif_key}.msg`;
+
+  const interpolate = (str, p) =>
+    str.replace(/\{(\w+)\}/g, (_, k) => p[k] !== undefined ? p[k] : `{${k}}`);
+
+  return {
+    title:   interpolate(t(titleKey), params),
+    message: interpolate(t(msgKey),   params)
+  };
 }
 
 // ── Apply data-i18n attributes to DOM ────────────────
