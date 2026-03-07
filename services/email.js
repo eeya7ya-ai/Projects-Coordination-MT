@@ -494,4 +494,115 @@ async function sendDailySummaryEmail({ date, summaryData, plannerEmails }) {
   return { sent, skipped };
 }
 
-module.exports = { sendMail, sendProjectAssignmentEmail, sendReportReviewEmail, sendDailySummaryEmail, clearAdminNameCache, resetTransporter };
+/**
+ * Notify the sales and presales persons when a project is marked as completed.
+ */
+async function sendProjectCompletionEmail({ userEmail, userName, userRole, projectName, clientName,
+  startDate, endDate, priority, modules = [] }) {
+  if (!userEmail) return false;
+
+  const priorityColors = {
+    critical: '#8B0000', high: '#C0392B', urgent: '#C0392B',
+    medium: '#E67E22', normal: '#2980B9', low: '#27AE60'
+  };
+  const priorityColor = priorityColors[priority?.toLowerCase()] || '#2980B9';
+  const priorityLabel = (priority || 'Normal').charAt(0).toUpperCase() + (priority || 'Normal').slice(1).toLowerCase();
+
+  const roleLabels = { sales: 'Sales', presales: 'Presales', user: 'Technician', planner: 'Planner' };
+  const roleLabel  = roleLabels[userRole] || 'Team Member';
+
+  const formattedStart = startDate ? new Date(startDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : null;
+  const formattedEnd   = endDate   ? new Date(endDate).toLocaleDateString('en-GB',   { day: '2-digit', month: 'short', year: 'numeric' }) : null;
+
+  const moduleRows = modules.length
+    ? modules.map((m, i) => `
+        <tr style="background:${i % 2 === 0 ? '#ffffff' : '#f9fafb'};">
+          <td style="padding:11px 16px;font-size:13px;color:#1a1a2e;font-weight:600;
+                     border-bottom:1px solid #eaecef;white-space:nowrap;">${m.module_type}</td>
+          <td style="padding:11px 16px;font-size:13px;color:#555;border-bottom:1px solid #eaecef;">
+            ${m.scope_of_work || '<em style="color:#aaa;">Not specified</em>'}
+          </td>
+        </tr>`).join('')
+    : `<tr><td colspan="2" style="padding:14px 16px;font-size:13px;color:#aaa;font-style:italic;">No modules listed</td></tr>`;
+
+  const body = `
+    <h2 style="margin:0 0 4px;color:#0f0f1a;font-size:26px;font-weight:700;letter-spacing:-0.5px;">
+      Project Completed
+    </h2>
+    <p style="margin:0 0 30px;color:#6c757d;font-size:15px;line-height:1.7;border-bottom:1px solid #f0f0f0;padding-bottom:26px;">
+      Hello <strong style="color:#1a1a2e;">${userName || roleLabel}</strong>,<br>
+      The following project has been marked as <strong style="color:#27AE60;">Completed</strong>.
+      All work has been finished and the project is now closed.
+    </p>
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+           style="border-radius:10px;overflow:hidden;border:1px solid #dde1e7;margin-bottom:28px;">
+      <tr>
+        <td colspan="2" style="background-color:#1e8449;padding:16px 20px;">
+          <span style="color:#ffffff;font-size:17px;font-weight:700;letter-spacing:-0.3px;">
+            ✓ ${projectName}
+          </span>
+        </td>
+      </tr>
+      <tr style="background-color:#eafaf1;">
+        <td style="padding:12px 20px;font-size:12px;color:#888;font-weight:600;
+                   text-transform:uppercase;letter-spacing:0.8px;width:130px;">Priority</td>
+        <td style="padding:12px 20px;">
+          <span style="display:inline-block;padding:4px 14px;background-color:${priorityColor};
+                       color:#fff;border-radius:20px;font-size:12px;font-weight:700;
+                       text-transform:uppercase;letter-spacing:1px;">${priorityLabel}</span>
+        </td>
+      </tr>
+      ${clientName ? `<tr>
+        <td style="padding:12px 20px;font-size:12px;color:#888;font-weight:600;
+                   text-transform:uppercase;letter-spacing:0.8px;border-top:1px solid #f2f2f2;">Client</td>
+        <td style="padding:12px 20px;font-size:14px;color:#1a1a2e;font-weight:600;
+                   border-top:1px solid #f2f2f2;">${clientName}</td>
+      </tr>` : ''}
+      ${formattedStart ? `<tr>
+        <td style="padding:12px 20px;font-size:12px;color:#888;font-weight:600;
+                   text-transform:uppercase;letter-spacing:0.8px;border-top:1px solid #f2f2f2;">Start Date</td>
+        <td style="padding:12px 20px;font-size:14px;color:#333;border-top:1px solid #f2f2f2;">${formattedStart}</td>
+      </tr>` : ''}
+      ${formattedEnd ? `<tr>
+        <td style="padding:12px 20px;font-size:12px;color:#888;font-weight:600;
+                   text-transform:uppercase;letter-spacing:0.8px;border-top:1px solid #f2f2f2;">End Date</td>
+        <td style="padding:12px 20px;font-size:14px;color:#333;border-top:1px solid #f2f2f2;">${formattedEnd}</td>
+      </tr>` : ''}
+    </table>
+
+    <p style="margin:0 0 10px;font-size:13px;font-weight:700;color:#888;
+              text-transform:uppercase;letter-spacing:1px;">Completed Modules</p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+           style="border-radius:10px;overflow:hidden;border:1px solid #dde1e7;margin-bottom:32px;">
+      <thead>
+        <tr style="background-color:#1a1a2e;">
+          <th style="padding:11px 16px;text-align:left;font-size:12px;color:rgba(255,255,255,0.8);
+                     font-weight:600;text-transform:uppercase;letter-spacing:0.8px;white-space:nowrap;">Module Type</th>
+          <th style="padding:11px 16px;text-align:left;font-size:12px;color:rgba(255,255,255,0.8);
+                     font-weight:600;text-transform:uppercase;letter-spacing:0.8px;">Scope of Work</th>
+        </tr>
+      </thead>
+      <tbody>${moduleRows}</tbody>
+    </table>
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+      <tr>
+        <td style="background-color:#eafaf1;border-radius:8px;padding:18px 20px;border-left:4px solid #27AE60;">
+          <p style="margin:0;font-size:14px;color:#555;line-height:1.6;">
+            Log in to <strong style="color:#1a1a2e;">MagicTech Projects Coordination</strong> to view the
+            full project record, final reports, and any handover documentation.
+          </p>
+        </td>
+      </tr>
+    </table>
+  `;
+
+  return sendMail({
+    to: userEmail,
+    subject: `Project Completed: ${projectName}`,
+    html: wrapEmail(body)
+  });
+}
+
+module.exports = { sendMail, sendProjectAssignmentEmail, sendReportReviewEmail, sendDailySummaryEmail, sendProjectCompletionEmail, clearAdminNameCache, resetTransporter };

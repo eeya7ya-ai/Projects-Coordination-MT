@@ -3,7 +3,7 @@ const multer = require('multer');
 const xlsx = require('xlsx');
 const db = require('../database/db');
 const { verifyToken, requireAdmin, requireSalesOrAdmin } = require('../middleware/auth');
-const { sendProjectAssignmentEmail, sendReportReviewEmail, sendDailySummaryEmail } = require('../services/email');
+const { sendProjectAssignmentEmail, sendReportReviewEmail, sendDailySummaryEmail, sendProjectCompletionEmail } = require('../services/email');
 
 const router = express.Router();
 
@@ -472,6 +472,36 @@ router.put('/:id', verifyToken, requireAdmin, async (req, res) => {
     );
 
     res.json({ success: true, message: 'Project updated' });
+
+    // Email sales/presales when project is marked completed — non-blocking
+    const newStatus = status ?? existing.status;
+    if (newStatus === 'completed' && existing.status !== 'completed') {
+      const notifSetting = await db.get("SELECT value FROM app_settings WHERE key='email_notifications_enabled'");
+      const notifEnabled = !notifSetting || notifSetting.value !== 'false';
+      if (notifEnabled) {
+        const mods = await db.all('SELECT module_type, scope_of_work FROM project_modules WHERE project_id=?', [req.params.id]);
+        const stakeholderIds = [finalSalesId, finalPresalesId].filter(Boolean).map(Number);
+        for (const uid of stakeholderIds) {
+          try {
+            const usr = await db.get('SELECT full_name, email, role FROM users WHERE id=?', [uid]);
+            if (!usr?.email) continue;
+            sendProjectCompletionEmail({
+              userEmail: usr.email,
+              userName: usr.full_name,
+              userRole: usr.role,
+              projectName: project_name ?? existing.project_name,
+              clientName: client_name_1 ?? existing.client_name_1,
+              startDate: start_date ?? existing.start_date,
+              endDate: end_date ?? existing.end_date,
+              priority: priority ?? existing.priority,
+              modules: mods
+            }).catch(e => console.error(`[Email] Completion email error for user id=${uid}:`, e.message));
+          } catch (e) {
+            console.error(`[Email] Failed to process completion email for user id=${uid}:`, e.message);
+          }
+        }
+      }
+    }
 
     // Email newly assigned stakeholders (technicians + sales/presales) — non-blocking
     const prevTechIds    = [existing.user_id_1, existing.user_id_2].filter(Boolean).map(Number);
