@@ -34,7 +34,7 @@ router.get('/users', async (req, res) => {
              (SELECT COUNT(*) FROM projects WHERE user_id_1 = u.id OR user_id_2 = u.id) AS total_projects,
              (SELECT COUNT(*) FROM projects WHERE (user_id_1 = u.id OR user_id_2 = u.id) AND status='completed') AS completed_projects
       FROM users u
-      WHERE u.role != 'admin' AND u.is_active = 1
+      WHERE u.role NOT IN ('admin') AND u.is_active = 1
       ORDER BY u.created_at DESC
     `);
     res.json(users);
@@ -53,7 +53,7 @@ router.post('/users', async (req, res) => {
     const existing = await db.get('SELECT id FROM users WHERE username = ?', [username]);
     if (existing) return res.status(400).json({ error: 'Username already exists' });
 
-    const allowedRoles = ['user', 'planner'];
+    const allowedRoles = ['user', 'planner', 'sales', 'presales'];
     const assignedRole = allowedRoles.includes(role) ? role : 'user';
 
     const hashed = bcrypt.hashSync(password, 10);
@@ -84,7 +84,7 @@ router.put('/users/:id', async (req, res) => {
       await db.run('UPDATE users SET password = ? WHERE id = ?', [hashed, req.params.id]);
     }
 
-    const allowedRoles = ['user', 'planner'];
+    const allowedRoles = ['user', 'planner', 'sales', 'presales'];
     const assignedRole = role && allowedRoles.includes(role) ? role : undefined;
 
     const roleClause = assignedRole ? ', role=?' : '';
