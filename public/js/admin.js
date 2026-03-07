@@ -31,6 +31,15 @@ window.addEventListener('DOMContentLoaded', async () => {
   av.textContent = (currentUser.full_name || 'A')[0].toUpperCase();
   av.style.background = currentUser.avatar_color || '#8B0000';
 
+  // Mobile more-sheet avatar
+  const mobAv = document.getElementById('mob-more-avatar');
+  if (mobAv) {
+    mobAv.textContent = (currentUser.full_name || 'A')[0].toUpperCase();
+    mobAv.style.background = currentUser.avatar_color || '#8B0000';
+  }
+  const mobName = document.getElementById('mob-more-name');
+  if (mobName) mobName.textContent = currentUser.full_name || 'Administrator';
+
   initMap();
 
   // Hide loading overlay immediately — data loads in background
@@ -80,33 +89,36 @@ window.addEventListener('DOMContentLoaded', async () => {
   });
 });
 
-// ── Mobile Sidebar ─────────────────────────────────────
-function toggleSidebar() {
-  document.getElementById('sidebar').classList.toggle('open');
-  document.getElementById('sidebar-overlay').classList.toggle('active');
+// ── Mobile Sidebar (desktop legacy, no-op on mobile) ──
+function toggleSidebar() {}
+function closeSidebar()  {}
+
+// ── Mobile More Sheet ──────────────────────────────────
+function openMobMore() {
+  document.getElementById('mob-more-overlay').classList.add('open');
 }
-function closeSidebar() {
-  document.getElementById('sidebar').classList.remove('open');
-  document.getElementById('sidebar-overlay').classList.remove('active');
+function closeMobMore() {
+  document.getElementById('mob-more-overlay').classList.remove('open');
 }
 
 // ── Navigation ────────────────────────────────────────
 function navigate(page) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.querySelectorAll('.nav-item, .mobile-nav-tab').forEach(n => n.classList.remove('active'));
   document.getElementById(`page-${page}`).classList.add('active');
   // Activate all matching nav items (sidebar + mobile bottom nav)
   document.querySelectorAll(`[data-page="${page}"]`).forEach(n => n.classList.add('active'));
 
   const titles = {
     'dashboard': 'Dashboard', 'analytics': 'Analytics', 'projects': 'Projects',
-    'new-project': 'New Project', 'reports': 'Reports', 'users': 'Users',
-    'daily-summary': 'Daily Summary', 'settings': 'Settings'
+    'new-project': 'New Project', 'assign-team': 'Assign Team', 'reports': 'Reports',
+    'users': 'Users', 'daily-summary': 'Daily Summary', 'settings': 'Settings'
   };
   document.getElementById('page-title').textContent = titles[page] || page;
 
   if (page === 'analytics') loadAnalytics();
   if (page === 'projects') loadProjects();
+  if (page === 'assign-team') loadAssignTeam();
   if (page === 'reports') loadReports();
   if (page === 'users') loadUsersTable();
   if (page === 'settings') { loadAdminProfile(); loadEmailSettings(); }
@@ -165,7 +177,7 @@ async function loadDashboard() {
   if (data.stats.pending_reports > 0) {
     document.getElementById('report-badge').style.display = '';
     document.getElementById('report-badge').textContent = data.stats.pending_reports;
-    const mob = document.getElementById('mobile-report-badge');
+    const mob = document.getElementById('mob-report-badge');
     if (mob) { mob.classList.remove('hidden'); mob.textContent = data.stats.pending_reports; }
   }
 }
@@ -750,7 +762,7 @@ async function loadUsersTable() {
         <td><code style="background:var(--gray-100);padding:3px 8px;border-radius:5px;font-size:13px">${u.username}</code></td>
         <td>${u.department || '—'}</td>
         <td>${u.phone || '—'}</td>
-        <td>${roleBadge(u.role)}</td>
+        <td><span class="badge" style="${u.role === 'planner' ? 'background:var(--info);color:#fff' : u.role === 'sales' ? 'background:#8E44AD;color:#fff' : u.role === 'presales' ? 'background:#6C3483;color:#fff' : u.role === 'technical' ? 'background:#1A5276;color:#fff' : u.role === 'engineer' ? 'background:#117A65;color:#fff' : u.role === 'admin' ? 'background:var(--red-dark);color:#fff' : 'background:var(--gray-200);color:var(--gray-700)'}">${u.role === 'planner' ? 'Planner' : u.role === 'sales' ? 'Sales' : u.role === 'presales' ? 'Presales' : u.role === 'technical' ? 'Technical' : u.role === 'engineer' ? 'Engineer' : u.role === 'admin' ? 'Admin' : 'Technical'}</span></td>
         <td><span class="badge badge-${u.total_projects > 0 ? 'progress' : 'pending'}">${u.total_projects || 0} projects</span></td>
         <td>${u.is_active ? '<span class="badge badge-completed">Active</span>' : '<span class="badge badge-cancelled">Inactive</span>'}</td>
         <td style="font-size:12px;color:var(--gray-400)">${u.last_login ? formatDate(u.last_login) : 'Never'}</td>
@@ -766,30 +778,18 @@ async function loadUsersTable() {
 }
 
 function populateUserDropdowns() {
-  const techUsers    = allUsers.filter(u => u.is_active && u.role === 'user');
-  const salesUsers   = allUsers.filter(u => u.is_active && u.role === 'sales');
-  const presalesUsers = allUsers.filter(u => u.is_active && u.role === 'presales');
-  const allFieldUsers = allUsers.filter(u => u.is_active && !['admin', 'planner'].includes(u.role));
-
-  const techOpts   = '<option value="">— Select Technician —</option>' + techUsers.map(u => `<option value="${u.id}">${u.full_name}</option>`).join('');
-  const salesOpts  = '<option value="">— None —</option>' + salesUsers.map(u => `<option value="${u.id}">${u.full_name}</option>`).join('');
-  const presalesOpts = '<option value="">— None —</option>' + presalesUsers.map(u => `<option value="${u.id}">${u.full_name}</option>`).join('');
-
-  document.getElementById('p-user1').innerHTML = techOpts;
-  document.getElementById('p-user2').innerHTML = '<option value="">— Optional —</option>' + techUsers.map(u => `<option value="${u.id}">${u.full_name}</option>`).join('');
-  document.getElementById('p-sales-person').innerHTML   = salesOpts;
-  document.getElementById('p-presales-person').innerHTML = presalesOpts;
-
-  // Edit modal dropdowns
-  const allOpts = '<option value="">— None —</option>' + allFieldUsers.map(u => `<option value="${u.id}">${u.full_name} (${u.role})</option>`).join('');
-  const editUser1 = document.getElementById('edit-proj-user1');
-  const editUser2 = document.getElementById('edit-proj-user2');
-  const editSales = document.getElementById('edit-proj-sales');
-  const editPresales = document.getElementById('edit-proj-presales');
-  if (editUser1) editUser1.innerHTML = '<option value="">— None —</option>' + techUsers.map(u => `<option value="${u.id}">${u.full_name}</option>`).join('');
-  if (editUser2) editUser2.innerHTML = '<option value="">— None —</option>' + techUsers.map(u => `<option value="${u.id}">${u.full_name}</option>`).join('');
-  if (editSales) editSales.innerHTML = salesOpts;
-  if (editPresales) editPresales.innerHTML = presalesOpts;
+  // Only technicians/engineers (role: user) can be assigned as executors
+  const fieldUsers = allUsers.filter(u => u.is_active && u.role === 'user');
+  const opts = '<option value="">— Select Technician/Engineer —</option>' + fieldUsers.map(u => `<option value="${u.id}">${u.full_name}</option>`).join('');
+  const el1 = document.getElementById('p-user1');
+  const el2 = document.getElementById('p-user2');
+  if (el1) el1.innerHTML = opts;
+  if (el2) el2.innerHTML = '<option value="">— Optional —</option>' + fieldUsers.map(u => `<option value="${u.id}">${u.full_name}</option>`).join('');
+  // Also refresh assign-team dropdowns if visible
+  const at1 = document.getElementById('at-user1');
+  const at2 = document.getElementById('at-user2');
+  if (at1) at1.innerHTML = opts;
+  if (at2) at2.innerHTML = '<option value="">— Optional —</option>' + fieldUsers.map(u => `<option value="${u.id}">${u.full_name}</option>`).join('');
 }
 
 function openUserModal(userId) {
@@ -1365,6 +1365,265 @@ async function sendTestEmail() {
     alertEl.innerHTML = '<div class="alert alert-error">Network error. Please try again.</div>';
   }
   setTimeout(() => { alertEl.innerHTML = ''; }, 5000);
+}
+
+// ── Assign Team ────────────────────────────────────────
+let _assignProjects = [];
+let _assignView = 'list'; // 'list' | 'calendar'
+
+function setAssignView(view) {
+  _assignView = view;
+  document.getElementById('assign-view-list').style.fontWeight = view === 'list' ? '700' : '400';
+  document.getElementById('assign-view-calendar').style.fontWeight = view === 'calendar' ? '700' : '400';
+  renderAssignTeamView();
+}
+
+async function loadAssignTeam() {
+  await loadUsers(); // ensure allUsers is up to date
+  const res = await apiFetch('/projects');
+  if (!res?.ok) return;
+  _assignProjects = await res.json();
+  renderAssignTeamView();
+}
+
+function renderAssignTeamView() {
+  const statusFilter = document.getElementById('assign-filter-status').value;
+  const search = (document.getElementById('assign-search').value || '').toLowerCase();
+  const container = document.getElementById('assign-team-content');
+
+  let projects = _assignProjects;
+  if (statusFilter === 'unassigned') {
+    projects = projects.filter(p => !p.user_id_1 && !p.user_id_2);
+  } else if (statusFilter) {
+    projects = projects.filter(p => p.status === statusFilter);
+  }
+  if (search) {
+    projects = projects.filter(p =>
+      p.project_name?.toLowerCase().includes(search) ||
+      p.client_name_1?.toLowerCase().includes(search) ||
+      p.location_name?.toLowerCase().includes(search)
+    );
+  }
+
+  if (_assignView === 'calendar') {
+    renderAssignCalendar(projects, container);
+  } else {
+    renderAssignList(projects, container);
+  }
+}
+
+function renderAssignList(projects, container) {
+  if (!projects.length) {
+    container.innerHTML = `<div style="text-align:center;padding:60px;color:var(--gray-400)">
+      <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="var(--gray-300)" stroke-width="1.5" style="margin-bottom:16px"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+      <p style="font-size:15px">No projects match the current filter</p>
+    </div>`;
+    return;
+  }
+
+  container.innerHTML = `<div style="display:flex;flex-direction:column;gap:14px">
+    ${projects.map(p => {
+      const isUnassigned = !p.user_id_1 && !p.user_id_2;
+      const users = [p.user1_name, p.user2_name].filter(Boolean);
+      return `
+        <div class="card" style="margin-bottom:0;border-left:4px solid ${isUnassigned ? 'var(--warning)' : 'var(--success)'}">
+          <div class="card-body" style="padding:16px 20px">
+            <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+              <div style="flex:1;min-width:200px">
+                <div style="font-size:15px;font-weight:700;color:var(--gray-900)">${p.project_name}</div>
+                <div style="font-size:13px;color:var(--gray-500);margin-top:2px">
+                  ${p.client_name_1 ? p.client_name_1 + ' · ' : ''}
+                  ${p.start_date ? p.start_date + ' → ' + (p.end_date || 'TBD') : 'No dates set'}
+                </div>
+              </div>
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                ${statusBadge(p.status)}
+                ${priorityBadge(p.priority)}
+              </div>
+              <div style="min-width:180px;font-size:13px">
+                ${users.length
+                  ? `<div style="color:var(--success);font-weight:600">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+                      ${users.join(' & ')}
+                    </div>`
+                  : `<div style="color:var(--warning);font-weight:600">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                      Unassigned
+                    </div>`}
+              </div>
+              <button class="btn btn-sm btn-danger" onclick="openAssignModal(${p.id})">
+                ${isUnassigned ? 'Assign Team' : 'Reassign'}
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('')}
+  </div>`;
+}
+
+function renderAssignCalendar(projects, container) {
+  // Build a 5-week calendar grid centered on today
+  const today = new Date();
+  const startDate = new Date(today);
+  startDate.setDate(today.getDate() - today.getDay()); // Start from Sunday of current week
+
+  const days = [];
+  for (let i = 0; i < 35; i++) {
+    const d = new Date(startDate);
+    d.setDate(startDate.getDate() + i);
+    days.push(d);
+  }
+
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  // Map projects to days they span
+  function projectSpans(p) {
+    if (!p.start_date && !p.end_date) return [];
+    const s = p.start_date ? new Date(p.start_date) : null;
+    const e = p.end_date ? new Date(p.end_date) : s;
+    return days.map(d => {
+      const dStr = d.toISOString().slice(0,10);
+      const pStart = s ? s.toISOString().slice(0,10) : null;
+      const pEnd = e ? e.toISOString().slice(0,10) : null;
+      return (!pStart || dStr >= pStart) && (!pEnd || dStr <= pEnd);
+    });
+  }
+
+  const priorityColors = { critical: '#8B0000', urgent: '#C0392B', high: '#E74C3C', normal: '#2980B9', low: '#27AE60' };
+
+  container.innerHTML = `
+    <div class="card" style="overflow:hidden">
+      <div class="card-body" style="padding:0;overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;min-width:700px">
+          <thead>
+            <tr style="background:var(--gray-50);border-bottom:2px solid var(--gray-200)">
+              ${dayNames.map(d => `<th style="padding:10px 6px;text-align:center;font-size:12px;color:var(--gray-500);font-weight:600">${d}</th>`).join('')}
+            </tr>
+            <tr style="background:white;border-bottom:1px solid var(--gray-100)">
+              ${days.slice(0,7).map(d => `<th style="padding:6px;text-align:center;font-size:11px;color:var(--gray-400)">${months[d.getMonth()]}</th>`).join('')}
+            </tr>
+          </thead>
+          <tbody>
+            ${[0,1,2,3,4].map(week => `
+              <tr>
+                ${days.slice(week*7, week*7+7).map((d, dayIdx) => {
+                  const isToday = d.toISOString().slice(0,10) === today.toISOString().slice(0,10);
+                  const globalDayIdx = week * 7 + dayIdx;
+                  const dayProjects = projects.filter(p => projectSpans(p)[globalDayIdx]);
+                  return `
+                    <td style="border:1px solid var(--gray-100);padding:4px;vertical-align:top;min-width:80px;max-width:120px;${isToday ? 'background:#FFF5F5;' : ''}">
+                      <div style="text-align:center;font-size:12px;font-weight:${isToday ? '800' : '600'};color:${isToday ? 'var(--red)' : 'var(--gray-700)'};margin-bottom:4px">${d.getDate()}</div>
+                      ${dayProjects.slice(0,3).map(p => `
+                        <div title="${p.project_name} — click to assign"
+                          onclick="openAssignModal(${p.id})"
+                          style="background:${priorityColors[p.priority] || '#2980B9'};color:white;border-radius:4px;padding:2px 5px;font-size:10px;font-weight:600;cursor:pointer;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;margin-bottom:2px;opacity:${!p.user_id_1 && !p.user_id_2 ? '0.7' : '1'}">
+                          ${!p.user_id_1 && !p.user_id_2 ? '⚠ ' : ''}${p.project_name}
+                        </div>`).join('')}
+                      ${dayProjects.length > 3 ? `<div style="font-size:9px;color:var(--gray-400);text-align:center">+${dayProjects.length-3} more</div>` : ''}
+                    </td>
+                  `;
+                }).join('')}
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div style="margin-top:12px;display:flex;gap:16px;font-size:12px;color:var(--gray-500);flex-wrap:wrap">
+      <span style="display:flex;align-items:center;gap:6px"><span style="display:inline-block;width:12px;height:12px;background:var(--warning);border-radius:3px;opacity:0.7"></span>Unassigned</span>
+      <span style="display:flex;align-items:center;gap:6px"><span style="display:inline-block;width:12px;height:12px;background:var(--red);border-radius:3px"></span>Assigned</span>
+      <span style="display:flex;align-items:center;gap:6px"><span style="display:inline-block;width:12px;height:12px;background:#FFF5F5;border:1px solid var(--red);border-radius:3px"></span>Today</span>
+      <span>Click any project bar to assign team</span>
+    </div>
+  `;
+}
+
+// ── Assign Team Modal ──────────────────────────────────
+let _assigningProjectId = null;
+
+async function openAssignModal(projectId) {
+  _assigningProjectId = projectId;
+  const p = _assignProjects.find(x => x.id === projectId);
+  if (!p) return;
+
+  const techUsers = allUsers.filter(u => u.is_active && u.role === 'user');
+  const techOpts = '<option value="">— None —</option>' + techUsers.map(u => `<option value="${u.id}">${u.full_name}${u.department ? ' ('+u.department+')' : ''}</option>`).join('');
+
+  // Build and show modal dynamically
+  let modal = document.getElementById('assign-team-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'assign-team-modal';
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+      <div class="modal" style="max-width:520px">
+        <div class="modal-header">
+          <h2 id="at-modal-title">Assign Team</h2>
+          <button class="modal-close" onclick="closeModal('assign-team-modal')">×</button>
+        </div>
+        <div class="modal-body">
+          <div id="at-proj-info" style="background:var(--gray-50);border-radius:8px;padding:14px 16px;margin-bottom:20px;font-size:14px"></div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Primary Technician / Engineer</label>
+              <select id="at-user1" style="width:100%;padding:10px;border:2px solid var(--gray-200);border-radius:8px;font-family:inherit"></select>
+            </div>
+            <div class="form-group">
+              <label>Secondary (Optional)</label>
+              <select id="at-user2" style="width:100%;padding:10px;border:2px solid var(--gray-200);border-radius:8px;font-family:inherit"></select>
+            </div>
+          </div>
+          <div style="background:#EAF6FF;border:1px solid #BEE3F8;border-radius:8px;padding:12px 14px;font-size:13px;color:#1A4E7A;margin-top:4px">
+            An email notification will be sent to newly assigned team members.
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" onclick="closeModal('assign-team-modal')">Cancel</button>
+          <button class="btn btn-danger" onclick="saveAssignment()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+            Assign &amp; Notify
+          </button>
+        </div>
+      </div>
+    `;
+    modal.addEventListener('click', e => { if (e.target === modal) closeModal('assign-team-modal'); });
+    document.body.appendChild(modal);
+  }
+
+  document.getElementById('at-modal-title').textContent = `Assign Team: ${p.project_name}`;
+  document.getElementById('at-proj-info').innerHTML = `
+    <div style="font-size:15px;font-weight:700;margin-bottom:6px">${p.project_name}</div>
+    <div style="color:var(--gray-500)">${p.client_name_1 ? 'Client: ' + p.client_name_1 + ' &nbsp;·&nbsp; ' : ''}${p.start_date ? 'Dates: ' + p.start_date + ' → ' + (p.end_date || 'TBD') : 'No dates set'}</div>
+    <div style="margin-top:6px;display:flex;gap:8px">${statusBadge(p.status)} ${priorityBadge(p.priority)}</div>
+  `;
+  document.getElementById('at-user1').innerHTML = techOpts;
+  document.getElementById('at-user2').innerHTML = '<option value="">— None —</option>' + techUsers.map(u => `<option value="${u.id}">${u.full_name}${u.department ? ' ('+u.department+')' : ''}</option>`).join('');
+  if (p.user_id_1) document.getElementById('at-user1').value = p.user_id_1;
+  if (p.user_id_2) document.getElementById('at-user2').value = p.user_id_2;
+
+  openModal('assign-team-modal');
+}
+
+async function saveAssignment() {
+  if (!_assigningProjectId) return;
+  const user1 = document.getElementById('at-user1').value || null;
+  const user2 = document.getElementById('at-user2').value || null;
+
+  const res = await apiFetch(`/projects/${_assigningProjectId}/assign`, {
+    method: 'PUT',
+    body: JSON.stringify({ user_id_1: user1, user_id_2: user2 })
+  });
+  const data = await res.json();
+  if (res.ok) {
+    showToast('Team assigned successfully. Notification sent.', 'success');
+    closeModal('assign-team-modal');
+    await loadAssignTeam();
+    loadProjects();
+    loadDashboard();
+  } else {
+    showToast('Error: ' + (data.error || 'Failed to assign team'), 'error');
+  }
 }
 
 // ── Daily Summary ─────────────────────────────────────

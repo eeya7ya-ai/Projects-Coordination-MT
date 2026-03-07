@@ -2,7 +2,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const db = require('../database/db');
 const { verifyToken, requireAdmin } = require('../middleware/auth');
-const { sendMail } = require('../services/email');
+const { sendMail, clearAdminNameCache } = require('../services/email');
 
 const router = express.Router();
 router.use(verifyToken, requireAdmin);
@@ -18,6 +18,7 @@ router.put('/profile', async (req, res) => {
        WHERE id = ? AND role = 'admin'`,
       [full_name, department, phone, email, avatar_color || '#8B0000', req.user.id]
     );
+    clearAdminNameCache(); // Ensure next email picks up the updated display name
     res.json({ success: true, message: 'Profile saved successfully' });
   } catch (err) {
     console.error('Save admin profile error:', err);
@@ -53,8 +54,8 @@ router.post('/users', async (req, res) => {
     const existing = await db.get('SELECT id FROM users WHERE username = ?', [username]);
     if (existing) return res.status(400).json({ error: 'Username already exists' });
 
-    const allowedRoles = ['user', 'planner', 'sales', 'presales'];
-    const assignedRole = allowedRoles.includes(role) ? role : 'user';
+    const allowedRoles = ['user', 'technical', 'engineer', 'sales', 'presales', 'planner'];
+    const assignedRole = allowedRoles.includes(role) ? role : 'technical';
 
     const hashed = bcrypt.hashSync(password, 10);
     const colors = ['#c0392b', '#e74c3c', '#8B0000', '#922B21', '#CB4335', '#A93226'];
@@ -84,7 +85,7 @@ router.put('/users/:id', async (req, res) => {
       await db.run('UPDATE users SET password = ? WHERE id = ?', [hashed, req.params.id]);
     }
 
-    const allowedRoles = ['user', 'planner', 'sales', 'presales'];
+    const allowedRoles = ['user', 'technical', 'engineer', 'sales', 'presales', 'planner'];
     const assignedRole = role && allowedRoles.includes(role) ? role : undefined;
 
     const roleClause = assignedRole ? ', role=?' : '';

@@ -3,27 +3,56 @@ const db = require('../database/db');
 
 // Generic SMTP transporter — credentials come from Vercel env vars:
 // SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_SECURE (true/false), SMTP_FROM
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: parseInt(process.env.SMTP_PORT || '587', 10),
-  secure: process.env.SMTP_SECURE === 'true',
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASSWORD
-  }
-});
+//
+// The transporter is a singleton with connection pooling so that repeated sends
+// reuse the same TCP connection instead of opening a new one each time.
+// Call resetTransporter() after SMTP credentials are changed (e.g. settings update).
+let _transporter = null;
+let _transporterKey = '';
+
+function _buildTransporter() {
+  const key = `${process.env.SMTP_HOST}|${process.env.SMTP_PORT}|${process.env.SMTP_USER}|${process.env.SMTP_SECURE}`;
+  if (_transporter && _transporterKey === key) return _transporter;
+  if (_transporter) { try { _transporter.close(); } catch (_) {} }
+  _transporter = nodemailer.createTransport({
+    pool: true,
+    maxConnections: 3,
+    maxMessages: 100,
+    host: process.env.SMTP_HOST,
+    port: parseInt(process.env.SMTP_PORT || '587', 10),
+    secure: process.env.SMTP_SECURE === 'true',
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASSWORD
+    },
+    tls: { rejectUnauthorized: false }
+  });
+  _transporterKey = key;
+  return _transporter;
+}
+
+function resetTransporter() {
+  if (_transporter) { try { _transporter.close(); } catch (_) {} }
+  _transporter = null;
+  _transporterKey = '';
+}
 
 // Cached admin display name — fetched once and reused to avoid per-email DB roundtrip.
+// Call clearAdminNameCache() whenever the admin profile is updated so the next email
+// picks up the new name.
 let _cachedAdminName = null;
 async function getAdminDisplayName() {
   if (_cachedAdminName) return _cachedAdminName;
   try {
     const admin = await db.get("SELECT full_name FROM users WHERE role = 'admin' LIMIT 1");
-    _cachedAdminName = admin?.full_name || 'MagicTech Projects Coordination';
+    _cachedAdminName = admin?.full_name || 'ELV Projects Coordination';
     return _cachedAdminName;
   } catch {
-    return 'MagicTech Projects Coordination';
+    return 'ELV Projects Coordination';
   }
+}
+function clearAdminNameCache() {
+  _cachedAdminName = null;
 }
 
 /**
@@ -108,12 +137,14 @@ function wrapEmail(bodyHtml) {
  * The "from" display name is taken from the admin user account in the database.
  */
 async function sendMail({ to, subject, html }) {
-  if (!process.env.SMTP_USER || !process.env.SMTP_PASSWORD) {
-    console.warn('[Email] SMTP_USER / SMTP_PASSWORD not configured — skipping email to', to);
+  // Guard: all three SMTP credentials must be present before attempting a connection.
+  if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASSWORD) {
+    console.warn('[Email] SMTP not fully configured (SMTP_HOST / SMTP_USER / SMTP_PASSWORD required) — skipping email to', to);
     return false;
   }
   if (!to) return false;
   try {
+    const transporter = _buildTransporter(); // reuses pooled connection
     const displayName = await getAdminDisplayName();
     const fromAddress = process.env.SMTP_FROM || process.env.SMTP_USER;
     await transporter.sendMail({
@@ -125,7 +156,7 @@ async function sendMail({ to, subject, html }) {
     console.log(`[Email] Sent "${subject}" → ${to}`);
     return true;
   } catch (err) {
-    console.error('[Email] Failed to send:', err.message);
+    console.error('[Email] Failed to send to', to, ':', err.message);
     return false;
   }
 }
@@ -372,4 +403,4 @@ async function sendReportReviewEmail({ userEmail, userName, projectName, moduleN
   });
 }
 
-module.exports = { sendMail, sendProjectAssignmentEmail, sendReportReviewEmail };
+module.exports = { sendMail, sendProjectAssignmentEmail, sendReportReviewEmail, clearAdminNameCache, resetTransporter };
