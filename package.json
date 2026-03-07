@@ -22,5 +22,8 @@
     "nodemailer": "^8.0.1",
     "ws": "^8.18.0",
     "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "canvas": "^3.2.1"
   }
 }
