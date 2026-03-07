@@ -33,9 +33,12 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   initMap();
 
-  // Load users first (needed for dropdowns), then load the rest in parallel
-  await loadUsers();
-  await Promise.all([loadDashboard(), loadProjects()]);
+  // Hide loading overlay immediately — data loads in background
+  document.getElementById('loading-overlay').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+
+  // Load users first (needed for dropdowns), then dashboard + projects in parallel
+  loadUsers().then(() => Promise.all([loadDashboard(), loadProjects()]));
 
   loadNotifications();
   setInterval(loadNotifications, 30000);
@@ -75,9 +78,6 @@ window.addEventListener('DOMContentLoaded', async () => {
     const file = e.dataTransfer.files[0];
     if (file) handleExcelUpload({ files: [file] });
   });
-
-  document.getElementById('loading-overlay').style.display = 'none';
-  document.getElementById('app').style.display = 'flex';
 });
 
 // ── Mobile Sidebar ─────────────────────────────────────
@@ -312,10 +312,14 @@ async function openProjectDetail(id) {
           <tr><td style="color:var(--gray-500);padding:5px 0;width:120px">Client</td><td>${p.client_name_1 || '—'}${p.client_name_2 ? ' / '+p.client_name_2 : ''}</td></tr>
           <tr><td style="color:var(--gray-500);padding:5px 0">Contact</td><td>${p.client_number || '—'}</td></tr>
           <tr><td style="color:var(--gray-500);padding:5px 0">Location</td><td>${p.location_name || '—'}${p.location_lat ? ` <a href="https://maps.google.com/?q=${p.location_lat},${p.location_lng}" target="_blank" style="color:var(--red);font-size:12px">View on Maps</a>` : ''}</td></tr>
+          ${p.scheduled_date ? `<tr><td style="color:var(--gray-500);padding:5px 0">Scheduled</td><td>${p.scheduled_date}</td></tr>` : ''}
+          ${p.scheduling_notes ? `<tr><td style="color:var(--gray-500);padding:5px 0;vertical-align:top">Sched. Notes</td><td style="font-size:13px;color:var(--gray-600)">${p.scheduling_notes}</td></tr>` : ''}
           <tr><td style="color:var(--gray-500);padding:5px 0">Start</td><td>${p.start_date || '—'}</td></tr>
           <tr><td style="color:var(--gray-500);padding:5px 0">End (Est.)</td><td>${p.end_date || '—'}</td></tr>
           <tr><td style="color:var(--gray-500);padding:5px 0">Priority</td><td>${priorityBadge(p.priority)}</td></tr>
           <tr><td style="color:var(--gray-500);padding:5px 0">Status</td><td>${statusBadge(p.status)}</td></tr>
+          ${p.sales_person_name ? `<tr><td style="color:var(--gray-500);padding:5px 0">Sales</td><td>${p.sales_person_name}</td></tr>` : ''}
+          ${p.presales_person_name ? `<tr><td style="color:var(--gray-500);padding:5px 0">Presales</td><td>${p.presales_person_name}</td></tr>` : ''}
         </table>
       </div>
       <div>
@@ -494,11 +498,20 @@ async function editProject(id) {
   document.getElementById('edit-proj-priority').value = proj.priority || 'normal';
   document.getElementById('edit-proj-status').value = proj.status || 'pending';
 
-  const userOpts = '<option value="">— None —</option>' + allUsers.filter(u => u.is_active).map(u => `<option value="${u.id}">${u.full_name}</option>`).join('');
-  document.getElementById('edit-proj-user1').innerHTML = userOpts;
-  document.getElementById('edit-proj-user2').innerHTML = userOpts;
+  const editSchedDate = document.getElementById('edit-proj-scheduled-date');
+  const editSchedNotes = document.getElementById('edit-proj-scheduling-notes');
+  if (editSchedDate) editSchedDate.value = proj.scheduled_date || '';
+  if (editSchedNotes) editSchedNotes.value = proj.scheduling_notes || '';
+
+  // Re-populate dropdowns before setting values
+  populateUserDropdowns();
+
   if (proj.user_id_1) document.getElementById('edit-proj-user1').value = proj.user_id_1;
   if (proj.user_id_2) document.getElementById('edit-proj-user2').value = proj.user_id_2;
+  const editSales = document.getElementById('edit-proj-sales');
+  const editPresales = document.getElementById('edit-proj-presales');
+  if (editSales && proj.sales_person_id) editSales.value = proj.sales_person_id;
+  if (editPresales && proj.presales_person_id) editPresales.value = proj.presales_person_id;
 
   openModal('edit-project-modal');
 }
@@ -516,8 +529,12 @@ async function saveEditProject() {
     location_name: document.getElementById('edit-proj-location').value.trim(),
     user_id_1: document.getElementById('edit-proj-user1').value || null,
     user_id_2: document.getElementById('edit-proj-user2').value || null,
-    start_date: document.getElementById('edit-proj-start').value,
-    end_date: document.getElementById('edit-proj-end').value,
+    sales_person_id: document.getElementById('edit-proj-sales')?.value || null,
+    presales_person_id: document.getElementById('edit-proj-presales')?.value || null,
+    start_date: document.getElementById('edit-proj-start').value || null,
+    end_date: document.getElementById('edit-proj-end').value || null,
+    scheduled_date: document.getElementById('edit-proj-scheduled-date')?.value || null,
+    scheduling_notes: document.getElementById('edit-proj-scheduling-notes')?.value || null,
     priority: document.getElementById('edit-proj-priority').value,
     status: document.getElementById('edit-proj-status').value
   };
@@ -660,8 +677,10 @@ async function submitProject() {
     location_lng: parseFloat(document.getElementById('p-lng').value) || null,
     user_id_1: document.getElementById('p-user1').value || null,
     user_id_2: document.getElementById('p-user2').value || null,
-    start_date: document.getElementById('p-start').value,
-    end_date: document.getElementById('p-end').value,
+    scheduled_date: document.getElementById('p-scheduled-date').value || null,
+    scheduling_notes: document.getElementById('p-scheduling-notes').value || null,
+    sales_person_id: document.getElementById('p-sales-person').value || null,
+    presales_person_id: document.getElementById('p-presales-person').value || null,
     priority: document.getElementById('p-priority').value,
     modules
   };
@@ -680,13 +699,18 @@ async function submitProject() {
 }
 
 function resetProjectForm() {
-  ['p-name','p-client1','p-client2','p-client-num','p-location-name','p-lat','p-lng','p-start','p-end'].forEach(id => {
+  ['p-name','p-client1','p-client2','p-client-num','p-location-name','p-lat','p-lng',
+   'p-scheduled-date','p-scheduling-notes'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
   document.getElementById('p-priority').value = 'normal';
   document.getElementById('p-user1').value = '';
   document.getElementById('p-user2').value = '';
+  const salesEl = document.getElementById('p-sales-person');
+  const presalesEl = document.getElementById('p-presales-person');
+  if (salesEl) salesEl.value = '';
+  if (presalesEl) presalesEl.value = '';
   document.querySelectorAll('.module-option.selected').forEach(el => el.classList.remove('selected'));
   selectedModules.clear();
   document.getElementById('module-details-container').innerHTML = '';
@@ -726,7 +750,7 @@ async function loadUsersTable() {
         <td><code style="background:var(--gray-100);padding:3px 8px;border-radius:5px;font-size:13px">${u.username}</code></td>
         <td>${u.department || '—'}</td>
         <td>${u.phone || '—'}</td>
-        <td><span class="badge badge-${u.role === 'planner' ? 'info' : 'pending'}" style="${u.role === 'planner' ? 'background:var(--info);color:#fff' : ''}">${u.role === 'planner' ? 'Planner' : 'Technician'}</span></td>
+        <td>${roleBadge(u.role)}</td>
         <td><span class="badge badge-${u.total_projects > 0 ? 'progress' : 'pending'}">${u.total_projects || 0} projects</span></td>
         <td>${u.is_active ? '<span class="badge badge-completed">Active</span>' : '<span class="badge badge-cancelled">Inactive</span>'}</td>
         <td style="font-size:12px;color:var(--gray-400)">${u.last_login ? formatDate(u.last_login) : 'Never'}</td>
@@ -742,10 +766,30 @@ async function loadUsersTable() {
 }
 
 function populateUserDropdowns() {
-  const fieldUsers = allUsers.filter(u => u.is_active && u.role !== 'planner');
-  const opts = '<option value="">— Select User —</option>' + fieldUsers.map(u => `<option value="${u.id}">${u.full_name}</option>`).join('');
-  document.getElementById('p-user1').innerHTML = opts;
-  document.getElementById('p-user2').innerHTML = '<option value="">— Optional —</option>' + fieldUsers.map(u => `<option value="${u.id}">${u.full_name}</option>`).join('');
+  const techUsers    = allUsers.filter(u => u.is_active && u.role === 'user');
+  const salesUsers   = allUsers.filter(u => u.is_active && u.role === 'sales');
+  const presalesUsers = allUsers.filter(u => u.is_active && u.role === 'presales');
+  const allFieldUsers = allUsers.filter(u => u.is_active && !['admin', 'planner'].includes(u.role));
+
+  const techOpts   = '<option value="">— Select Technician —</option>' + techUsers.map(u => `<option value="${u.id}">${u.full_name}</option>`).join('');
+  const salesOpts  = '<option value="">— None —</option>' + salesUsers.map(u => `<option value="${u.id}">${u.full_name}</option>`).join('');
+  const presalesOpts = '<option value="">— None —</option>' + presalesUsers.map(u => `<option value="${u.id}">${u.full_name}</option>`).join('');
+
+  document.getElementById('p-user1').innerHTML = techOpts;
+  document.getElementById('p-user2').innerHTML = '<option value="">— Optional —</option>' + techUsers.map(u => `<option value="${u.id}">${u.full_name}</option>`).join('');
+  document.getElementById('p-sales-person').innerHTML   = salesOpts;
+  document.getElementById('p-presales-person').innerHTML = presalesOpts;
+
+  // Edit modal dropdowns
+  const allOpts = '<option value="">— None —</option>' + allFieldUsers.map(u => `<option value="${u.id}">${u.full_name} (${u.role})</option>`).join('');
+  const editUser1 = document.getElementById('edit-proj-user1');
+  const editUser2 = document.getElementById('edit-proj-user2');
+  const editSales = document.getElementById('edit-proj-sales');
+  const editPresales = document.getElementById('edit-proj-presales');
+  if (editUser1) editUser1.innerHTML = '<option value="">— None —</option>' + techUsers.map(u => `<option value="${u.id}">${u.full_name}</option>`).join('');
+  if (editUser2) editUser2.innerHTML = '<option value="">— None —</option>' + techUsers.map(u => `<option value="${u.id}">${u.full_name}</option>`).join('');
+  if (editSales) editSales.innerHTML = salesOpts;
+  if (editPresales) editPresales.innerHTML = presalesOpts;
 }
 
 function openUserModal(userId) {
@@ -1148,6 +1192,17 @@ function showToast(message, type = 'info', duration = 3500) {
     toast.classList.add('toast-out');
     setTimeout(() => toast.remove(), 320);
   }, duration);
+}
+
+function roleBadge(role) {
+  const map = {
+    user:     { label: 'Technician', color: 'var(--warning)', bg: '#FFF3E0' },
+    planner:  { label: 'Planner',    color: 'var(--info)',    bg: '#E3F2FD' },
+    sales:    { label: 'Sales',      color: '#1a7f37',        bg: '#E6FFED' },
+    presales: { label: 'Presales',   color: '#7c3aed',        bg: '#F3E8FF' }
+  };
+  const r = map[role] || { label: role, color: 'var(--gray-500)', bg: 'var(--gray-100)' };
+  return `<span style="display:inline-block;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700;background:${r.bg};color:${r.color}">${r.label}</span>`;
 }
 
 function statusBadge(status) {
