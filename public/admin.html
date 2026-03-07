@@ -760,6 +760,81 @@
   </div>
 </div>
 
+<!-- ═══ ASSIGN TEAM MODAL ═══ -->
+<div class="modal-overlay" id="assign-team-modal">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header">
+      <h2 id="assign-modal-title">Assign Team</h2>
+      <button class="modal-close" onclick="closeModal('assign-team-modal')">×</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="assign-proj-id">
+
+      <!-- Project Summary Card -->
+      <div id="assign-proj-summary" style="background:var(--gray-50);border:1px solid var(--gray-200);border-radius:12px;padding:16px;margin-bottom:20px">
+        <div style="font-size:16px;font-weight:700;color:var(--gray-900);margin-bottom:4px" id="assign-proj-name">—</div>
+        <div style="font-size:13px;color:var(--gray-500);margin-bottom:10px" id="assign-proj-dates">No dates set</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap" id="assign-proj-badges"></div>
+      </div>
+
+      <!-- Date Fields -->
+      <div class="form-grid" style="margin-bottom:4px">
+        <div class="form-group">
+          <label>Start Date</label>
+          <input type="date" id="assign-start-date">
+        </div>
+        <div class="form-group">
+          <label>End Date (Estimated)</label>
+          <input type="date" id="assign-end-date">
+        </div>
+        <div class="form-group form-full">
+          <label>Preferred Schedule Date</label>
+          <input type="date" id="assign-scheduled-date">
+        </div>
+      </div>
+
+      <!-- Team Selection -->
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Primary Technician / Engineer *</label>
+          <select id="assign-user1" onchange="updateAssignPreview()"></select>
+          <div id="assign-user1-preview" style="display:none;margin-top:8px;display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--gray-100);border-radius:8px">
+            <div id="assign-user1-avatar" class="user-avatar" style="width:32px;height:32px;font-size:13px;border-radius:8px;flex-shrink:0"></div>
+            <div>
+              <div id="assign-user1-name" style="font-size:13px;font-weight:600"></div>
+              <div id="assign-user1-dept" style="font-size:11px;color:var(--gray-500)"></div>
+            </div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Secondary (Optional)</label>
+          <select id="assign-user2" onchange="updateAssignPreview()"></select>
+          <div id="assign-user2-preview" style="display:none;margin-top:8px;display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--gray-100);border-radius:8px">
+            <div id="assign-user2-avatar" class="user-avatar" style="width:32px;height:32px;font-size:13px;border-radius:8px;flex-shrink:0"></div>
+            <div>
+              <div id="assign-user2-name" style="font-size:13px;font-weight:600"></div>
+              <div id="assign-user2-dept" style="font-size:11px;color:var(--gray-500)"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Notification Notice -->
+      <div style="background:#EBF5FB;border:1px solid #AED6F1;border-radius:8px;padding:10px 14px;font-size:13px;color:#1A5276;display:flex;align-items:center;gap:8px;margin-top:4px">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        An in-app notification will be sent to newly assigned team members.
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('assign-team-modal')">Cancel</button>
+      <button class="btn btn-danger" onclick="saveAssignTeam()" style="display:flex;align-items:center;gap:8px">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+        Assign &amp; Notify
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- ═══ CHANGE PASSWORD MODAL ═══ -->
 <div class="modal-overlay" id="pw-modal">
   <div class="modal" style="max-width:400px">

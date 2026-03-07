@@ -272,6 +272,10 @@ function renderProjects(projects) {
         <div class="project-card-footer">
           <span style="font-size:12px;color:var(--gray-400)">${formatDate(p.created_at)}</span>
           <div style="display:flex;gap:8px">
+            <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation();openAssignTeam(${p.id})" title="Assign Team" style="display:flex;align-items:center;gap:4px">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+              Assign
+            </button>
             <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation();editProject(${p.id})">Edit</button>
             <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteProject(${p.id},'${p.project_name}')">Delete</button>
           </div>
@@ -335,10 +339,16 @@ async function openProjectDetail(id) {
         </table>
       </div>
       <div>
-        <h4 style="font-size:13px;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px">Assigned Team</h4>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <h4 style="font-size:13px;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.5px;margin:0">Assigned Team</h4>
+          <button class="btn btn-sm btn-secondary" onclick="closeModal('project-detail-modal');openAssignTeam(${p.id})" style="display:flex;align-items:center;gap:4px;font-size:12px;padding:4px 10px">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+            Assign Team
+          </button>
+        </div>
         ${p.user1_name ? `<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px"><div class="user-avatar" style="background:${p.user1_color || 'var(--red)'};width:38px;height:38px;font-size:14px;border-radius:10px">${p.user1_name[0].toUpperCase()}</div><div><div style="font-size:14px;font-weight:600">${p.user1_name}</div><div style="font-size:12px;color:var(--gray-400)">Primary</div></div></div>` : ''}
         ${p.user2_name ? `<div style="display:flex;align-items:center;gap:10px"><div class="user-avatar" style="background:${p.user2_color || '#8B0000'};width:38px;height:38px;font-size:14px;border-radius:10px">${p.user2_name[0].toUpperCase()}</div><div><div style="font-size:14px;font-weight:600">${p.user2_name}</div><div style="font-size:12px;color:var(--gray-400)">Secondary</div></div></div>` : ''}
-        ${!p.user1_name && !p.user2_name ? '<p class="text-muted text-small">No users assigned</p>' : ''}
+        ${!p.user1_name && !p.user2_name ? '<p class="text-muted text-small" style="margin-bottom:8px">No users assigned yet</p>' : ''}
 
         <div style="margin-top:20px">
           <h4 style="font-size:13px;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px">Update Status</h4>
@@ -560,6 +570,102 @@ async function saveEditProject() {
   } else {
     const data = await res.json();
     showToast('Error: ' + (data.error || 'Failed to update'), 'error');
+  }
+}
+
+// ── Assign Team Modal ─────────────────────────────────
+function openAssignTeam(projectId) {
+  const proj = allProjects.find(x => x.id === projectId);
+  if (!proj) return;
+
+  document.getElementById('assign-proj-id').value = projectId;
+  document.getElementById('assign-modal-title').textContent = `Assign Team: ${proj.project_name}`;
+  document.getElementById('assign-proj-name').textContent = proj.project_name;
+
+  // Dates summary
+  const hasDates = proj.start_date || proj.end_date;
+  document.getElementById('assign-proj-dates').textContent = hasDates
+    ? `${proj.start_date || '?'} → ${proj.end_date || 'TBD'}`
+    : 'No dates set';
+
+  // Date inputs
+  document.getElementById('assign-start-date').value = proj.start_date || '';
+  document.getElementById('assign-end-date').value = proj.end_date || '';
+  document.getElementById('assign-scheduled-date').value = proj.scheduled_date || '';
+
+  // Status + priority badges
+  const badgesEl = document.getElementById('assign-proj-badges');
+  badgesEl.innerHTML = statusBadge(proj.status) + ' ' + priorityBadge(proj.priority || 'normal');
+  if (proj.client_name_1) {
+    badgesEl.innerHTML += ` <span style="font-size:12px;color:var(--gray-500);margin-left:4px">${proj.client_name_1}</span>`;
+  }
+
+  // Populate dropdowns
+  populateUserDropdowns();
+  const techUsers = allUsers.filter(u => u.is_active && u.role === 'user');
+  document.getElementById('assign-user1').innerHTML =
+    '<option value="">— Select Technician —</option>' +
+    techUsers.map(u => `<option value="${u.id}" data-color="${u.avatar_color || '#C0392B'}" data-dept="${u.department || ''}">${u.full_name}</option>`).join('');
+  document.getElementById('assign-user2').innerHTML =
+    '<option value="">— None (Optional) —</option>' +
+    techUsers.map(u => `<option value="${u.id}" data-color="${u.avatar_color || '#8B0000'}" data-dept="${u.department || ''}">${u.full_name}</option>`).join('');
+
+  // Pre-select current assignment
+  if (proj.user_id_1) document.getElementById('assign-user1').value = proj.user_id_1;
+  if (proj.user_id_2) document.getElementById('assign-user2').value = proj.user_id_2;
+
+  updateAssignPreview();
+  openModal('assign-team-modal');
+}
+
+function updateAssignPreview() {
+  ['1','2'].forEach(n => {
+    const sel = document.getElementById(`assign-user${n}`);
+    const preview = document.getElementById(`assign-user${n}-preview`);
+    const opt = sel.options[sel.selectedIndex];
+    if (sel.value && opt) {
+      const color = opt.dataset.color || (n === '1' ? '#C0392B' : '#8B0000');
+      const dept = opt.dataset.dept || '';
+      const name = opt.text;
+      document.getElementById(`assign-user${n}-avatar`).style.background = color;
+      document.getElementById(`assign-user${n}-avatar`).textContent = name[0]?.toUpperCase() || '?';
+      document.getElementById(`assign-user${n}-name`).textContent = name;
+      document.getElementById(`assign-user${n}-dept`).textContent = dept || (n === '1' ? 'Primary Technician' : 'Secondary Technician');
+      preview.style.display = 'flex';
+    } else {
+      preview.style.display = 'none';
+    }
+  });
+}
+
+async function saveAssignTeam() {
+  const id = document.getElementById('assign-proj-id').value;
+  const user1 = document.getElementById('assign-user1').value || null;
+  const user2 = document.getElementById('assign-user2').value || null;
+  const startDate = document.getElementById('assign-start-date').value || null;
+  const endDate = document.getElementById('assign-end-date').value || null;
+  const scheduledDate = document.getElementById('assign-scheduled-date').value || null;
+
+  const proj = allProjects.find(x => x.id == id) || {};
+  const res = await apiFetch(`/projects/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify({
+      project_name: proj.project_name,
+      user_id_1: user1,
+      user_id_2: user2,
+      start_date: startDate,
+      end_date: endDate,
+      scheduled_date: scheduledDate,
+    })
+  });
+  if (res?.ok) {
+    closeModal('assign-team-modal');
+    showToast('Team assigned successfully', 'success');
+    await loadProjects();
+    loadDashboard();
+  } else {
+    const data = await res?.json().catch(() => ({}));
+    showToast('Error: ' + (data.error || 'Failed to assign team'), 'error');
   }
 }
 
