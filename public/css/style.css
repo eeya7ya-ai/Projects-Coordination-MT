@@ -1652,3 +1652,106 @@ tbody tr:last-child td { border-bottom: none; }
 }
 /* Desktop: light bottom padding for espark footer */
 .login-page { padding-bottom: 32px; }
+
+/* ══════════════════════════════════════════════════════
+   RTL (Arabic) SUPPORT
+══════════════════════════════════════════════════════ */
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap');
+
+/* Language toggle button */
+#lang-toggle-btn {
+  background: rgba(255,255,255,0.12);
+  color: white;
+  border: 1px solid rgba(255,255,255,0.25);
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+  font-family: inherit;
+  white-space: nowrap;
+}
+#lang-toggle-btn:hover { background: rgba(255,255,255,0.22); }
+
+/* On light topbar (admin/dashboard pages) or login card */
+.topbar #lang-toggle-btn,
+.login-card #lang-toggle-btn {
+  background: var(--gray-100);
+  color: var(--gray-700);
+  border-color: var(--gray-300);
+}
+.topbar #lang-toggle-btn:hover,
+.login-card #lang-toggle-btn:hover { background: var(--gray-200); }
+
+/* Arabic font & base direction */
+[dir="rtl"] body {
+  font-family: 'Cairo', system-ui, sans-serif;
+}
+[dir="rtl"] h1,[dir="rtl"] h2,[dir="rtl"] h3,
+[dir="rtl"] h4,[dir="rtl"] h5,[dir="rtl"] h6 {
+  font-family: 'Cairo', 'Rajdhani', sans-serif;
+}
+
+/* Sidebar flips to the right */
+[dir="rtl"] .sidebar {
+  left: auto;
+  right: 0;
+  box-shadow: -4px 0 20px rgba(0,0,0,0.3);
+}
+[dir="rtl"] .main-content {
+  margin-left: 0;
+  margin-right: 260px;
+}
+
+/* Active nav indicator moves to right edge */
+[dir="rtl"] .nav-item.active::before {
+  left: auto;
+  right: 0;
+  border-radius: 2px 0 0 2px;
+}
+
+/* Nav badge margin */
+[dir="rtl"] .nav-badge { margin-left: 0; margin-right: auto; }
+
+/* Topbar */
+[dir="rtl"] .topbar { flex-direction: row-reverse; }
+[dir="rtl"] .topbar-actions { flex-direction: row-reverse; }
+
+/* Cards & flex elements */
+[dir="rtl"] .card-header { flex-direction: row-reverse; }
+[dir="rtl"] .project-card-footer { flex-direction: row-reverse; }
+[dir="rtl"] .stat-card { text-align: right; }
+
+/* Form labels */
+[dir="rtl"] .form-label { text-align: right; }
+[dir="rtl"] .form-control { text-align: right; direction: rtl; }
+[dir="rtl"] textarea { text-align: right; direction: rtl; }
+
+/* Sidebar logo */
+[dir="rtl"] .sidebar-logo { flex-direction: row-reverse; }
+[dir="rtl"] .user-info { flex-direction: row-reverse; }
+
+/* Project card */
+[dir="rtl"] .proj-meta-row { flex-direction: row-reverse; }
+[dir="rtl"] .project-card-header { text-align: right; }
+
+/* Search input */
+[dir="rtl"] .search-input { flex-direction: row-reverse; }
+[dir="rtl"] .search-input input { text-align: right; }
+
+/* Modals */
+[dir="rtl"] .modal-header { flex-direction: row-reverse; }
+
+/* Notification panel */
+[dir="rtl"] .notif-panel { left: 0; right: auto; }
+[dir="rtl"] .notif-item { text-align: right; }
+
+/* Login page RTL */
+[dir="rtl"] .login-logo { direction: rtl; }
+[dir="rtl"] .form-group { text-align: right; }
+
+/* Responsive: on mobile sidebar is already hidden */
+@media (max-width: 768px) {
+  [dir="rtl"] .main-content { margin-right: 0; }
+}

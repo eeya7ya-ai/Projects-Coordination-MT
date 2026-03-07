@@ -13,6 +13,9 @@
   <div class="particles" id="particles"></div>
 
   <div class="login-card">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
+      <button id="lang-toggle-btn" onclick="toggleLanguage()" title="Toggle language / تبديل اللغة">عربي</button>
+    </div>
     <div class="login-logo">
       <div class="logo-icon">
         <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -20,23 +23,23 @@
         </svg>
       </div>
       <h1>MagicTech</h1>
-      <p>Projects Coordination Platform</p>
+      <p data-i18n="login.title">Projects Coordination Platform</p>
     </div>
 
     <div id="alert" class="alert hidden"></div>
 
     <form id="login-form">
       <div class="form-group">
-        <label class="form-label">Username</label>
+        <label class="form-label" data-i18n="label.username">Username</label>
         <input type="text" id="username" class="form-control" placeholder="Enter your username" autocomplete="username" required>
       </div>
       <div class="form-group">
-        <label class="form-label">Password</label>
+        <label class="form-label" data-i18n="label.password">Password</label>
         <input type="password" id="password" class="form-control" placeholder="Enter your password" autocomplete="current-password" required>
       </div>
       <button type="submit" class="btn btn-primary" id="login-btn">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg>
-        Sign In
+        <span data-i18n="btn.sign_in">Sign In</span>
       </button>
     </form>
 
@@ -47,6 +50,7 @@
   <span>Created by <span class="espark-brand">eSpark</span> Developers</span>
 </footer>
 
+<script src="/js/i18n.js"></script>
 <script>
 // Generate floating particles
 const particlesEl = document.getElementById('particles');

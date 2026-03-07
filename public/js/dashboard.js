@@ -74,8 +74,8 @@ function navigate(page) {
   // Activate all matching nav items (sidebar + mobile bottom nav)
   document.querySelectorAll(`[data-page="${page}"]`).forEach(n => n.classList.add('active'));
 
-  const titles = { 'my-projects': 'My Projects', 'active-tasks': 'Active Tasks', 'my-reports': 'My Reports' };
-  document.getElementById('page-title').textContent = titles[page] || page;
+  const pageTitleKeys = { 'my-projects': 'page.my_projects', 'active-tasks': 'page.active_tasks', 'my-reports': 'page.my_reports' };
+  document.getElementById('page-title').textContent = t(pageTitleKeys[page] || page);
 
   if (page === 'active-tasks') renderActiveTasks();
   if (page === 'my-reports') loadMyReports();
@@ -102,10 +102,10 @@ async function loadMyProjects() {
   }
 
   document.getElementById('user-stats').innerHTML = `
-    <div class="stat-card"><div class="stat-icon red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg></div><div class="stat-value">${total}</div><div class="stat-label">Total Assigned</div></div>
-    <div class="stat-card"><div class="stat-icon blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><div class="stat-value">${active}</div><div class="stat-label">In Progress</div></div>
-    <div class="stat-card"><div class="stat-icon green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div><div class="stat-value">${completed}</div><div class="stat-label">Completed</div></div>
-    <div class="stat-card"><div class="stat-icon orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div><div class="stat-value">${pending}</div><div class="stat-label">Pending</div></div>
+    <div class="stat-card"><div class="stat-icon red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg></div><div class="stat-value">${total}</div><div class="stat-label">${t('stat.total_assigned')}</div></div>
+    <div class="stat-card"><div class="stat-icon blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><div class="stat-value">${active}</div><div class="stat-label">${t('stat.in_progress')}</div></div>
+    <div class="stat-card"><div class="stat-icon green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div><div class="stat-value">${completed}</div><div class="stat-label">${t('stat.completed')}</div></div>
+    <div class="stat-card"><div class="stat-icon orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div><div class="stat-value">${pending}</div><div class="stat-label">${t('stat.pending')}</div></div>
   `;
 
   document.getElementById('my-proj-count').textContent = `${total} project${total !== 1 ? 's' : ''}`;
@@ -120,7 +120,7 @@ function renderMyProjects(projects) {
       <div class="project-card" onclick="openProject(${p.id})">
         <div class="project-card-header" style="background:linear-gradient(135deg, var(--red-deep), var(--red))">
           <div class="proj-name">${p.project_name}</div>
-          <div class="proj-client">${p.client_name_1 || 'No client specified'}</div>
+          <div class="proj-client">${p.client_name_1 || t('msg.no_client_specified')}</div>
           <div class="proj-priority" style="background:${priorityColor}22;color:${priorityColor};border:1px solid ${priorityColor}44">${p.priority || 'normal'}</div>
           <div class="hex-pattern"></div>
         </div>
@@ -137,7 +137,7 @@ function renderMyProjects(projects) {
         <div class="project-card-footer">
           <span style="font-size:12px;color:var(--gray-400)">${formatDate(p.created_at)}</span>
           <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();openProject(${p.id})">
-            View Tasks →
+            ${t('btn.view_tasks')}
           </button>
         </div>
       </div>
@@ -145,8 +145,7 @@ function renderMyProjects(projects) {
   }).join('') || `
     <div style="grid-column:1/-1;text-align:center;padding:80px 20px;color:var(--gray-400)">
       <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" style="margin-bottom:16px;opacity:0.3"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
-      <h3 style="font-size:18px;margin-bottom:8px;color:var(--gray-600)">No Projects Assigned</h3>
-      <p style="font-size:14px">Your admin will assign projects to you soon.</p>
+      <h3 style="font-size:18px;margin-bottom:8px;color:var(--gray-600)">${t('msg.no_projects')}</h3>
     </div>
   `;
 }
@@ -252,14 +251,14 @@ function renderUserModuleCard(m, project) {
       <div style="padding:20px">
         <!-- Info -->
         <div class="grid-2" style="gap:16px;margin-bottom:20px">
-          ${m.scope_of_work ? `<div><label style="font-size:11px;font-weight:700;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.5px">Scope of Work</label><p style="font-size:13px;color:var(--gray-700);margin-top:6px;line-height:1.6">${m.scope_of_work}</p></div>` : ''}
-          ${m.issue_details ? `<div><label style="font-size:11px;font-weight:700;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.5px">Issue Details</label><p style="font-size:13px;color:var(--gray-700);margin-top:6px;line-height:1.6">${m.issue_details}</p></div>` : ''}
+          ${m.scope_of_work ? `<div><label style="font-size:11px;font-weight:700;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.5px">${t('label.scope_of_work')}</label><p style="font-size:13px;color:var(--gray-700);margin-top:6px;line-height:1.6">${m.scope_of_work}</p></div>` : ''}
+          ${m.issue_details ? `<div><label style="font-size:11px;font-weight:700;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.5px">${t('label.issue_details')}</label><p style="font-size:13px;color:var(--gray-700);margin-top:6px;line-height:1.6">${m.issue_details}</p></div>` : ''}
         </div>
 
         <!-- Devices -->
         ${m.devices?.length ? `
           <div style="margin-bottom:20px">
-            <label style="font-size:11px;font-weight:700;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.5px">Equipment / Devices</label>
+            <label style="font-size:11px;font-weight:700;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.5px">${t('label.equipment')}</label>
             <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px">
               ${m.devices.map(d => `
                 <div style="background:var(--gray-50);border:1px solid var(--gray-200);border-radius:8px;padding:8px 12px">
@@ -274,7 +273,7 @@ function renderUserModuleCard(m, project) {
         <!-- Checklist -->
         <div style="margin-bottom:20px">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-            <label style="font-size:13px;font-weight:700;color:var(--gray-700)">Task Checklist <span style="color:var(--gray-400);font-weight:400">(${done}/${total} completed)</span></label>
+            <label style="font-size:13px;font-weight:700;color:var(--gray-700)">${t('label.task_checklist')} <span style="color:var(--gray-400);font-weight:400">(${done}/${total} ${t('stat.completed').toLowerCase()})</span></label>
           </div>
           <div>
             ${m.checklist.map(item => `
@@ -292,18 +291,18 @@ function renderUserModuleCard(m, project) {
 
         <!-- User Notes -->
         <div style="margin-bottom:20px">
-          <label style="font-size:11px;font-weight:700;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:8px">My Notes</label>
+          <label style="font-size:11px;font-weight:700;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:8px">${t('label.my_notes')}</label>
           <textarea id="notes-${m.id}" rows="2" placeholder="Add your working notes here..."
             style="width:100%;padding:10px 14px;border:2px solid var(--gray-200);border-radius:8px;font-size:13px;font-family:inherit;resize:vertical;outline:none;transition:border-color 0.2s"
             onfocus="this.style.borderColor='var(--red)'" onblur="this.style.borderColor='var(--gray-200)'">${m.user_notes || ''}</textarea>
-          <button class="btn btn-sm btn-secondary" style="margin-top:6px" onclick="saveNotes(${project.id}, ${m.id})">Save Notes</button>
+          <button class="btn btn-sm btn-secondary" style="margin-top:6px" onclick="saveNotes(${project.id}, ${m.id})">${t('btn.save_notes')}</button>
         </div>
 
         <!-- Report section -->
         ${lastReport ? `
           <div style="background:#F8F9FA;border-radius:10px;padding:14px;margin-bottom:16px;border:1px solid var(--gray-200)">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-              <strong style="font-size:13px">Last Report</strong>
+              <strong style="font-size:13px">${t('label.last_report')}</strong>
               <span class="badge badge-${lastReport.review_status === 'approved' ? 'completed' : lastReport.review_status === 'rejected' ? 'urgent' : 'pending'}">${lastReport.review_status}</span>
             </div>
             ${lastReport.work_done ? `<p style="font-size:13px;color:var(--gray-600)">${lastReport.work_done}</p>` : ''}
@@ -317,16 +316,16 @@ function renderUserModuleCard(m, project) {
         <div style="display:flex;gap:10px;flex-wrap:wrap">
           <button class="btn btn-danger" onclick="openReportModal(${project.id}, ${m.id})">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-            Submit Report
+            ${t('btn.submit_report')}
           </button>
           ${m.status !== 'completed' && done === total && total > 0 ? `
             <button class="btn btn-success" onclick="markModuleComplete(${project.id}, ${m.id})">
-              ✓ Mark as Complete
+              ${t('btn.mark_complete')}
             </button>
           ` : ''}
         </div>
 
-        ${m.admin_notes ? `<div style="margin-top:12px;background:#FFF3CD;border:1px solid #FFDA6A;border-radius:8px;padding:12px"><strong style="font-size:12px;color:#856404">Admin Notes:</strong><p style="font-size:13px;margin-top:4px;color:#856404">${m.admin_notes}</p></div>` : ''}
+        ${m.admin_notes ? `<div style="margin-top:12px;background:#FFF3CD;border:1px solid #FFDA6A;border-radius:8px;padding:12px"><strong style="font-size:12px;color:#856404">${t('msg.admin_notes_label')}</strong><p style="font-size:13px;margin-top:4px;color:#856404">${m.admin_notes}</p></div>` : ''}
       </div>
     </div>
   `;
@@ -388,13 +387,13 @@ async function saveNotes(projectId, moduleId) {
   });
   if (res?.ok) {
     const btn = event.target;
-    btn.textContent = '✓ Saved!';
-    setTimeout(() => btn.textContent = 'Save Notes', 1500);
+    btn.textContent = '✓ ' + t('btn.save_notes');
+    setTimeout(() => { btn.textContent = t('btn.save_notes'); }, 1500);
   }
 }
 
 async function markModuleComplete(projectId, moduleId) {
-  if (!confirm('Mark this module as complete and notify admin?')) return;
+  if (!confirm(t('prompt.confirm_complete'))) return;
   const res = await apiFetch(`/projects/${projectId}/modules/${moduleId}`, {
     method: 'PUT',
     body: JSON.stringify({ status: 'completed', progress: 100 })
@@ -409,7 +408,7 @@ async function markModuleComplete(projectId, moduleId) {
 function renderActiveTasks() {
   if (!myProjects.length) {
     document.getElementById('active-tasks-list').innerHTML =
-      '<div class="text-center text-muted" style="padding:60px">No projects assigned yet</div>';
+      `<div class="text-center text-muted" style="padding:60px">${t('msg.no_projects')}</div>`;
     return;
   }
   // Show select first
@@ -417,22 +416,22 @@ function renderActiveTasks() {
     <div class="card" style="margin-bottom:20px">
       <div class="card-body">
         <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-          <label style="font-size:14px;font-weight:600;color:var(--gray-700)">Select Project:</label>
+          <label style="font-size:14px;font-weight:600;color:var(--gray-700)">${t('label.select_project')}</label>
           <select onchange="openProject(this.value)" style="flex:1;min-width:200px;padding:10px;border:2px solid var(--gray-200);border-radius:8px;font-family:inherit;outline:none">
-            <option value="">— Choose a project —</option>
-            ${myProjects.filter(p => p.status !== 'completed').map(p => `<option value="${p.id}">${p.project_name} (${p.status?.replace('_',' ') || 'pending'})</option>`).join('')}
+            <option value="">${t('misc.choose_project')}</option>
+            ${myProjects.filter(p => p.status !== 'completed').map(p => `<option value="${p.id}">${p.project_name} (${t('status.' + (p.status || 'pending'))})</option>`).join('')}
           </select>
         </div>
       </div>
     </div>
-    <div class="text-center text-muted" style="padding:40px">Select a project above to view its tasks</div>
+    <div class="text-center text-muted" style="padding:40px">${t('msg.select_project')}</div>
   `;
 }
 
 // ── My Reports ────────────────────────────────────────
 async function loadMyReports() {
   const container = document.getElementById('my-reports-list');
-  container.innerHTML = '<div class="text-center text-muted" style="padding:20px">Loading...</div>';
+  container.innerHTML = `<div class="text-center text-muted" style="padding:20px">${t('msg.loading')}</div>`;
 
   const reportItems = [];
   for (const p of myProjects) {
@@ -452,8 +451,7 @@ async function loadMyReports() {
     container.innerHTML = `
       <div style="text-align:center;padding:80px;color:var(--gray-400)">
         <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" style="margin-bottom:16px;opacity:0.3"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-        <h3 style="font-size:18px;color:var(--gray-600);margin-bottom:8px">No Reports Yet</h3>
-        <p>Submit your first report from your project tasks.</p>
+        <h3 style="font-size:18px;color:var(--gray-600);margin-bottom:8px">${t('msg.no_reports')}</h3>
       </div>`;
     return;
   }
@@ -472,11 +470,11 @@ async function loadMyReports() {
       </div>
       <div class="card-body">
         <div class="grid-2" style="gap:16px">
-          ${r.work_done ? `<div><label style="font-size:11px;font-weight:700;color:var(--gray-400);text-transform:uppercase;display:block;margin-bottom:4px">Work Done</label><p style="font-size:14px">${r.work_done}</p></div>` : ''}
-          ${r.issues_found ? `<div><label style="font-size:11px;font-weight:700;color:var(--gray-400);text-transform:uppercase;display:block;margin-bottom:4px">Issues Found</label><p style="font-size:14px">${r.issues_found}</p></div>` : ''}
-          ${r.hours_spent ? `<div><label style="font-size:11px;font-weight:700;color:var(--gray-400);text-transform:uppercase;display:block;margin-bottom:4px">Hours Spent</label><p style="font-size:14px">${r.hours_spent}h</p></div>` : ''}
+          ${r.work_done ? `<div><label style="font-size:11px;font-weight:700;color:var(--gray-400);text-transform:uppercase;display:block;margin-bottom:4px">${t('label.work_done')}</label><p style="font-size:14px">${r.work_done}</p></div>` : ''}
+          ${r.issues_found ? `<div><label style="font-size:11px;font-weight:700;color:var(--gray-400);text-transform:uppercase;display:block;margin-bottom:4px">${t('label.issues_found')}</label><p style="font-size:14px">${r.issues_found}</p></div>` : ''}
+          ${r.hours_spent ? `<div><label style="font-size:11px;font-weight:700;color:var(--gray-400);text-transform:uppercase;display:block;margin-bottom:4px">${t('label.hours_spent')}</label><p style="font-size:14px">${r.hours_spent}${t('misc.hours_suffix')}</p></div>` : ''}
         </div>
-        ${r.review_notes ? `<div style="margin-top:12px;padding:10px;background:${r.review_status==='rejected'?'#FDECEA':'#D5F5E3'};border-radius:8px;font-size:13px"><strong>Admin:</strong> ${r.review_notes}</div>` : ''}
+        ${r.review_notes ? `<div style="margin-top:12px;padding:10px;background:${r.review_status==='rejected'?'#FDECEA':'#D5F5E3'};border-radius:8px;font-size:13px"><strong>${t('msg.admin_label')}</strong> ${r.review_notes}</div>` : ''}
       </div>
     </div>
   `).join('');
@@ -586,7 +584,7 @@ function logout() { localStorage.clear(); window.location.href = '/'; }
 
 function statusBadge(status) {
   const map = { pending: 'pending', in_progress: 'progress', completed: 'completed', cancelled: 'cancelled' };
-  return `<span class="badge badge-${map[status] || 'pending'}">${(status || 'pending').replace('_',' ')}</span>`;
+  return `<span class="badge badge-${map[status] || 'pending'}">${t('status.' + (status || 'pending'))}</span>`;
 }
 
 function moduleIcon(type) {
@@ -608,3 +606,16 @@ document.addEventListener('click', e => {
   const btn = document.querySelector('.notif-btn');
   if (btn && !panel.contains(e.target) && !btn.contains(e.target)) panel.classList.remove('open');
 });
+
+// ── Language re-render hook (called by i18n.js toggleLanguage) ──
+function reRenderCurrentPage() {
+  const activePage = document.querySelector('.page.active');
+  if (!activePage) return;
+  const pageId = activePage.id.replace('page-', '');
+  if (pageId === 'my-projects') loadMyProjects();
+  if (pageId === 'active-tasks') renderActiveTasks();
+  if (pageId === 'my-reports') loadMyReports();
+  const pageTitleKeys = { 'my-projects': 'page.my_projects', 'active-tasks': 'page.active_tasks', 'my-reports': 'page.my_reports' };
+  const titleEl = document.getElementById('page-title');
+  if (titleEl && pageTitleKeys[pageId]) titleEl.textContent = t(pageTitleKeys[pageId]);
+}
