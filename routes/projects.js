@@ -791,6 +791,87 @@ router.put('/:projectId/modules/:moduleId/reports/:reportId', verifyToken, requi
   }
 });
 
+// ── Reopen a ticket (module) — admin only ───────────────
+// Creates a new work cycle: resets status/checklist, keeps history, notifies team
+router.post('/:projectId/modules/:moduleId/reopen', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    const { reason, new_user_id_1, new_user_id_2 } = req.body;
+    if (!reason || !reason.trim()) {
+      return res.status(400).json({ error: 'A reopen reason is required' });
+    }
+
+    const mod = await db.get(
+      `SELECT pm.*, p.project_name, p.status as project_status,
+              p.user_id_1, p.user_id_2
+       FROM project_modules pm JOIN projects p ON p.id = pm.project_id
+       WHERE pm.id = ?`,
+      [req.params.moduleId]
+    );
+    if (!mod) return res.status(404).json({ error: 'Module not found' });
+
+    await db.transaction(async (tx) => {
+      // 1. Reset module to pending and record reopen metadata
+      await tx.run(
+        `UPDATE project_modules SET
+          status        = 'pending',
+          progress      = 0,
+          completed_at  = NULL,
+          reopen_reason = ?,
+          last_reopened_at = NOW(),
+          last_reopened_by = ?,
+          reopened_count = COALESCE(reopened_count, 0) + 1,
+          updated_at    = NOW()
+         WHERE id = ?`,
+        [reason.trim(), req.user.id, req.params.moduleId]
+      );
+
+      // 2. Reset all checklist items so the technician starts fresh
+      await tx.run(
+        `UPDATE module_checklist
+         SET is_completed = 0, completed_by = NULL, completed_at = NULL
+         WHERE module_id = ?`,
+        [req.params.moduleId]
+      );
+
+      // 3. If the project itself was completed/cancelled, reactivate it
+      if (mod.project_status === 'completed' || mod.project_status === 'cancelled') {
+        await tx.run(
+          `UPDATE projects SET status = 'in_progress', updated_at = NOW() WHERE id = ?`,
+          [req.params.projectId]
+        );
+      }
+
+      // 4. Optional reassignment
+      const userId1 = new_user_id_1 !== undefined ? (new_user_id_1 || null) : mod.user_id_1;
+      const userId2 = new_user_id_2 !== undefined ? (new_user_id_2 || null) : mod.user_id_2;
+      if (new_user_id_1 !== undefined || new_user_id_2 !== undefined) {
+        await tx.run(
+          'UPDATE projects SET user_id_1 = ?, user_id_2 = ?, updated_at = NOW() WHERE id = ?',
+          [userId1, userId2, req.params.projectId]
+        );
+      }
+
+      // 5. Notify assigned technicians
+      const notifyIds = [...new Set([userId1, userId2].filter(Boolean))];
+      for (const uid of notifyIds) {
+        await tx.run(
+          "INSERT INTO notifications (user_id, title, message, type) VALUES (?, ?, ?, 'project')",
+          [
+            uid,
+            `Ticket Reopened: ${mod.project_name}`,
+            `Module "${mod.module_type}" has been reopened. Client reason: ${reason.trim()}`
+          ]
+        );
+      }
+    });
+
+    res.json({ success: true, message: 'Ticket reopened successfully' });
+  } catch (err) {
+    console.error('Reopen ticket error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // ── Excel upload & parsing ──────────────────────────────
 router.post('/excel-parse', verifyToken, upload.single('file'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });

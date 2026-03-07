@@ -377,16 +377,25 @@ function renderModuleCard(m, projectId) {
   const total = m.checklist.length;
   const progress = total > 0 ? Math.round((done/total)*100) : m.progress;
   const modClass = 'mt-' + m.module_type.toLowerCase().replace(/\s+&?\s*/g, '-').replace(/[^a-z-]/g,'').replace(/-+/g,'-');
+  const reopenedCount = m.reopened_count || 0;
 
   return `
-    <div style="border:2px solid var(--gray-200);border-radius:12px;overflow:hidden">
+    <div style="border:2px solid ${reopenedCount > 0 ? 'var(--warning)' : 'var(--gray-200)'};border-radius:12px;overflow:hidden">
       <div style="background:var(--gray-50);padding:14px 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--gray-200)">
-        <div style="display:flex;align-items:center;gap:10px">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
           <span style="font-size:18px">${moduleIcon(m.module_type)}</span>
           <strong style="font-size:15px">${m.module_type}</strong>
           ${statusBadge(m.status)}
+          ${reopenedCount > 0 ? `<span style="background:#FFF3CD;color:#856404;border:1px solid #FFDA6A;border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700">🔄 Reopened ×${reopenedCount}</span>` : ''}
         </div>
-        <div style="font-size:13px;font-weight:700;color:var(--red)">${progress}%</div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-size:13px;font-weight:700;color:var(--red)">${progress}%</span>
+          <button class="btn btn-sm" onclick="openReopenModal(${projectId}, ${m.id})"
+            style="background:#FFF3CD;color:#856404;border:1px solid #FFDA6A;display:flex;align-items:center;gap:5px;font-size:12px;padding:5px 10px;border-radius:8px">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
+            Reopen
+          </button>
+        </div>
       </div>
       <div style="padding:16px 18px">
         <div class="progress-bar" style="margin-bottom:14px"><div class="progress-fill" style="width:${progress}%"></div></div>
@@ -462,6 +471,14 @@ function renderModuleCard(m, projectId) {
         ` : ''}
 
         ${m.user_notes ? `<div style="background:#FFF8E1;border:1px solid #FFE082;border-radius:8px;padding:10px;margin-top:10px"><span style="font-size:11px;font-weight:700;color:#F9A825;text-transform:uppercase;letter-spacing:0.5px">User Notes</span><p style="font-size:13px;margin-top:4px">${m.user_notes}</p></div>` : ''}
+
+        ${m.reopen_reason ? `
+          <div style="background:#FFF3CD;border:1px solid #FFDA6A;border-radius:8px;padding:10px;margin-top:10px">
+            <span style="font-size:11px;font-weight:700;color:#856404;text-transform:uppercase;letter-spacing:0.5px">🔄 Latest Reopen Reason</span>
+            <p style="font-size:13px;margin-top:4px;color:#856404">${m.reopen_reason}</p>
+            ${m.last_reopened_at ? `<div style="font-size:11px;color:#a07820;margin-top:4px">Reopened ${formatDate(m.last_reopened_at)}</div>` : ''}
+          </div>
+        ` : ''}
       </div>
     </div>
   `;
@@ -491,6 +508,58 @@ async function reviewReport(reportId, projectId, moduleId, status) {
     showToast(`Report ${status}`, 'success');
     openProjectDetail(projectId);
     loadDashboard();
+  }
+}
+
+// ── Reopen Ticket ─────────────────────────────────────
+function openReopenModal(projectId, moduleId) {
+  document.getElementById('reopen-project-id').value = projectId;
+  document.getElementById('reopen-module-id').value = moduleId;
+  document.getElementById('reopen-reason').value = '';
+  document.getElementById('reopen-alert').innerHTML = '';
+
+  // Populate user dropdowns
+  const users = allUsers.filter(u => u.is_active && (u.role === 'user' || u.role === 'technician' || u.role === 'engineer'));
+  const techUsers = allUsers.filter(u => u.is_active && u.role !== 'admin');
+  const opts = techUsers.map(u => `<option value="${u.id}">${u.full_name} (${u.role})</option>`).join('');
+  const keepOpt = '<option value="">— Keep current —</option>';
+  document.getElementById('reopen-user1').innerHTML = keepOpt + opts;
+  document.getElementById('reopen-user2').innerHTML = keepOpt + opts;
+
+  openModal('reopen-ticket-modal');
+}
+
+async function confirmReopenTicket() {
+  const projectId = document.getElementById('reopen-project-id').value;
+  const moduleId  = document.getElementById('reopen-module-id').value;
+  const reason    = document.getElementById('reopen-reason').value.trim();
+  const alertEl   = document.getElementById('reopen-alert');
+  const user1Val  = document.getElementById('reopen-user1').value;
+  const user2Val  = document.getElementById('reopen-user2').value;
+
+  if (!reason) {
+    alertEl.innerHTML = '<div class="alert alert-error">Please enter a reason for reopening.</div>';
+    return;
+  }
+
+  const payload = { reason };
+  if (user1Val) payload.new_user_id_1 = parseInt(user1Val);
+  if (user2Val) payload.new_user_id_2 = parseInt(user2Val);
+
+  const res = await apiFetch(`/projects/${projectId}/modules/${moduleId}/reopen`, {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+
+  if (res?.ok) {
+    closeModal('reopen-ticket-modal');
+    showToast('Ticket reopened — team notified', 'success');
+    openProjectDetail(projectId);
+    loadDashboard();
+    loadProjects();
+  } else {
+    const data = await res?.json();
+    alertEl.innerHTML = `<div class="alert alert-error">${data?.error || 'Failed to reopen ticket'}</div>`;
   }
 }
 

@@ -216,11 +216,19 @@ function renderUserModuleCard(m, project) {
   const progress = total > 0 ? Math.round((done/total)*100) : m.progress;
   const hasReport = m.reports?.length > 0;
   const lastReport = m.reports?.[0];
+  const reopenedCount = m.reopened_count || 0;
 
   return `
-    <div class="card" style="margin-bottom:20px;overflow:visible">
+    <div class="card" style="margin-bottom:20px;overflow:visible;${reopenedCount > 0 ? 'border:2px solid #FFDA6A' : ''}">
+      ${reopenedCount > 0 ? `
+        <div style="background:#FFF3CD;padding:8px 16px;border-radius:var(--radius) var(--radius) 0 0;display:flex;align-items:center;gap:8px;border-bottom:1px solid #FFDA6A">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#856404" stroke-width="2.5"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
+          <span style="font-size:12px;font-weight:700;color:#856404">Reopened ×${reopenedCount} — New work requested</span>
+          ${m.reopen_reason ? `<span style="font-size:12px;color:#a07820;margin-left:4px">· ${m.reopen_reason}</span>` : ''}
+        </div>
+      ` : ''}
       <!-- Module Header -->
-      <div style="background:linear-gradient(135deg,var(--red-dark),var(--red));padding:16px 20px;border-radius:var(--radius) var(--radius) 0 0;position:relative;overflow:hidden">
+      <div style="background:linear-gradient(135deg,var(--red-dark),var(--red));padding:16px 20px;border-radius:${reopenedCount > 0 ? '0' : 'var(--radius) var(--radius)'} 0 0;position:relative;overflow:hidden">
         <div class="hex-pattern"></div>
         <div style="display:flex;align-items:center;justify-content:space-between;position:relative">
           <div style="display:flex;align-items:center;gap:12px">

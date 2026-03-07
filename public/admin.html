@@ -859,6 +859,65 @@
   </div>
 </div>
 
+<!-- ═══ REOPEN TICKET MODAL ═══ -->
+<div class="modal-overlay" id="reopen-ticket-modal">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header">
+      <h2>🔄 Reopen Ticket</h2>
+      <button class="modal-close" onclick="closeModal('reopen-ticket-modal')">×</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="reopen-project-id">
+      <input type="hidden" id="reopen-module-id">
+
+      <div style="background:#FFF3CD;border:1px solid #FFDA6A;border-radius:10px;padding:12px 16px;margin-bottom:20px;font-size:13px;color:#856404">
+        <strong>⚠️ What happens when you reopen:</strong>
+        <ul style="margin:8px 0 0 0;padding-left:18px;line-height:1.8">
+          <li>Module status resets to <strong>Pending</strong></li>
+          <li>All checklist items are unchecked for a fresh start</li>
+          <li>Progress resets to 0%</li>
+          <li>Assigned technicians are notified with the reason</li>
+          <li>The project is reactivated if it was completed/cancelled</li>
+        </ul>
+      </div>
+
+      <div class="form-group">
+        <label>Client Request / Reason <span style="color:var(--red)">*</span></label>
+        <textarea id="reopen-reason" rows="3" placeholder="Describe what the client is requesting or why this ticket needs to be reopened..."
+          style="width:100%;padding:10px 14px;border:2px solid var(--gray-200);border-radius:8px;font-size:13px;font-family:inherit;resize:vertical;outline:none;transition:border-color 0.2s"
+          onfocus="this.style.borderColor='var(--red)'" onblur="this.style.borderColor='var(--gray-200)'"></textarea>
+      </div>
+
+      <div style="background:var(--gray-50);border-radius:10px;padding:14px;margin-top:4px">
+        <div style="font-size:12px;font-weight:700;color:var(--gray-500);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:12px">Reassign Team (optional)</div>
+        <div class="grid-2" style="gap:12px">
+          <div class="form-group" style="margin-bottom:0">
+            <label style="font-size:12px">Primary Engineer</label>
+            <select id="reopen-user1" style="width:100%;padding:8px;border:2px solid var(--gray-200);border-radius:8px;font-family:inherit;font-size:13px">
+              <option value="">— Keep current —</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label style="font-size:12px">Secondary Engineer</label>
+            <select id="reopen-user2" style="width:100%;padding:8px;border:2px solid var(--gray-200);border-radius:8px;font-family:inherit;font-size:13px">
+              <option value="">— Keep current —</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div id="reopen-alert" style="margin-top:12px"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('reopen-ticket-modal')">Cancel</button>
+      <button class="btn btn-danger" onclick="confirmReopenTicket()" style="display:flex;align-items:center;gap:8px">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
+        Reopen Ticket
+      </button>
+    </div>
+  </div>
+</div>
+
 <div id="toast-container"></div>
 <footer class="espark-footer">
   <span>Created by <span class="espark-brand">eSpark</span> Developers</span>
