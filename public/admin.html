@@ -217,21 +217,33 @@
                     </select>
                   </div>
                   <div class="form-group">
-                    <label>Start Date</label>
-                    <input type="date" id="p-start">
+                    <label>Preferred Schedule Date</label>
+                    <input type="date" id="p-scheduled-date">
+                  </div>
+                  <div class="form-group form-full">
+                    <label>Scheduling Notes <span style="font-size:11px;color:var(--gray-400);font-weight:400">(from sales / presales)</span></label>
+                    <textarea id="p-scheduling-notes" rows="2" placeholder="e.g. Client prefers morning visits, must be completed before end of month..."></textarea>
                   </div>
                   <div class="form-group">
-                    <label>Estimated End Date</label>
-                    <input type="date" id="p-end">
+                    <label>Sales Person</label>
+                    <select id="p-sales-person">
+                      <option value="">— Select Sales Person —</option>
+                    </select>
                   </div>
                   <div class="form-group">
-                    <label>Assign User (Primary)</label>
+                    <label>Presales Person</label>
+                    <select id="p-presales-person">
+                      <option value="">— Select Presales Person —</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label>Assign Technician (Primary)</label>
                     <select id="p-user1">
                       <option value="">— Select User —</option>
                     </select>
                   </div>
                   <div class="form-group">
-                    <label>Assign User (Secondary)</label>
+                    <label>Assign Technician (Secondary)</label>
                     <select id="p-user2">
                       <option value="">— Select User (optional) —</option>
                     </select>
@@ -691,20 +703,36 @@
           <input type="text" id="edit-proj-location" placeholder="Street, Area">
         </div>
         <div class="form-group">
-          <label>Primary User</label>
+          <label>Primary Technician</label>
           <select id="edit-proj-user1"></select>
         </div>
         <div class="form-group">
-          <label>Secondary User</label>
+          <label>Secondary Technician</label>
           <select id="edit-proj-user2"></select>
         </div>
         <div class="form-group">
-          <label>Start Date</label>
+          <label>Sales Person</label>
+          <select id="edit-proj-sales"></select>
+        </div>
+        <div class="form-group">
+          <label>Presales Person</label>
+          <select id="edit-proj-presales"></select>
+        </div>
+        <div class="form-group">
+          <label>Start Date <span style="font-size:11px;color:var(--gray-400);font-weight:400">(admin only)</span></label>
           <input type="date" id="edit-proj-start">
         </div>
         <div class="form-group">
-          <label>End Date (Est.)</label>
+          <label>Estimated End Date <span style="font-size:11px;color:var(--gray-400);font-weight:400">(admin only)</span></label>
           <input type="date" id="edit-proj-end">
+        </div>
+        <div class="form-group">
+          <label>Preferred Schedule Date</label>
+          <input type="date" id="edit-proj-scheduled-date">
+        </div>
+        <div class="form-group form-full">
+          <label>Scheduling Notes</label>
+          <textarea id="edit-proj-scheduling-notes" rows="2" placeholder="Scheduling notes from sales/presales..."></textarea>
         </div>
         <div class="form-group">
           <label>Priority</label>

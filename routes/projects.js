@@ -80,20 +80,26 @@ router.get('/', verifyToken, async (req, res) => {
       projects = await db.all(`
         SELECT p.*, u1.full_name as user1_name, u1.avatar_color as user1_color,
                u2.full_name as user2_name, u2.avatar_color as user2_color,
+               sp.full_name as sales_person_name, pp.full_name as presales_person_name,
                (SELECT COUNT(*) FROM project_modules WHERE project_id = p.id) as module_count
         FROM projects p
         LEFT JOIN users u1 ON u1.id=p.user_id_1
         LEFT JOIN users u2 ON u2.id=p.user_id_2
+        LEFT JOIN users sp ON sp.id=p.sales_person_id
+        LEFT JOIN users pp ON pp.id=p.presales_person_id
         ORDER BY p.created_at DESC
       `);
     } else {
       projects = await db.all(`
         SELECT p.*, u1.full_name as user1_name, u1.avatar_color as user1_color,
                u2.full_name as user2_name, u2.avatar_color as user2_color,
+               sp.full_name as sales_person_name, pp.full_name as presales_person_name,
                (SELECT COUNT(*) FROM project_modules WHERE project_id = p.id) as module_count
         FROM projects p
         LEFT JOIN users u1 ON u1.id=p.user_id_1
         LEFT JOIN users u2 ON u2.id=p.user_id_2
+        LEFT JOIN users sp ON sp.id=p.sales_person_id
+        LEFT JOIN users pp ON pp.id=p.presales_person_id
         WHERE p.user_id_1=? OR p.user_id_2=?
         ORDER BY p.created_at DESC
       `, [req.user.id, req.user.id]);
@@ -191,10 +197,14 @@ router.get('/:id', verifyToken, async (req, res) => {
   try {
     const project = await db.get(`
       SELECT p.*, u1.full_name as user1_name, u1.avatar_color as user1_color,
-             u2.full_name as user2_name, u2.avatar_color as user2_color
+             u2.full_name as user2_name, u2.avatar_color as user2_color,
+             sp.full_name as sales_person_name, sp.email as sales_person_email,
+             pp.full_name as presales_person_name, pp.email as presales_person_email
       FROM projects p
       LEFT JOIN users u1 ON u1.id=p.user_id_1
       LEFT JOIN users u2 ON u2.id=p.user_id_2
+      LEFT JOIN users sp ON sp.id=p.sales_person_id
+      LEFT JOIN users pp ON pp.id=p.presales_person_id
       WHERE p.id=?
     `, [req.params.id]);
 
@@ -230,7 +240,8 @@ router.post('/', verifyToken, requireSalesOrAdmin, async (req, res) => {
     const {
       project_name, client_name_1, client_name_2, client_number,
       location_name, location_lat, location_lng,
-      user_id_1, user_id_2, start_date, end_date, priority, modules
+      user_id_1, user_id_2, start_date, end_date, priority, modules,
+      scheduled_date, scheduling_notes, sales_person_id, presales_person_id
     } = req.body;
 
     if (!project_name) return res.status(400).json({ error: 'Project name is required' });
@@ -240,11 +251,13 @@ router.post('/', verifyToken, requireSalesOrAdmin, async (req, res) => {
       const result = await tx.run(
         `INSERT INTO projects (project_name, client_name_1, client_name_2, client_number,
           location_name, location_lat, location_lng, user_id_1, user_id_2,
-          start_date, end_date, status, priority, created_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
+          start_date, end_date, status, priority, created_by,
+          scheduled_date, scheduling_notes, sales_person_id, presales_person_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?)`,
         [project_name, client_name_1, client_name_2, client_number,
           location_name, location_lat, location_lng, user_id_1, user_id_2,
-          start_date, end_date, priority || 'normal', req.user.id]
+          start_date, end_date, priority || 'normal', req.user.id,
+          scheduled_date, scheduling_notes, sales_person_id, presales_person_id]
       );
 
       const projId = result.lastInsertRowid;
@@ -290,7 +303,7 @@ router.post('/', verifyToken, requireSalesOrAdmin, async (req, res) => {
         }
       }
 
-      // Notify assigned users (in-app)
+      // Notify assigned technician/engineer users (in-app)
       const userIds = [user_id_1, user_id_2].filter(Boolean);
       for (const uid of userIds) {
         await tx.run(
@@ -300,21 +313,31 @@ router.post('/', verifyToken, requireSalesOrAdmin, async (req, res) => {
         );
       }
 
+      // Notify sales/presales persons (in-app)
+      const salesIds = [sales_person_id, presales_person_id].filter(Boolean);
+      for (const uid of salesIds) {
+        await tx.run(
+          "INSERT INTO notifications (user_id, title, message, type) VALUES (?, ?, ?, 'project')",
+          [uid, `Project Created: ${project_name}`,
+            `The project "${project_name}" you are associated with has been created and assigned.`]
+        );
+      }
+
       return projId;
     });
 
     res.json({ success: true, id: projectId, message: 'Project created successfully' });
 
-    // Send email notifications to ALL assigned users (non-blocking — runs after response)
-    const assignedUserIds = [user_id_1, user_id_2].filter(Boolean);
-    if (assignedUserIds.length) {
+    // Send email notifications to ALL stakeholders (non-blocking — runs after response)
+    const allNotifyIds = [user_id_1, user_id_2, sales_person_id, presales_person_id].filter(Boolean);
+    if (allNotifyIds.length) {
       const notifSetting = await db.get("SELECT value FROM app_settings WHERE key='email_notifications_enabled'");
       const notifEnabled = !notifSetting || notifSetting.value !== 'false';
       if (notifEnabled) {
         const moduleList = modules.map(m => ({ module_type: m.module_type, scope_of_work: m.scope_of_work || '' }));
-        for (const uid of assignedUserIds) {
+        for (const uid of allNotifyIds) {
           try {
-            const usr = await db.get('SELECT full_name, email FROM users WHERE id=?', [uid]);
+            const usr = await db.get('SELECT full_name, email, role FROM users WHERE id=?', [uid]);
             if (!usr) {
               console.warn(`[Email] User id=${uid} not found — skipping assignment email`);
               continue;
@@ -326,8 +349,11 @@ router.post('/', verifyToken, requireSalesOrAdmin, async (req, res) => {
             sendProjectAssignmentEmail({
               userEmail: usr.email,
               userName: usr.full_name,
+              userRole: usr.role,
               projectName: project_name,
               clientName: client_name_1,
+              scheduledDate: scheduled_date,
+              schedulingNotes: scheduling_notes,
               startDate: start_date,
               endDate: end_date,
               priority,
@@ -353,15 +379,20 @@ router.put('/:id', verifyToken, requireAdmin, async (req, res) => {
 
     const { project_name, client_name_1, client_name_2, client_number,
       location_name, location_lat, location_lng, user_id_1, user_id_2,
-      start_date, end_date, status, priority } = req.body;
+      start_date, end_date, status, priority,
+      scheduled_date, scheduling_notes, sales_person_id, presales_person_id } = req.body;
 
-    const finalUserId1 = user_id_1 ?? existing.user_id_1;
-    const finalUserId2 = user_id_2 ?? existing.user_id_2;
+    const finalUserId1      = user_id_1       ?? existing.user_id_1;
+    const finalUserId2      = user_id_2       ?? existing.user_id_2;
+    const finalSalesId      = sales_person_id    !== undefined ? (sales_person_id || null)    : existing.sales_person_id;
+    const finalPresalesId   = presales_person_id !== undefined ? (presales_person_id || null) : existing.presales_person_id;
 
     await db.run(
       `UPDATE projects SET project_name=?, client_name_1=?, client_name_2=?, client_number=?,
         location_name=?, location_lat=?, location_lng=?, user_id_1=?, user_id_2=?,
-        start_date=?, end_date=?, status=?, priority=?, updated_at=NOW()
+        start_date=?, end_date=?, status=?, priority=?,
+        scheduled_date=?, scheduling_notes=?, sales_person_id=?, presales_person_id=?,
+        updated_at=NOW()
       WHERE id=?`,
       [
         project_name ?? existing.project_name,
@@ -377,16 +408,26 @@ router.put('/:id', verifyToken, requireAdmin, async (req, res) => {
         end_date ?? existing.end_date,
         status ?? existing.status,
         priority ?? existing.priority,
+        scheduled_date ?? existing.scheduled_date,
+        scheduling_notes ?? existing.scheduling_notes,
+        finalSalesId,
+        finalPresalesId,
         req.params.id
       ]
     );
 
     res.json({ success: true, message: 'Project updated' });
 
-    // Email newly assigned users (those not previously assigned) — non-blocking, runs after response
-    const prevIds  = [existing.user_id_1, existing.user_id_2].filter(Boolean).map(Number);
-    const newIds   = [finalUserId1, finalUserId2].filter(Boolean).map(Number);
-    const addedIds = newIds.filter(id => !prevIds.includes(id));
+    // Email newly assigned stakeholders (technicians + sales/presales) — non-blocking
+    const prevTechIds    = [existing.user_id_1, existing.user_id_2].filter(Boolean).map(Number);
+    const newTechIds     = [finalUserId1, finalUserId2].filter(Boolean).map(Number);
+    const addedTechIds   = newTechIds.filter(id => !prevTechIds.includes(id));
+
+    const prevSalesIds   = [existing.sales_person_id, existing.presales_person_id].filter(Boolean).map(Number);
+    const newSalesIds    = [finalSalesId, finalPresalesId].filter(Boolean).map(Number);
+    const addedSalesIds  = newSalesIds.filter(id => !prevSalesIds.includes(id));
+
+    const addedIds = [...new Set([...addedTechIds, ...addedSalesIds])];
 
     if (addedIds.length) {
       const notifSetting = await db.get("SELECT value FROM app_settings WHERE key='email_notifications_enabled'");
@@ -396,7 +437,7 @@ router.put('/:id', verifyToken, requireAdmin, async (req, res) => {
         const mods  = await db.all('SELECT module_type, scope_of_work FROM project_modules WHERE project_id=?', [req.params.id]);
         for (const uid of addedIds) {
           try {
-            const usr = await db.get('SELECT full_name, email FROM users WHERE id=?', [uid]);
+            const usr = await db.get('SELECT full_name, email, role FROM users WHERE id=?', [uid]);
             if (!usr) {
               console.warn(`[Email] User id=${uid} not found — skipping assignment email`);
               continue;
@@ -408,8 +449,11 @@ router.put('/:id', verifyToken, requireAdmin, async (req, res) => {
             sendProjectAssignmentEmail({
               userEmail: usr.email,
               userName: usr.full_name,
+              userRole: usr.role,
               projectName: pName,
               clientName: client_name_1 ?? existing.client_name_1,
+              scheduledDate: scheduled_date ?? existing.scheduled_date,
+              schedulingNotes: scheduling_notes ?? existing.scheduling_notes,
               startDate: start_date ?? existing.start_date,
               endDate: end_date ?? existing.end_date,
               priority: priority ?? existing.priority,

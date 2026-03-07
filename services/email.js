@@ -163,8 +163,10 @@ async function sendMail({ to, subject, html }) {
 
 /**
  * Notify a user that they have been assigned to a project.
+ * Accepts optional scheduledDate / schedulingNotes for sales & presales context.
  */
-async function sendProjectAssignmentEmail({ userEmail, userName, projectName, clientName, startDate, endDate, priority, modules = [] }) {
+async function sendProjectAssignmentEmail({ userEmail, userName, userRole, projectName, clientName,
+  scheduledDate, schedulingNotes, startDate, endDate, priority, modules = [] }) {
   if (!userEmail) return false;
 
   const priorityColors = {
@@ -177,6 +179,11 @@ async function sendProjectAssignmentEmail({ userEmail, userName, projectName, cl
   };
   const priorityColor = priorityColors[priority?.toLowerCase()] || '#2980B9';
   const priorityLabel = (priority || 'Normal').charAt(0).toUpperCase() + (priority || 'Normal').slice(1).toLowerCase();
+
+  // Role-aware greeting
+  const roleLabels = { sales: 'Sales', presales: 'Presales', user: 'Technician', planner: 'Planner' };
+  const roleLabel  = roleLabels[userRole] || 'Team Member';
+  const isSalesPerson = userRole === 'sales' || userRole === 'presales';
 
   const moduleRows = modules.length
     ? modules.map((m, i) => `
@@ -193,8 +200,9 @@ async function sendProjectAssignmentEmail({ userEmail, userName, projectName, cl
          No modules listed
        </td></tr>`;
 
-  const formattedStart = startDate ? new Date(startDate).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' }) : null;
-  const formattedEnd   = endDate   ? new Date(endDate).toLocaleDateString('en-GB',   { day:'2-digit', month:'short', year:'numeric' }) : null;
+  const formattedScheduled = scheduledDate ? new Date(scheduledDate).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' }) : null;
+  const formattedStart     = startDate ? new Date(startDate).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' }) : null;
+  const formattedEnd       = endDate   ? new Date(endDate).toLocaleDateString('en-GB',   { day:'2-digit', month:'short', year:'numeric' }) : null;
 
   const body = `
     <!-- Greeting -->
@@ -202,8 +210,10 @@ async function sendProjectAssignmentEmail({ userEmail, userName, projectName, cl
       New Project Assigned
     </h2>
     <p style="margin:0 0 30px;color:#6c757d;font-size:15px;line-height:1.7;border-bottom:1px solid #f0f0f0;padding-bottom:26px;">
-      Hello <strong style="color:#1a1a2e;">${userName || 'Team Member'}</strong>,<br>
-      You have been assigned to a new project. Please review the details below and log in to begin your work.
+      Hello <strong style="color:#1a1a2e;">${userName || roleLabel}</strong>,<br>
+      ${isSalesPerson
+        ? `A project associated with your account has been created and assigned to the technical team. Below are the project details for your records.`
+        : `You have been assigned to a new project. Please review the details below and log in to begin your work.`}
     </p>
 
     <!-- Project Info Card -->
@@ -239,6 +249,18 @@ async function sendProjectAssignmentEmail({ userEmail, userName, projectName, cl
                    border-top:1px solid #f2f2f2;">${clientName}</td>
       </tr>` : ''}
 
+      ${formattedScheduled ? `<tr>
+        <td style="padding:12px 20px;font-size:12px;color:#888;font-weight:600;
+                   text-transform:uppercase;letter-spacing:0.8px;border-top:1px solid #f2f2f2;">Scheduled Date</td>
+        <td style="padding:12px 20px;font-size:14px;color:#333;border-top:1px solid #f2f2f2;">${formattedScheduled}</td>
+      </tr>` : ''}
+
+      ${schedulingNotes ? `<tr>
+        <td style="padding:12px 20px;font-size:12px;color:#888;font-weight:600;
+                   text-transform:uppercase;letter-spacing:0.8px;border-top:1px solid #f2f2f2;vertical-align:top;">Scheduling Notes</td>
+        <td style="padding:12px 20px;font-size:14px;color:#333;border-top:1px solid #f2f2f2;line-height:1.6;">${schedulingNotes}</td>
+      </tr>` : ''}
+
       ${formattedStart ? `<tr>
         <td style="padding:12px 20px;font-size:12px;color:#888;font-weight:600;
                    text-transform:uppercase;letter-spacing:0.8px;border-top:1px solid #f2f2f2;">Start Date</td>
@@ -247,7 +269,7 @@ async function sendProjectAssignmentEmail({ userEmail, userName, projectName, cl
 
       ${formattedEnd ? `<tr>
         <td style="padding:12px 20px;font-size:12px;color:#888;font-weight:600;
-                   text-transform:uppercase;letter-spacing:0.8px;border-top:1px solid #f2f2f2;">End Date</td>
+                   text-transform:uppercase;letter-spacing:0.8px;border-top:1px solid #f2f2f2;">Est. End Date</td>
         <td style="padding:12px 20px;font-size:14px;color:#333;border-top:1px solid #f2f2f2;">${formattedEnd}</td>
       </tr>` : ''}
     </table>
@@ -279,8 +301,9 @@ async function sendProjectAssignmentEmail({ userEmail, userName, projectName, cl
       <tr>
         <td style="background-color:#f8f9fa;border-radius:8px;padding:18px 20px;border-left:4px solid #C0392B;">
           <p style="margin:0;font-size:14px;color:#555;line-height:1.6;">
-            Log in to <strong style="color:#1a1a2e;">MagicTech Projects Coordination</strong> to view your full
-            task list, complete checklist items, and submit work reports.
+            ${isSalesPerson
+              ? `Log in to <strong style="color:#1a1a2e;">MagicTech Projects Coordination</strong> to track project progress and stay updated on all activities.`
+              : `Log in to <strong style="color:#1a1a2e;">MagicTech Projects Coordination</strong> to view your full task list, complete checklist items, and submit work reports.`}
           </p>
         </td>
       </tr>

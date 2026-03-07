@@ -35,7 +35,7 @@ router.get('/users', async (req, res) => {
              (SELECT COUNT(*) FROM projects WHERE user_id_1 = u.id OR user_id_2 = u.id) AS total_projects,
              (SELECT COUNT(*) FROM projects WHERE (user_id_1 = u.id OR user_id_2 = u.id) AND status='completed') AS completed_projects
       FROM users u
-      WHERE u.role != 'admin' AND u.is_active = 1
+      WHERE u.role NOT IN ('admin') AND u.is_active = 1
       ORDER BY u.created_at DESC
     `);
     res.json(users);

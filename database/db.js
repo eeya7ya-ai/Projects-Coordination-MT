@@ -223,6 +223,14 @@ async function initializeDB() {
     );
   `);
 
+  // ── Schema migrations (add new columns if missing) ───
+  await db.exec(`
+    ALTER TABLE projects ADD COLUMN IF NOT EXISTS scheduled_date TEXT;
+    ALTER TABLE projects ADD COLUMN IF NOT EXISTS scheduling_notes TEXT;
+    ALTER TABLE projects ADD COLUMN IF NOT EXISTS sales_person_id INTEGER REFERENCES users(id);
+    ALTER TABLE projects ADD COLUMN IF NOT EXISTS presales_person_id INTEGER REFERENCES users(id);
+  `);
+
   // ── Admin user ────────────────────────────────────────
   const adminExists = await db.get("SELECT id FROM users WHERE role = $1 LIMIT 1", ['admin']);
   let adminId;
