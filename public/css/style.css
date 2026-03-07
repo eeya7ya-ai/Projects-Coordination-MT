@@ -140,6 +140,27 @@ h1,h2,h3,h4,h5,h6 { font-family: 'Rajdhani', 'Inter', sans-serif; font-weight: 7
 .login-logo h1 { font-size: 24px; color: var(--red-dark); letter-spacing: 1px; }
 .login-logo p  { font-size: 13px; color: var(--gray-500); margin-top: 4px; }
 
+/* Login wordmark — replaces image logo */
+.login-brand-wordmark {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 46px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  line-height: 1;
+  margin-bottom: 12px;
+}
+.wm-magic {
+  color: var(--gray-800);
+  font-weight: 400;
+}
+.wm-tech {
+  color: var(--red);
+  font-weight: 800;
+}
+
+/* Sidebar brand icon sizing */
+.sidebar-brand-icon { width: 28px; height: 28px; display: block; }
+
 .form-group { margin-bottom: 20px; }
 .form-label { display: block; font-size: 13px; font-weight: 600; color: var(--gray-700); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
 
@@ -1545,6 +1566,7 @@ tbody tr:last-child td { border-bottom: none; }
   .login-logo { margin-bottom: 24px; }
   .login-logo .logo-icon { width: 68px; height: 68px; border-radius: 16px; }
   .login-logo h1 { font-size: 22px; }
+  .login-brand-wordmark { font-size: 38px; }
 
   /* New project submit/reset button row — wrap on mobile */
   #page-new-project .form-actions-row {
@@ -1613,6 +1635,7 @@ tbody tr:last-child td { border-bottom: none; }
   .login-logo .logo-icon { width: 60px; height: 60px; }
   .login-logo h1 { font-size: 20px; }
   .login-logo p  { font-size: 12px; }
+  .login-brand-wordmark { font-size: 34px; letter-spacing: 2px; }
 
   /* Device rows — fully stacked on small phones */
   .device-row { grid-template-columns: 1fr !important; }
@@ -1931,8 +1954,8 @@ tbody tr:last-child td { border-bottom: none; }
   width: 44px;
   height: 44px;
   border-radius: 10px;
-  object-fit: cover;
   flex-shrink: 0;
+  overflow: hidden;
 }
 .pwa-banner-text {
   display: flex;
