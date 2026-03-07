@@ -125,7 +125,7 @@ router.get('/analytics', async (req, res) => {
       total_projects: (await db.get("SELECT COUNT(*) as c FROM projects")).c,
       active_projects: (await db.get("SELECT COUNT(*) as c FROM projects WHERE status NOT IN ('completed','cancelled')")).c,
       completed_projects: (await db.get("SELECT COUNT(*) as c FROM projects WHERE status='completed'")).c,
-      total_users: (await db.get("SELECT COUNT(*) as c FROM users WHERE role='user' AND is_active=1")).c,
+      total_users: (await db.get("SELECT COUNT(*) as c FROM users WHERE role != 'admin' AND is_active=1")).c,
       pending_reports: (await db.get("SELECT COUNT(*) as c FROM module_reports WHERE review_status='pending'")).c,
       total_modules: (await db.get("SELECT COUNT(*) as c FROM project_modules")).c
     };
