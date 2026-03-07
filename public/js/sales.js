@@ -596,13 +596,16 @@ async function loadNotifications() {
   const notes = await res.json();
   const unread = notes.filter(n => !n.is_read);
   document.getElementById('notif-dot').classList.toggle('hidden', unread.length === 0);
-  document.getElementById('notif-list').innerHTML = notes.map(n => `
+  const noNotifMsg = typeof t === 'function' ? t('msg.no_notifications') : 'No notifications';
+  document.getElementById('notif-list').innerHTML = notes.map(n => {
+    const tx = typeof tNotif === 'function' ? tNotif(n) : { title: n.title, message: n.message || '' };
+    return `
     <div class="notif-item ${n.is_read ? '' : 'unread'}" onclick="markRead(${n.id})">
-      <div class="notif-title">${n.title}</div>
-      <div class="notif-msg">${n.message || ''}</div>
+      <div class="notif-title">${tx.title}</div>
+      <div class="notif-msg">${tx.message}</div>
       <div class="notif-time">${formatDate(n.created_at)}</div>
-    </div>
-  `).join('') || '<div style="padding:20px;text-align:center;color:var(--gray-400)">No notifications</div>';
+    </div>`;
+  }).join('') || `<div style="padding:20px;text-align:center;color:var(--gray-400)">${noNotifMsg}</div>`;
 }
 
 function toggleNotifs() {

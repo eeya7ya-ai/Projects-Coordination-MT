@@ -36,14 +36,14 @@
     </div>
 
     <nav class="sidebar-nav">
-      <div class="nav-section-label">Projects</div>
+      <div class="nav-section-label" data-i18n="nav.projects_section">Projects</div>
       <a class="nav-item active" data-page="projects">
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
-        All Projects
+        <span data-i18n="nav.all_projects">All Projects</span>
       </a>
       <a class="nav-item" data-page="new-project">
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
-        New Project
+        <span data-i18n="nav.new_project">New Project</span>
       </a>
     </nav>
 
@@ -58,7 +58,7 @@
       </div>
       <button onclick="logout()" class="btn btn-secondary" style="width:100%;margin-top:8px;font-size:13px">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-        Logout
+        <span data-i18n="btn.logout">Logout</span>
       </button>
     </div>
   </aside>
@@ -70,8 +70,9 @@
       <div class="topbar-actions">
         <div class="search-input">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input type="text" placeholder="Search projects..." id="global-search" oninput="filterProjects()">
+          <input type="text" data-i18n-placeholder="search.placeholder" placeholder="Search projects..." id="global-search" oninput="filterProjects()">
         </div>
+        <button id="lang-toggle-btn" onclick="toggleLanguage()" title="Toggle language / تبديل اللغة">عربي</button>
         <button class="notif-btn" onclick="toggleNotifs()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/></svg>
           <span class="notif-dot hidden" id="notif-dot"></span>
@@ -278,8 +279,8 @@
 <!-- ═══ NOTIFICATION PANEL ═══ -->
 <div class="notif-panel" id="notif-panel">
   <div class="notif-panel-header">
-    <h3 style="font-size:16px">Notifications</h3>
-    <button class="btn btn-sm btn-secondary" onclick="markAllRead()">Mark all read</button>
+    <h3 style="font-size:16px" data-i18n="notif.panel_title">Notifications</h3>
+    <button class="btn btn-sm btn-secondary" onclick="markAllRead()" data-i18n="notif.mark_all_read">Mark all read</button>
   </div>
   <div class="notif-list" id="notif-list"></div>
 </div>
@@ -339,6 +340,7 @@
 </nav>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="/js/i18n.js"></script>
 <script src="/js/sales.js"></script>
 </body>
 </html>
