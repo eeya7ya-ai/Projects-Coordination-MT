@@ -570,6 +570,10 @@
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
                   Copy for WhatsApp
                 </button>
+                <button class="btn btn-secondary" id="btn-forward-planner" onclick="forwardSummaryToPlanner()" style="display:none">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                  Forward to Planner
+                </button>
               </div>
             </div>
           </div>
@@ -798,7 +802,7 @@
         <div class="form-group">
           <label>Primary Technician / Engineer *</label>
           <select id="assign-user1" onchange="updateAssignPreview()"></select>
-          <div id="assign-user1-preview" style="display:none;margin-top:8px;display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--gray-100);border-radius:8px">
+          <div id="assign-user1-preview" style="display:none;margin-top:8px;align-items:center;gap:8px;padding:8px 10px;background:var(--gray-100);border-radius:8px">
             <div id="assign-user1-avatar" class="user-avatar" style="width:32px;height:32px;font-size:13px;border-radius:8px;flex-shrink:0"></div>
             <div>
               <div id="assign-user1-name" style="font-size:13px;font-weight:600"></div>
@@ -809,7 +813,7 @@
         <div class="form-group">
           <label>Secondary (Optional)</label>
           <select id="assign-user2" onchange="updateAssignPreview()"></select>
-          <div id="assign-user2-preview" style="display:none;margin-top:8px;display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--gray-100);border-radius:8px">
+          <div id="assign-user2-preview" style="display:none;margin-top:8px;align-items:center;gap:8px;padding:8px 10px;background:var(--gray-100);border-radius:8px">
             <div id="assign-user2-avatar" class="user-avatar" style="width:32px;height:32px;font-size:13px;border-radius:8px;flex-shrink:0"></div>
             <div>
               <div id="assign-user2-name" style="font-size:13px;font-weight:600"></div>
