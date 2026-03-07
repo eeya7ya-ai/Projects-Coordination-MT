@@ -1744,7 +1744,8 @@ tbody tr:last-child td { border-bottom: none; }
 [dir="rtl"] .modal-header { flex-direction: row-reverse; }
 
 /* Notification panel */
-[dir="rtl"] .notif-panel { left: 0; right: auto; }
+[dir="rtl"] .notif-panel { left: 0; right: auto; transform: translateX(-100%); }
+[dir="rtl"] .notif-panel.open { transform: translateX(0); }
 [dir="rtl"] .notif-item { text-align: right; }
 
 /* Login page RTL */
