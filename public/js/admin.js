@@ -109,12 +109,12 @@ function navigate(page) {
   // Activate all matching nav items (sidebar + mobile bottom nav)
   document.querySelectorAll(`[data-page="${page}"]`).forEach(n => n.classList.add('active'));
 
-  const titles = {
-    'dashboard': 'Dashboard', 'analytics': 'Analytics', 'projects': 'Projects',
-    'new-project': 'New Project', 'assign-team': 'Assign Team', 'reports': 'Reports',
-    'users': 'Users', 'daily-summary': 'Daily Summary', 'settings': 'Settings'
+  const pageTitleKeys = {
+    'dashboard': 'page.dashboard', 'analytics': 'page.analytics', 'projects': 'page.projects',
+    'new-project': 'page.new_project', 'assign-team': 'page.assign_team', 'reports': 'page.reports',
+    'users': 'page.users', 'daily-summary': 'page.daily_summary', 'settings': 'page.settings'
   };
-  document.getElementById('page-title').textContent = titles[page] || page;
+  document.getElementById('page-title').textContent = t(pageTitleKeys[page] || page);
 
   if (page === 'analytics') loadAnalytics();
   if (page === 'projects') loadProjects();
@@ -254,7 +254,7 @@ function renderProjects(projects) {
       <div class="project-card" onclick="openProjectDetail(${p.id})">
         <div class="project-card-header">
           <div class="proj-name">${p.project_name}</div>
-          <div class="proj-client">${p.client_name_1 || 'No client'}</div>
+          <div class="proj-client">${p.client_name_1 || t('msg.no_client')}</div>
           <div class="proj-priority">${p.priority || 'normal'}</div>
           <div class="hex-pattern"></div>
         </div>
@@ -272,12 +272,12 @@ function renderProjects(projects) {
         <div class="project-card-footer">
           <span style="font-size:12px;color:var(--gray-400)">${formatDate(p.created_at)}</span>
           <div style="display:flex;gap:8px">
-            <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation();openAssignTeam(${p.id})" title="Assign Team" style="display:flex;align-items:center;gap:4px">
+            ${p.status !== 'completed' ? `<button class="btn btn-sm btn-secondary" onclick="event.stopPropagation();openAssignTeam(${p.id})" title="${t('btn.assign_team')}" style="display:flex;align-items:center;gap:4px">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
-              Assign
-            </button>
-            <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation();editProject(${p.id})">Edit</button>
-            <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteProject(${p.id},'${p.project_name}')">Delete</button>
+              ${t('btn.assign')}
+            </button>` : ''}
+            <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation();editProject(${p.id})">${t('btn.edit')}</button>
+            <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteProject(${p.id},'${p.project_name}')">${t('btn.delete')}</button>
           </div>
         </div>
       </div>
@@ -499,14 +499,22 @@ async function updateProjectStatus(projectId) {
 }
 
 async function reviewReport(reportId, projectId, moduleId, status) {
-  const notes = status === 'rejected' ? prompt('Reason for rejection:') : null;
+  const notes = status === 'rejected' ? prompt(t('prompt.rejection_reason')) : null;
   const res = await apiFetch(`/projects/${projectId}/modules/${moduleId}/reports/${reportId}`, {
     method: 'PUT',
     body: JSON.stringify({ review_status: status, review_notes: notes || '' })
   });
   if (res?.ok) {
-    showToast(`Report ${status}`, 'success');
-    openProjectDetail(projectId);
+    showToast(`${t('msg.report')} ${t('status.' + status)}`, 'success');
+    // If on reports page, just reload the reports list (single fast query)
+    // If in project detail modal, re-fetch only that project
+    const onReportsPage = document.getElementById('page-reports')?.classList.contains('active');
+    if (onReportsPage) {
+      loadReports();
+    } else {
+      openProjectDetail(projectId);
+    }
+    // Update dashboard stats in background without blocking UI
     loadDashboard();
   }
 }
@@ -1044,37 +1052,32 @@ async function deactivateUser(id, name) {
 
 // ── Reports ───────────────────────────────────────────
 async function loadReports() {
-  const res = await apiFetch('/projects');
-  if (!res?.ok) return;
-  const projects = await res.json();
   const container = document.getElementById('reports-list');
+  container.innerHTML = `<div class="text-center text-muted" style="padding:40px">${t('msg.loading')}</div>`;
 
-  // Fetch all project details in parallel (instead of sequential N+1 calls)
-  const details = await Promise.all(
-    projects.map(p => apiFetch(`/projects/${p.id}`).then(r => r?.ok ? r.json() : null))
-  );
-
-  const reportCards = [];
-  for (const pd of details) {
-    if (!pd) continue;
-    for (const m of pd.modules || []) {
-      for (const r of m.reports || []) {
-        reportCards.push({ ...r, project: pd, module: m });
-      }
-    }
-  }
+  // Single query endpoint — much faster than N+1 project detail fetches
+  const res = await apiFetch('/projects/reports/all');
+  if (!res?.ok) return;
+  const reportCards = await res.json();
 
   if (!reportCards.length) {
-    container.innerHTML = '<div class="text-center text-muted" style="padding:60px">No reports submitted yet</div>';
+    container.innerHTML = `<div class="text-center text-muted" style="padding:60px">${t('msg.no_reports_submitted')}</div>`;
     return;
   }
 
-  container.innerHTML = reportCards.map(r => `
+  // Reshape to match template expectations
+  const shaped = reportCards.map(r => ({
+    ...r,
+    project: { id: r.project_id, project_name: r.project_name },
+    module:  { id: r.module_id,  module_type: r.module_type }
+  }));
+
+  container.innerHTML = shaped.map(r => `
     <div class="card" style="margin-bottom:16px">
       <div class="card-header">
         <div>
           <div style="font-size:16px;font-weight:700">${r.project.project_name}</div>
-          <div style="font-size:13px;color:var(--gray-500)">${r.module.module_type} — Submitted by <strong>${r.submitted_by_name}</strong></div>
+          <div style="font-size:13px;color:var(--gray-500)">${r.module.module_type} — ${t('msg.submitted_by')} <strong>${r.submitted_by_name}</strong></div>
         </div>
         <div style="display:flex;gap:10px;align-items:center">
           <span class="badge badge-${r.review_status === 'approved' ? 'completed' : r.review_status === 'rejected' ? 'urgent' : 'pending'}">${r.review_status}</span>
@@ -1083,15 +1086,15 @@ async function loadReports() {
       </div>
       <div class="card-body">
         <div class="grid-2" style="gap:16px">
-          ${r.work_done ? `<div><label style="font-size:11px;font-weight:700;color:var(--gray-400);text-transform:uppercase">Work Done</label><p style="font-size:14px;margin-top:4px">${r.work_done}</p></div>` : ''}
-          ${r.issues_found ? `<div><label style="font-size:11px;font-weight:700;color:var(--gray-400);text-transform:uppercase">Issues Found</label><p style="font-size:14px;margin-top:4px">${r.issues_found}</p></div>` : ''}
-          ${r.next_steps ? `<div><label style="font-size:11px;font-weight:700;color:var(--gray-400);text-transform:uppercase">Next Steps</label><p style="font-size:14px;margin-top:4px">${r.next_steps}</p></div>` : ''}
-          ${r.hours_spent ? `<div><label style="font-size:11px;font-weight:700;color:var(--gray-400);text-transform:uppercase">Hours Spent</label><p style="font-size:14px;margin-top:4px">${r.hours_spent}h</p></div>` : ''}
+          ${r.work_done ? `<div><label style="font-size:11px;font-weight:700;color:var(--gray-400);text-transform:uppercase">${t('label.work_done')}</label><p style="font-size:14px;margin-top:4px">${r.work_done}</p></div>` : ''}
+          ${r.issues_found ? `<div><label style="font-size:11px;font-weight:700;color:var(--gray-400);text-transform:uppercase">${t('label.issues_found')}</label><p style="font-size:14px;margin-top:4px">${r.issues_found}</p></div>` : ''}
+          ${r.next_steps ? `<div><label style="font-size:11px;font-weight:700;color:var(--gray-400);text-transform:uppercase">${t('label.next_steps')}</label><p style="font-size:14px;margin-top:4px">${r.next_steps}</p></div>` : ''}
+          ${r.hours_spent ? `<div><label style="font-size:11px;font-weight:700;color:var(--gray-400);text-transform:uppercase">${t('label.hours_spent')}</label><p style="font-size:14px;margin-top:4px">${r.hours_spent}h</p></div>` : ''}
         </div>
         ${r.review_status === 'pending' ? `
           <div style="display:flex;gap:10px;margin-top:16px">
-            <button class="btn btn-success btn-sm" onclick="reviewReport(${r.id}, ${r.project.id}, ${r.module.id}, 'approved')">✓ Approve</button>
-            <button class="btn btn-danger btn-sm" onclick="reviewReport(${r.id}, ${r.project.id}, ${r.module.id}, 'rejected')">✗ Reject</button>
+            <button class="btn btn-success btn-sm" onclick="reviewReport(${r.id}, ${r.project.id}, ${r.module.id}, 'approved')">${t('btn.approve')}</button>
+            <button class="btn btn-danger btn-sm" onclick="reviewReport(${r.id}, ${r.project.id}, ${r.module.id}, 'rejected')">${t('btn.reject')}</button>
           </div>
         ` : ''}
       </div>
@@ -1395,7 +1398,8 @@ function roleBadge(role) {
 function statusBadge(status) {
   const map = { pending: 'pending', in_progress: 'progress', completed: 'completed', cancelled: 'cancelled' };
   const cls = map[status] || 'pending';
-  return `<span class="badge badge-${cls}">${(status || 'pending').replace('_',' ')}</span>`;
+  const labelKey = 'status.' + (status || 'pending');
+  return `<span class="badge badge-${cls}">${t(labelKey)}</span>`;
 }
 
 function priorityBadge(p) {
@@ -2031,4 +2035,23 @@ async function forwardSummaryToPlanner() {
       btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg> Forward to Planner';
     }
   }
+}
+
+// ── Language re-render hook (called by i18n.js toggleLanguage) ──
+function reRenderCurrentPage() {
+  const activePage = document.querySelector('.page.active');
+  if (!activePage) return;
+  const pageId = activePage.id.replace('page-', '');
+  // Re-render data-driven pages
+  if (pageId === 'projects') renderProjects(allProjects);
+  if (pageId === 'reports') loadReports();
+  if (pageId === 'dashboard') loadDashboard();
+  // Update topbar title
+  const pageTitleKeys = {
+    'dashboard': 'page.dashboard', 'analytics': 'page.analytics', 'projects': 'page.projects',
+    'new-project': 'page.new_project', 'assign-team': 'page.assign_team', 'reports': 'page.reports',
+    'users': 'page.users', 'daily-summary': 'page.daily_summary', 'settings': 'page.settings'
+  };
+  const titleEl = document.getElementById('page-title');
+  if (titleEl && pageTitleKeys[pageId]) titleEl.textContent = t(pageTitleKeys[pageId]);
 }
