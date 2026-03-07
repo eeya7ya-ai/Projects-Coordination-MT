@@ -49,6 +49,32 @@
   </div>
 </div>
 
+<!-- PWA Install Banner (Android/Chrome) -->
+<div id="pwa-banner" class="pwa-install-banner" style="display:none" role="banner" aria-label="Install app">
+  <div class="pwa-banner-content">
+    <img src="/company-logo.jpg" class="pwa-banner-icon" alt="App Icon">
+    <div class="pwa-banner-text">
+      <strong>Install MagicTech App</strong>
+      <span>Add to home screen for quick access</span>
+    </div>
+  </div>
+  <div class="pwa-banner-actions">
+    <button id="pwa-install-btn" class="pwa-install-btn">Install</button>
+    <button id="pwa-dismiss-btn" class="pwa-dismiss-btn" aria-label="Dismiss">✕</button>
+  </div>
+</div>
+
+<!-- PWA iOS Banner -->
+<div id="pwa-ios-banner" class="pwa-ios-banner" style="display:none" role="banner">
+  <div class="pwa-ios-banner-inner">
+    <div class="pwa-ios-steps">
+      <strong>📲 Install MagicTech on your iPhone</strong>
+      Tap <svg class="ios-share-icon" viewBox="0 0 24 24" fill="none" stroke="#2980B9" stroke-width="2"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg> <strong>Share</strong> then choose <strong>"Add to Home Screen"</strong>
+    </div>
+    <button id="pwa-ios-dismiss" class="pwa-dismiss-btn" aria-label="Dismiss">✕</button>
+  </div>
+</div>
+
 <footer class="espark-footer">
   <span>Created by <span class="espark-brand">eSpark</span> Developers</span>
 </footer>
@@ -130,6 +156,60 @@ form.addEventListener('submit', async (e) => {
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
   }
+
+  // ── PWA Install Prompt ──────────────────────────────────────
+  (function() {
+    // Already running as installed PWA — skip
+    if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone) return;
+    // Already dismissed this session
+    if (sessionStorage.getItem('pwa_dismissed')) return;
+
+    const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
+    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+
+    if (isIOS && isSafari) {
+      // Show iOS instruction banner after a short delay
+      setTimeout(() => {
+        const banner = document.getElementById('pwa-ios-banner');
+        if (banner) banner.style.display = 'block';
+      }, 2500);
+      document.getElementById('pwa-ios-dismiss').addEventListener('click', () => {
+        document.getElementById('pwa-ios-banner').style.display = 'none';
+        sessionStorage.setItem('pwa_dismissed', '1');
+      });
+      return;
+    }
+
+    // Android / Chrome / Edge — intercept beforeinstallprompt
+    let deferredPrompt = null;
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      setTimeout(() => {
+        const banner = document.getElementById('pwa-banner');
+        if (banner) banner.style.display = 'flex';
+      }, 1500);
+    });
+
+    document.getElementById('pwa-install-btn').addEventListener('click', async () => {
+      if (!deferredPrompt) return;
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      deferredPrompt = null;
+      document.getElementById('pwa-banner').style.display = 'none';
+      if (outcome === 'accepted') sessionStorage.setItem('pwa_dismissed', '1');
+    });
+
+    document.getElementById('pwa-dismiss-btn').addEventListener('click', () => {
+      document.getElementById('pwa-banner').style.display = 'none';
+      sessionStorage.setItem('pwa_dismissed', '1');
+    });
+
+    // Hide if user installs
+    window.addEventListener('appinstalled', () => {
+      document.getElementById('pwa-banner').style.display = 'none';
+    });
+  })();
 </script>
 </body>
 </html>
