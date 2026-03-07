@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background -->
+  <rect width="512" height="512" fill="#8B0000"/>
+  <!-- "M" letter -->
+  <text
+    x="256"
+    y="320"
+    font-family="Arial Black, Arial, sans-serif"
+    font-weight="900"
+    font-size="280"
+    fill="white"
+    text-anchor="middle"
+    letter-spacing="-10"
+  >MT</text>
+  <!-- Bottom accent bar -->
+  <rect x="80" y="400" width="352" height="18" rx="9" fill="#E74C3C" opacity="0.85"/>
+</svg>
