@@ -229,6 +229,7 @@ async function initializeDB() {
     ALTER TABLE projects ADD COLUMN IF NOT EXISTS scheduling_notes TEXT;
     ALTER TABLE projects ADD COLUMN IF NOT EXISTS sales_person_id INTEGER REFERENCES users(id);
     ALTER TABLE projects ADD COLUMN IF NOT EXISTS presales_person_id INTEGER REFERENCES users(id);
+    ALTER TABLE projects ADD COLUMN IF NOT EXISTS google_map_url TEXT;
     ALTER TABLE project_modules ADD COLUMN IF NOT EXISTS reopened_count INTEGER DEFAULT 0;
     ALTER TABLE project_modules ADD COLUMN IF NOT EXISTS reopen_reason TEXT;
     ALTER TABLE project_modules ADD COLUMN IF NOT EXISTS last_reopened_at TIMESTAMP;

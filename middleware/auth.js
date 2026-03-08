@@ -19,11 +19,19 @@ function requireAdmin(req, res, next) {
   next();
 }
 
+function requireAdminOrManager(req, res, next) {
+  if (req.user?.role !== 'admin' && req.user?.role !== 'projects_manager') {
+    return res.status(403).json({ error: 'Admin or Projects Manager access required' });
+  }
+  next();
+}
+
 function requireSalesOrAdmin(req, res, next) {
-  if (req.user?.role !== 'admin' && req.user?.role !== 'sales' && req.user?.role !== 'presales') {
+  const allowed = ['admin', 'projects_manager', 'sales', 'presales'];
+  if (!allowed.includes(req.user?.role)) {
     return res.status(403).json({ error: 'Access restricted to sales or admin users' });
   }
   next();
 }
 
-module.exports = { verifyToken, requireAdmin, requireSalesOrAdmin, JWT_SECRET };
+module.exports = { verifyToken, requireAdmin, requireAdminOrManager, requireSalesOrAdmin, JWT_SECRET };
