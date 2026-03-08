@@ -1,14 +1,15 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const db = require('../database/db');
-const { verifyToken, requireAdmin } = require('../middleware/auth');
+const { verifyToken, requireAdmin, requireAdminOrManager } = require('../middleware/auth');
 const { sendMail, clearAdminNameCache } = require('../services/email');
 
 const router = express.Router();
-router.use(verifyToken, requireAdmin);
+// All admin routes require at minimum a valid token; individual routes enforce stricter roles
+router.use(verifyToken);
 
 // ── Admin self-profile update ───────────────────────────
-router.put('/profile', async (req, res) => {
+router.put('/profile', requireAdmin, async (req, res) => {
   try {
     const { full_name, department, phone, email, avatar_color } = req.body;
     const existing = await db.get('SELECT id FROM users WHERE id = ? AND role = ?', [req.user.id, 'admin']);
@@ -27,7 +28,7 @@ router.put('/profile', async (req, res) => {
 });
 
 // ── Users ──────────────────────────────────────────────
-router.get('/users', async (req, res) => {
+router.get('/users', requireAdmin, async (req, res) => {
   try {
     const users = await db.all(`
       SELECT u.id, u.username, u.full_name, u.role, u.department, u.phone, u.email,
@@ -45,7 +46,7 @@ router.get('/users', async (req, res) => {
   }
 });
 
-router.post('/users', async (req, res) => {
+router.post('/users', requireAdmin, async (req, res) => {
   try {
     const { username, password, full_name, role, department, phone, email, avatar_color } = req.body;
     if (!username || !password || !full_name) {
@@ -54,7 +55,7 @@ router.post('/users', async (req, res) => {
     const existing = await db.get('SELECT id FROM users WHERE username = ?', [username]);
     if (existing) return res.status(400).json({ error: 'Username already exists' });
 
-    const allowedRoles = ['user', 'technical', 'engineer', 'sales', 'presales', 'planner'];
+    const allowedRoles = ['user', 'technical', 'engineer', 'sales', 'presales', 'planner', 'projects_manager'];
     const assignedRole = allowedRoles.includes(role) ? role : 'technical';
 
     const hashed = bcrypt.hashSync(password, 10);
@@ -74,7 +75,7 @@ router.post('/users', async (req, res) => {
   }
 });
 
-router.put('/users/:id', async (req, res) => {
+router.put('/users/:id', requireAdmin, async (req, res) => {
   try {
     const { full_name, role, department, phone, email, avatar_color, is_active, password } = req.body;
     const user = await db.get('SELECT id FROM users WHERE id = ? AND role != ?', [req.params.id, 'admin']);
@@ -85,7 +86,7 @@ router.put('/users/:id', async (req, res) => {
       await db.run('UPDATE users SET password = ? WHERE id = ?', [hashed, req.params.id]);
     }
 
-    const allowedRoles = ['user', 'technical', 'engineer', 'sales', 'presales', 'planner'];
+    const allowedRoles = ['user', 'technical', 'engineer', 'sales', 'presales', 'planner', 'projects_manager'];
     const assignedRole = role && allowedRoles.includes(role) ? role : undefined;
 
     const roleClause = assignedRole ? ', role=?' : '';
@@ -106,7 +107,7 @@ router.put('/users/:id', async (req, res) => {
   }
 });
 
-router.delete('/users/:id', async (req, res) => {
+router.delete('/users/:id', requireAdmin, async (req, res) => {
   try {
     const user = await db.get('SELECT id FROM users WHERE id = ? AND role != ?', [req.params.id, 'admin']);
     if (!user) return res.status(404).json({ error: 'User not found' });
@@ -119,7 +120,7 @@ router.delete('/users/:id', async (req, res) => {
 });
 
 // ── Analytics ──────────────────────────────────────────
-router.get('/analytics', async (req, res) => {
+router.get('/analytics', requireAdminOrManager, async (req, res) => {
   try {
     const stats = {
       total_projects: (await db.get("SELECT COUNT(*) as c FROM projects")).c,
@@ -183,7 +184,7 @@ router.get('/analytics', async (req, res) => {
 });
 
 // ── Email Settings ──────────────────────────────────────
-router.get('/email-settings', async (req, res) => {
+router.get('/email-settings', requireAdmin, async (req, res) => {
   try {
     const rows = await db.all("SELECT key, value FROM app_settings WHERE key LIKE 'email_%'");
     const settings = {};
@@ -207,7 +208,7 @@ router.get('/email-settings', async (req, res) => {
   }
 });
 
-router.put('/email-settings', async (req, res) => {
+router.put('/email-settings', requireAdmin, async (req, res) => {
   try {
     // Only email_notifications_enabled is user-controlled.
     // Sender name/address come from the admin profile, not this form.
@@ -228,7 +229,7 @@ router.put('/email-settings', async (req, res) => {
   }
 });
 
-router.post('/email-settings/test', async (req, res) => {
+router.post('/email-settings/test', requireAdmin, async (req, res) => {
   try {
     const { test_email } = req.body;
     if (!test_email) return res.status(400).json({ error: 'test_email is required' });

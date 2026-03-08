@@ -135,7 +135,7 @@ form.addEventListener('submit', async (e) => {
 
     showAlert('Login successful! Redirecting...', 'success');
     setTimeout(() => {
-      if (data.user.role === 'admin') {
+      if (data.user.role === 'admin' || data.user.role === 'projects_manager') {
         window.location.href = '/admin';
       } else if (data.user.role === 'planner') {
         window.location.href = '/planner';

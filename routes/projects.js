@@ -2,7 +2,7 @@ const express = require('express');
 const multer = require('multer');
 const xlsx = require('xlsx');
 const db = require('../database/db');
-const { verifyToken, requireAdmin, requireSalesOrAdmin } = require('../middleware/auth');
+const { verifyToken, requireAdmin, requireAdminOrManager, requireSalesOrAdmin } = require('../middleware/auth');
 const { sendProjectAssignmentEmail, sendReportReviewEmail, sendDailySummaryEmail, sendProjectCompletionEmail } = require('../services/email');
 
 const router = express.Router();
@@ -75,8 +75,8 @@ const MODULE_CHECKLISTS = {
 router.get('/', verifyToken, async (req, res) => {
   try {
     let projects;
-    if (req.user.role === 'admin') {
-      // Admins see all projects
+    if (req.user.role === 'admin' || req.user.role === 'projects_manager') {
+      // Admins and Projects Managers see all projects
       projects = await db.all(`
         SELECT p.*, u1.full_name as user1_name, u1.avatar_color as user1_color,
                u2.full_name as user2_name, u2.avatar_color as user2_color,
@@ -114,7 +114,7 @@ router.get('/', verifyToken, async (req, res) => {
 // ── Daily Summary ────────────────────────────────────────
 // MUST be declared before /:id to prevent Express from matching "daily-summary" as an id param
 router.get('/daily-summary', verifyToken, async (req, res) => {
-  if (req.user.role !== 'admin' && req.user.role !== 'planner') {
+  if (req.user.role !== 'admin' && req.user.role !== 'projects_manager' && req.user.role !== 'planner') {
     return res.status(403).json({ error: 'Access denied' });
   }
   try {
@@ -163,7 +163,7 @@ router.get('/daily-summary', verifyToken, async (req, res) => {
 // ── Forward daily summary to planner-role users via SMTP ─
 // Must be declared before /:id routes to avoid conflicts
 router.post('/daily-summary/forward', verifyToken, async (req, res) => {
-  if (req.user.role !== 'admin' && req.user.role !== 'planner') {
+  if (req.user.role !== 'admin' && req.user.role !== 'projects_manager' && req.user.role !== 'planner') {
     return res.status(403).json({ error: 'Access denied' });
   }
   try {
@@ -218,7 +218,7 @@ router.post('/daily-summary/forward', verifyToken, async (req, res) => {
 // ── Toggle module preparation (planner/admin) ─────────────
 // Must be declared before /:id routes to avoid conflicts
 router.put('/modules/:moduleId/prepare', verifyToken, async (req, res) => {
-  if (req.user.role !== 'admin' && req.user.role !== 'planner') {
+  if (req.user.role !== 'admin' && req.user.role !== 'projects_manager' && req.user.role !== 'planner') {
     return res.status(403).json({ error: 'Access denied' });
   }
   try {
@@ -264,7 +264,7 @@ router.get('/:id', verifyToken, async (req, res) => {
     `, [req.params.id]);
 
     if (!project) return res.status(404).json({ error: 'Project not found' });
-    if (req.user.role !== 'admin' && project.user_id_1 !== req.user.id && project.user_id_2 !== req.user.id) {
+    if (req.user.role !== 'admin' && req.user.role !== 'projects_manager' && project.user_id_1 !== req.user.id && project.user_id_2 !== req.user.id) {
       return res.status(403).json({ error: 'Access denied' });
     }
 
@@ -294,7 +294,7 @@ router.post('/', verifyToken, requireSalesOrAdmin, async (req, res) => {
   try {
     const {
       project_name, client_name_1, client_name_2, client_number,
-      location_name, location_lat, location_lng,
+      location_name, location_lat, location_lng, google_map_url,
       user_id_1, user_id_2, start_date, end_date, priority, modules,
       scheduled_date, scheduling_notes, sales_person_id, presales_person_id
     } = req.body;
@@ -305,12 +305,12 @@ router.post('/', verifyToken, requireSalesOrAdmin, async (req, res) => {
     const projectId = await db.transaction(async (tx) => {
       const result = await tx.run(
         `INSERT INTO projects (project_name, client_name_1, client_name_2, client_number,
-          location_name, location_lat, location_lng, user_id_1, user_id_2,
+          location_name, location_lat, location_lng, google_map_url, user_id_1, user_id_2,
           start_date, end_date, status, priority, created_by,
           scheduled_date, scheduling_notes, sales_person_id, presales_person_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?)`,
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?)`,
         [project_name, client_name_1, client_name_2, client_number,
-          location_name, location_lat, location_lng, user_id_1, user_id_2,
+          location_name, location_lat, location_lng, google_map_url || null, user_id_1, user_id_2,
           start_date, end_date, priority || 'normal', req.user.id,
           scheduled_date, scheduling_notes, sales_person_id, presales_person_id]
       );
@@ -428,14 +428,14 @@ router.post('/', verifyToken, requireSalesOrAdmin, async (req, res) => {
   }
 });
 
-// ── Update project (admin only) ─────────────────────────
-router.put('/:id', verifyToken, requireAdmin, async (req, res) => {
+// ── Update project (admin or projects manager) ──────────
+router.put('/:id', verifyToken, requireAdminOrManager, async (req, res) => {
   try {
     const existing = await db.get('SELECT * FROM projects WHERE id=?', [req.params.id]);
     if (!existing) return res.status(404).json({ error: 'Project not found' });
 
     const { project_name, client_name_1, client_name_2, client_number,
-      location_name, location_lat, location_lng, user_id_1, user_id_2,
+      location_name, location_lat, location_lng, google_map_url, user_id_1, user_id_2,
       start_date, end_date, status, priority,
       scheduled_date, scheduling_notes, sales_person_id, presales_person_id } = req.body;
 
@@ -446,7 +446,7 @@ router.put('/:id', verifyToken, requireAdmin, async (req, res) => {
 
     await db.run(
       `UPDATE projects SET project_name=?, client_name_1=?, client_name_2=?, client_number=?,
-        location_name=?, location_lat=?, location_lng=?, user_id_1=?, user_id_2=?,
+        location_name=?, location_lat=?, location_lng=?, google_map_url=?, user_id_1=?, user_id_2=?,
         start_date=?, end_date=?, status=?, priority=?,
         scheduled_date=?, scheduling_notes=?, sales_person_id=?, presales_person_id=?,
         updated_at=NOW()
@@ -459,6 +459,7 @@ router.put('/:id', verifyToken, requireAdmin, async (req, res) => {
         location_name ?? existing.location_name,
         location_lat ?? existing.location_lat,
         location_lng ?? existing.location_lng,
+        google_map_url !== undefined ? (google_map_url || null) : existing.google_map_url,
         finalUserId1,
         finalUserId2,
         start_date ?? existing.start_date,
@@ -558,9 +559,9 @@ router.put('/:id', verifyToken, requireAdmin, async (req, res) => {
   }
 });
 
-// ── Assign team to project (admin only) ─────────────────
+// ── Assign team to project (admin or projects manager) ──
 // Dedicated endpoint so sales-created projects can have technicians assigned later
-router.put('/:id/assign', verifyToken, requireAdmin, async (req, res) => {
+router.put('/:id/assign', verifyToken, requireAdminOrManager, async (req, res) => {
   try {
     const existing = await db.get('SELECT * FROM projects WHERE id=?', [req.params.id]);
     if (!existing) return res.status(404).json({ error: 'Project not found' });
@@ -648,7 +649,7 @@ router.put('/:projectId/modules/:moduleId', verifyToken, async (req, res) => {
     );
     if (!mod) return res.status(404).json({ error: 'Module not found' });
 
-    if (req.user.role !== 'admin' && mod.user_id_1 !== req.user.id && mod.user_id_2 !== req.user.id) {
+    if (req.user.role !== 'admin' && req.user.role !== 'projects_manager' && mod.user_id_1 !== req.user.id && mod.user_id_2 !== req.user.id) {
       return res.status(403).json({ error: 'Access denied' });
     }
 
@@ -656,7 +657,7 @@ router.put('/:projectId/modules/:moduleId', verifyToken, async (req, res) => {
     if (status) updates.status = status;
     if (progress !== undefined) updates.progress = progress;
     if (user_notes !== undefined) updates.user_notes = user_notes;
-    if (admin_notes !== undefined && req.user.role === 'admin') updates.admin_notes = admin_notes;
+    if (admin_notes !== undefined && (req.user.role === 'admin' || req.user.role === 'projects_manager')) updates.admin_notes = admin_notes;
     if (status === 'in_progress' && !mod.started_at) updates.started_at = new Date().toISOString();
     if (status === 'completed') updates.completed_at = new Date().toISOString();
 
@@ -753,8 +754,8 @@ router.post('/:projectId/modules/:moduleId/reports', verifyToken, async (req, re
   }
 });
 
-// ── Review report (admin) ───────────────────────────────
-router.put('/:projectId/modules/:moduleId/reports/:reportId', verifyToken, requireAdmin, async (req, res) => {
+// ── Review report (admin or projects manager) ───────────
+router.put('/:projectId/modules/:moduleId/reports/:reportId', verifyToken, requireAdminOrManager, async (req, res) => {
   try {
     const { review_status, review_notes } = req.body;
 
@@ -797,7 +798,7 @@ router.put('/:projectId/modules/:moduleId/reports/:reportId', verifyToken, requi
 
 // ── Reopen a ticket (module) — admin only ───────────────
 // Creates a new work cycle: resets status/checklist, keeps history, notifies team
-router.post('/:projectId/modules/:moduleId/reopen', verifyToken, requireAdmin, async (req, res) => {
+router.post('/:projectId/modules/:moduleId/reopen', verifyToken, requireAdminOrManager, async (req, res) => {
   try {
     const { reason, new_user_id_1, new_user_id_2 } = req.body;
     if (!reason || !reason.trim()) {
@@ -997,8 +998,8 @@ router.post('/excel-parse', verifyToken, upload.single('file'), (req, res) => {
   }
 });
 
-// ── All reports (admin, single query) ──────────────────
-router.get('/reports/all', verifyToken, requireAdmin, async (req, res) => {
+// ── All reports (admin or projects manager) ─────────────
+router.get('/reports/all', verifyToken, requireAdminOrManager, async (req, res) => {
   try {
     const reports = await db.all(`
       SELECT mr.*,

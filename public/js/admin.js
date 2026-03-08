@@ -12,7 +12,9 @@ let selectedModules = new Set();
 let excelData = null;
 
 // ── Auth check ────────────────────────────────────────
-if (!token || currentUser.role !== 'admin') {
+const isAdmin = currentUser.role === 'admin';
+const isProjectsManager = currentUser.role === 'projects_manager';
+if (!token || (!isAdmin && !isProjectsManager)) {
   window.location.href = '/';
 }
 
@@ -27,9 +29,19 @@ async function apiFetch(path, opts = {}) {
 // ── Init ──────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('sidebar-name').textContent = currentUser.full_name || 'Administrator';
+  const roleLabel = document.getElementById('sidebar-role');
+  if (roleLabel) roleLabel.textContent = isProjectsManager ? 'Projects Manager' : 'Admin';
   const av = document.getElementById('sidebar-avatar');
   av.textContent = (currentUser.full_name || 'A')[0].toUpperCase();
   av.style.background = currentUser.avatar_color || '#8B0000';
+
+  // Hide admin-only nav items for projects_manager
+  if (isProjectsManager) {
+    const navUsers = document.getElementById('nav-users');
+    const navSettings = document.getElementById('nav-settings');
+    if (navUsers) navUsers.style.display = 'none';
+    if (navSettings) navSettings.style.display = 'none';
+  }
 
   // Mobile more-sheet avatar
   const mobAv = document.getElementById('mob-more-avatar');
@@ -277,7 +289,7 @@ function renderProjects(projects) {
               ${t('btn.assign')}
             </button>` : ''}
             <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation();editProject(${p.id})">${t('btn.edit')}</button>
-            <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteProject(${p.id},'${p.project_name}')">${t('btn.delete')}</button>
+            ${isAdmin ? `<button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteProject(${p.id},'${p.project_name}')">${t('btn.delete')}</button>` : ''}
           </div>
         </div>
       </div>
@@ -327,7 +339,7 @@ async function openProjectDetail(id) {
         <table style="width:100%;font-size:14px">
           <tr><td style="color:var(--gray-500);padding:5px 0;width:120px">Client</td><td>${p.client_name_1 || '—'}${p.client_name_2 ? ' / '+p.client_name_2 : ''}</td></tr>
           <tr><td style="color:var(--gray-500);padding:5px 0">Contact</td><td>${p.client_number || '—'}</td></tr>
-          <tr><td style="color:var(--gray-500);padding:5px 0">Location</td><td>${p.location_name || '—'}${p.location_lat ? ` <a href="https://maps.google.com/?q=${p.location_lat},${p.location_lng}" target="_blank" style="color:var(--red);font-size:12px">View on Maps</a>` : ''}</td></tr>
+          <tr><td style="color:var(--gray-500);padding:5px 0">Location</td><td>${p.location_name || '—'}${p.google_map_url ? ` <a href="${p.google_map_url}" target="_blank" rel="noopener" style="color:var(--red);font-size:12px">📍 Google Maps</a>` : (p.location_lat ? ` <a href="https://maps.google.com/?q=${p.location_lat},${p.location_lng}" target="_blank" style="color:var(--red);font-size:12px">View on Maps</a>` : '')}</td></tr>
           ${p.scheduled_date ? `<tr><td style="color:var(--gray-500);padding:5px 0">Scheduled</td><td>${p.scheduled_date}</td></tr>` : ''}
           ${p.scheduling_notes ? `<tr><td style="color:var(--gray-500);padding:5px 0;vertical-align:top">Sched. Notes</td><td style="font-size:13px;color:var(--gray-600)">${p.scheduling_notes}</td></tr>` : ''}
           <tr><td style="color:var(--gray-500);padding:5px 0">Start</td><td>${p.start_date || '—'}</td></tr>
@@ -592,6 +604,8 @@ async function editProject(id) {
   document.getElementById('edit-proj-client2').value = proj.client_name_2 || '';
   document.getElementById('edit-proj-clientnum').value = proj.client_number || '';
   document.getElementById('edit-proj-location').value = proj.location_name || '';
+  const editGoogleMapUrl = document.getElementById('edit-proj-google-map-url');
+  if (editGoogleMapUrl) editGoogleMapUrl.value = proj.google_map_url || '';
   document.getElementById('edit-proj-start').value = proj.start_date || '';
   document.getElementById('edit-proj-end').value = proj.end_date || '';
   document.getElementById('edit-proj-priority').value = proj.priority || 'normal';
@@ -626,6 +640,7 @@ async function saveEditProject() {
     client_name_2: document.getElementById('edit-proj-client2').value.trim(),
     client_number: document.getElementById('edit-proj-clientnum').value.trim(),
     location_name: document.getElementById('edit-proj-location').value.trim(),
+    google_map_url: document.getElementById('edit-proj-google-map-url')?.value.trim() || null,
     user_id_1: document.getElementById('edit-proj-user1').value || null,
     user_id_2: document.getElementById('edit-proj-user2').value || null,
     sales_person_id: document.getElementById('edit-proj-sales')?.value || null,
@@ -870,6 +885,7 @@ async function submitProject() {
     location_name: document.getElementById('p-location-name').value,
     location_lat: parseFloat(document.getElementById('p-lat').value) || null,
     location_lng: parseFloat(document.getElementById('p-lng').value) || null,
+    google_map_url: document.getElementById('p-google-map-url').value.trim() || null,
     user_id_1: document.getElementById('p-user1').value || null,
     user_id_2: document.getElementById('p-user2').value || null,
     scheduled_date: document.getElementById('p-scheduled-date').value || null,
@@ -895,7 +911,7 @@ async function submitProject() {
 
 function resetProjectForm() {
   ['p-name','p-client1','p-client2','p-client-num','p-location-name','p-lat','p-lng',
-   'p-scheduled-date','p-scheduling-notes'].forEach(id => {
+   'p-google-map-url','p-scheduled-date','p-scheduling-notes'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
@@ -945,7 +961,7 @@ async function loadUsersTable() {
         <td><code style="background:var(--gray-100);padding:3px 8px;border-radius:5px;font-size:13px">${u.username}</code></td>
         <td>${u.department || '—'}</td>
         <td>${u.phone || '—'}</td>
-        <td><span class="badge" style="${u.role === 'planner' ? 'background:var(--info);color:#fff' : u.role === 'sales' ? 'background:#8E44AD;color:#fff' : u.role === 'presales' ? 'background:#6C3483;color:#fff' : u.role === 'technical' ? 'background:#1A5276;color:#fff' : u.role === 'engineer' ? 'background:#117A65;color:#fff' : u.role === 'admin' ? 'background:var(--red-dark);color:#fff' : 'background:var(--gray-200);color:var(--gray-700)'}">${u.role === 'planner' ? 'Planner' : u.role === 'sales' ? 'Sales' : u.role === 'presales' ? 'Presales' : u.role === 'technical' ? 'Technical' : u.role === 'engineer' ? 'Engineer' : u.role === 'admin' ? 'Admin' : 'Technical'}</span></td>
+        <td><span class="badge" style="${u.role === 'projects_manager' ? 'background:#C0392B;color:#fff' : u.role === 'planner' ? 'background:var(--info);color:#fff' : u.role === 'sales' ? 'background:#8E44AD;color:#fff' : u.role === 'presales' ? 'background:#6C3483;color:#fff' : u.role === 'technical' ? 'background:#1A5276;color:#fff' : u.role === 'engineer' ? 'background:#117A65;color:#fff' : u.role === 'admin' ? 'background:var(--red-dark);color:#fff' : 'background:var(--gray-200);color:var(--gray-700)'}">${u.role === 'projects_manager' ? 'Projects Manager' : u.role === 'planner' ? 'Planner' : u.role === 'sales' ? 'Sales' : u.role === 'presales' ? 'Presales' : u.role === 'technical' ? 'Technical' : u.role === 'engineer' ? 'Engineer' : u.role === 'admin' ? 'Admin' : 'Technical'}</span></td>
         <td><span class="badge badge-${u.total_projects > 0 ? 'progress' : 'pending'}">${u.total_projects || 0} projects</span></td>
         <td>${u.is_active ? '<span class="badge badge-completed">Active</span>' : '<span class="badge badge-cancelled">Inactive</span>'}</td>
         <td style="font-size:12px;color:var(--gray-400)">${u.last_login ? formatDate(u.last_login) : 'Never'}</td>
@@ -1971,7 +1987,7 @@ function copySummaryText() {
   d.projects.forEach((proj, idx) => {
     text += `📁 *${idx + 1}. ${proj.project_name}*\n`;
     if (proj.client_name_1) text += `   👤 Client: ${proj.client_name_1}\n`;
-    if (proj.location_name) text += `   📍 ${proj.location_name}\n`;
+    if (proj.location_name) text += `   📍 ${proj.location_name}${proj.google_map_url ? ' — ' + proj.google_map_url : ''}\n`;
     if (proj.user1_name || proj.user2_name) {
       text += `   👷 ${[proj.user1_name, proj.user2_name].filter(Boolean).join(' & ')}\n`;
     }
