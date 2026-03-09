@@ -28,7 +28,7 @@ router.put('/profile', requireAdmin, async (req, res) => {
 });
 
 // ── Users ──────────────────────────────────────────────
-router.get('/users', requireAdmin, async (req, res) => {
+router.get('/users', requireAdminOrManager, async (req, res) => {
   try {
     const users = await db.all(`
       SELECT u.id, u.username, u.full_name, u.role, u.department, u.phone, u.email,
