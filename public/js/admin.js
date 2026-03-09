@@ -1922,38 +1922,68 @@ async function loadDailySummary() {
 
   data.projects.forEach((proj, idx) => {
     const modules = proj.modules || [];
-    const rowCount = Math.max(modules.length, 1);
     const team = [proj.user1_name, proj.user2_name].filter(Boolean).join(' & ') || '—';
     const rowBg = idx % 2 === 0 ? 'white' : 'var(--gray-50)';
 
-    if (modules.length === 0) {
-      html += `<tr style="border-bottom:1px solid var(--gray-200);background:${rowBg}">
-        <td style="padding:10px 14px;font-weight:700;color:var(--red)">${idx + 1}</td>
-        <td style="padding:10px 14px;font-weight:600">${proj.project_name}</td>
-        <td style="padding:10px 14px;color:var(--gray-600)">${proj.client_name_1 || '—'}</td>
-        <td style="padding:10px 14px;color:var(--gray-600)">${proj.location_name || '—'}</td>
-        <td colspan="4" style="padding:10px 14px;color:var(--gray-400);font-style:italic">No modules assigned</td>
-        <td style="padding:10px 14px;color:var(--gray-600)">${team}</td>
-      </tr>`;
+    // Collect all devices across all modules
+    const allDevices = [];
+    modules.forEach(mod => {
+      (mod.devices || []).forEach(d => allDevices.push(d));
+    });
+
+    // Build modules summary string
+    const modulesStr = modules.length
+      ? modules.map(m => {
+          const icon = moduleIcons[m.module_type] || '📋';
+          const color = statusColors[m.status] || '#999';
+          return `<span style="white-space:nowrap">${icon} ${m.module_type} <span style="background:${color};color:white;padding:1px 7px;border-radius:10px;font-size:10px;font-weight:600">${(m.status || 'pending').replace('_',' ')}</span> <span style="font-weight:600;color:var(--gray-700)">${m.progress || 0}%</span></span>`;
+        }).join(' &nbsp;|&nbsp; ')
+      : '<span style="color:var(--gray-400);font-style:italic">No modules</span>';
+
+    // Build device table rows
+    let deviceRows = '';
+    if (allDevices.length === 0) {
+      deviceRows = `<tr><td colspan="2" style="padding:6px 10px;color:var(--gray-400);font-style:italic;font-size:12px">No devices</td></tr>`;
     } else {
-      modules.forEach((mod, mIdx) => {
-        const devText = (mod.devices || []).map(d => `${d.device_model} ×${d.device_qty}${d.device_description ? ' – ' + d.device_description : ''}`).join('<br>') || '—';
-        const color = statusColors[mod.status] || '#999';
-        const icon = moduleIcons[mod.module_type] || '📋';
-        const isFirst = mIdx === 0;
-        html += `<tr style="border-bottom:1px solid var(--gray-200);background:${rowBg}">
-          ${isFirst ? `<td style="padding:10px 14px;font-weight:700;color:var(--red);vertical-align:top" rowspan="${rowCount}">${idx + 1}</td>` : ''}
-          ${isFirst ? `<td style="padding:10px 14px;font-weight:600;vertical-align:top" rowspan="${rowCount}">${proj.project_name}</td>` : ''}
-          ${isFirst ? `<td style="padding:10px 14px;color:var(--gray-600);vertical-align:top" rowspan="${rowCount}">${proj.client_name_1 || '—'}${proj.client_name_2 ? '<br><span style="font-size:11px;color:var(--gray-400)">' + proj.client_name_2 + '</span>' : ''}</td>` : ''}
-          ${isFirst ? `<td style="padding:10px 14px;color:var(--gray-600);vertical-align:top" rowspan="${rowCount}">${proj.location_name || '—'}</td>` : ''}
-          <td style="padding:10px 14px;font-size:13px">${icon} ${mod.module_type}</td>
-          <td style="padding:10px 14px"><span style="background:${color};color:white;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap">${(mod.status || 'pending').replace('_', ' ')}</span></td>
-          <td style="padding:10px 14px;text-align:right;font-weight:600;color:var(--gray-700)">${mod.progress || 0}%</td>
-          <td style="padding:10px 14px;font-size:12px;color:var(--gray-600);line-height:1.6">${devText}</td>
-          ${isFirst ? `<td style="padding:10px 14px;color:var(--gray-600);vertical-align:top" rowspan="${rowCount}">${team}</td>` : ''}
+      allDevices.forEach(d => {
+        deviceRows += `<tr style="border-bottom:1px solid var(--gray-100)">
+          <td style="padding:5px 10px;font-size:12px;color:var(--gray-700)">${d.device_model || '—'}</td>
+          <td style="padding:5px 10px;font-size:12px;font-weight:600;color:var(--gray-800);text-align:center">×${d.device_qty}</td>
         </tr>`;
       });
     }
+
+    html += `
+      <!-- Sub-header row -->
+      <tr style="background:${rowBg};border-top:2px solid var(--red-dark)">
+        <td style="padding:12px 14px;font-weight:700;color:var(--red);font-size:14px;vertical-align:top">${idx + 1}</td>
+        <td colspan="8" style="padding:12px 14px">
+          <div style="display:flex;gap:32px;flex-wrap:wrap;margin-bottom:6px;font-size:13px">
+            <span><strong style="color:var(--gray-500);font-weight:600">Project Name:</strong> <span style="font-weight:700">${proj.project_name}</span></span>
+            <span><strong style="color:var(--gray-500);font-weight:600">Client Name:</strong> <span>${proj.client_name_1 || '—'}${proj.client_name_2 ? ' / ' + proj.client_name_2 : ''}</span></span>
+            <span><strong style="color:var(--gray-500);font-weight:600">Client Phone:</strong> <span>${proj.client_number || '—'}</span></span>
+          </div>
+          <div style="display:flex;gap:32px;flex-wrap:wrap;font-size:13px">
+            <span><strong style="color:var(--gray-500);font-weight:600">Modules:</strong> ${modulesStr}</span>
+            <span><strong style="color:var(--gray-500);font-weight:600">Assigned Team:</strong> <span style="font-weight:600;color:var(--info)">${team}</span></span>
+          </div>
+        </td>
+      </tr>
+      <!-- Device table row -->
+      <tr style="background:${rowBg};border-bottom:2px solid var(--gray-200)">
+        <td></td>
+        <td colspan="8" style="padding:0 14px 14px 14px">
+          <table style="width:auto;min-width:280px;border-collapse:collapse;border:1px solid var(--gray-200);border-radius:6px;overflow:hidden">
+            <thead>
+              <tr style="background:var(--gray-100)">
+                <th style="padding:6px 10px;text-align:left;font-size:11px;font-weight:700;color:var(--gray-600);text-transform:uppercase;letter-spacing:0.4px;min-width:180px">Model</th>
+                <th style="padding:6px 10px;text-align:center;font-size:11px;font-weight:700;color:var(--gray-600);text-transform:uppercase;letter-spacing:0.4px;min-width:70px">Number</th>
+              </tr>
+            </thead>
+            <tbody>${deviceRows}</tbody>
+          </table>
+        </td>
+      </tr>`;
   });
 
   html += `</tbody></table></div></div>`;
@@ -1980,26 +2010,48 @@ function exportSummaryPDF() {
   d.projects.forEach((proj, idx) => {
     const modules = proj.modules || [];
     const team = [proj.user1_name, proj.user2_name].filter(Boolean).join(' & ') || '—';
-    if (modules.length === 0) {
-      rows += `<tr><td>${idx + 1}</td><td>${proj.project_name}</td><td>${proj.client_name_1 || '—'}</td><td>${proj.location_name || '—'}</td><td colspan="4" style="color:#aaa;font-style:italic">No modules</td><td>${team}</td></tr>`;
-    } else {
-      modules.forEach((mod, mIdx) => {
-        const devText = (mod.devices || []).map(dv => `${dv.device_model} ×${dv.device_qty}${dv.device_description ? ' – ' + dv.device_description : ''}`).join('\n') || '—';
-        const color = statusColors[mod.status] || '#999';
-        const isFirst = mIdx === 0;
-        rows += `<tr>
-          ${isFirst ? `<td rowspan="${modules.length}" style="vertical-align:top;font-weight:700;color:#8B0000">${idx + 1}</td>` : ''}
-          ${isFirst ? `<td rowspan="${modules.length}" style="vertical-align:top;font-weight:600">${proj.project_name}</td>` : ''}
-          ${isFirst ? `<td rowspan="${modules.length}" style="vertical-align:top">${proj.client_name_1 || '—'}${proj.client_name_2 ? '<br><span style="font-size:9px;color:#666">' + proj.client_name_2 + '</span>' : ''}</td>` : ''}
-          ${isFirst ? `<td rowspan="${modules.length}" style="vertical-align:top">${proj.location_name || '—'}</td>` : ''}
-          <td>${mod.module_type}</td>
-          <td><span style="background:${color};color:white;padding:2px 7px;border-radius:10px;font-size:9px;font-weight:600;white-space:nowrap">${(mod.status || 'pending').replace('_', ' ')}</span></td>
-          <td style="text-align:right;font-weight:600">${mod.progress || 0}%</td>
-          <td style="white-space:pre-line">${devText}</td>
-          ${isFirst ? `<td rowspan="${modules.length}" style="vertical-align:top">${team}</td>` : ''}
-        </tr>`;
-      });
-    }
+
+    // Collect all devices across all modules
+    const allDevices = [];
+    modules.forEach(mod => { (mod.devices || []).forEach(dv => allDevices.push(dv)); });
+
+    // Modules summary string
+    const modulesStr = modules.length
+      ? modules.map(m => {
+          const color = statusColors[m.status] || '#999';
+          return `${m.module_type} <span style="background:${color};color:white;padding:1px 5px;border-radius:8px;font-size:8px;font-weight:600">${(m.status||'pending').replace('_',' ')}</span> ${m.progress||0}%`;
+        }).join(' &nbsp;|&nbsp; ')
+      : '<span style="color:#aaa;font-style:italic">No modules</span>';
+
+    // Device table rows
+    let deviceRows = allDevices.length
+      ? allDevices.map(dv => `<tr><td style="padding:3px 8px;border-bottom:1px solid #eee;font-size:10px">${dv.device_model || '—'}</td><td style="padding:3px 8px;border-bottom:1px solid #eee;font-size:10px;text-align:center;font-weight:600">×${dv.device_qty}</td></tr>`).join('')
+      : `<tr><td colspan="2" style="padding:4px 8px;color:#aaa;font-style:italic;font-size:10px">No devices</td></tr>`;
+
+    const rowBg = idx % 2 === 0 ? '#fff' : '#f8f9fa';
+
+    rows += `
+      <tr style="background:${rowBg};border-top:2px solid #8B0000">
+        <td style="padding:10px 8px;font-weight:700;color:#8B0000;vertical-align:top;font-size:12px">${idx + 1}</td>
+        <td colspan="8" style="padding:10px 8px">
+          <div style="display:flex;gap:28px;flex-wrap:wrap;margin-bottom:5px;font-size:11px">
+            <span><strong style="color:#555">Project Name:</strong> <strong>${proj.project_name}</strong></span>
+            <span><strong style="color:#555">Client Name:</strong> ${proj.client_name_1 || '—'}${proj.client_name_2 ? ' / ' + proj.client_name_2 : ''}</span>
+            <span><strong style="color:#555">Client Phone:</strong> ${proj.client_number || '—'}</span>
+          </div>
+          <div style="display:flex;gap:28px;flex-wrap:wrap;font-size:11px;margin-bottom:8px">
+            <span><strong style="color:#555">Modules:</strong> ${modulesStr}</span>
+            <span><strong style="color:#555">Assigned Team:</strong> <strong style="color:#2980B9">${team}</strong></span>
+          </div>
+          <table style="border-collapse:collapse;border:1px solid #ddd;min-width:240px">
+            <thead><tr style="background:#e9ecef">
+              <th style="padding:5px 8px;text-align:left;font-size:10px;font-weight:700;color:#444;text-transform:uppercase;min-width:160px">Model</th>
+              <th style="padding:5px 8px;text-align:center;font-size:10px;font-weight:700;color:#444;text-transform:uppercase;min-width:60px">Number</th>
+            </tr></thead>
+            <tbody>${deviceRows}</tbody>
+          </table>
+        </td>
+      </tr>`;
   });
 
   const html = `<!DOCTYPE html><html><head>
@@ -2012,19 +2064,8 @@ function exportSummaryPDF() {
   .stats { display: flex; gap: 32px; padding: 10px 0 14px; border-bottom: 2px solid #C0392B; margin-bottom: 16px; }
   .stat-num { font-size: 26px; font-weight: 800; color: #C0392B; line-height: 1; }
   .stat-lbl { font-size: 9px; color: #777; text-transform: uppercase; letter-spacing: .5px; margin-top: 2px; }
-  table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-  col.c-num  { width: 3%; }
-  col.c-proj { width: 16%; }
-  col.c-cli  { width: 12%; }
-  col.c-loc  { width: 13%; }
-  col.c-mod  { width: 16%; }
-  col.c-stat { width: 9%; }
-  col.c-prog { width: 6%; }
-  col.c-dev  { width: 17%; }
-  col.c-team { width: 10%; }
-  thead th { background: #8B0000; color: white; padding: 8px 8px; text-align: left; font-size: 10px; word-wrap: break-word; }
-  tbody td { padding: 6px 8px; border-bottom: 1px solid #e9ecef; vertical-align: top; word-wrap: break-word; }
-  tbody tr:nth-child(even) { background: #f8f9fa; }
+  table.outer { width: 100%; border-collapse: collapse; }
+  thead th { background: #8B0000; color: white; padding: 8px 8px; text-align: left; font-size: 10px; }
   .footer { margin-top: 20px; font-size: 9px; color: #999; text-align: center; }
   @page { margin: 12mm; size: A4 landscape; }
   @media print { body { padding: 0; } }
@@ -2036,14 +2077,10 @@ function exportSummaryPDF() {
   <div><div class="stat-num">${d.projects.length}</div><div class="stat-lbl">Projects</div></div>
   <div><div class="stat-num">${totalModules}</div><div class="stat-lbl">Modules</div></div>
 </div>
-<table>
-  <colgroup>
-    <col class="c-num"><col class="c-proj"><col class="c-cli"><col class="c-loc">
-    <col class="c-mod"><col class="c-stat"><col class="c-prog"><col class="c-dev"><col class="c-team">
-  </colgroup>
+<table class="outer">
   <thead><tr>
-    <th>#</th><th>Project</th><th>Client</th><th>Location</th>
-    <th>Module</th><th>Status</th><th>Progress</th><th>Devices</th><th>Assigned To</th>
+    <th style="width:3%">#</th><th style="width:16%">Project</th><th style="width:12%">Client</th><th style="width:13%">Location</th>
+    <th style="width:16%">Module</th><th style="width:9%">Status</th><th style="width:6%">Progress</th><th style="width:17%">Devices</th><th style="width:10%">Assigned To</th>
   </tr></thead>
   <tbody>${rows}</tbody>
 </table>
