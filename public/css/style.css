@@ -277,7 +277,7 @@ h1,h2,h3,h4,h5,h6 { font-family: 'Rajdhani', 'Inter', sans-serif; font-weight: 7
 }
 
 .sidebar-header {
-  padding: 28px 24px 20px;
+  padding: max(28px, calc(env(safe-area-inset-top, 0px) + 10px)) 24px 20px;
   border-bottom: 1px solid rgba(255,255,255,0.1);
 }
 
@@ -414,8 +414,8 @@ h1,h2,h3,h4,h5,h6 { font-family: 'Rajdhani', 'Inter', sans-serif; font-weight: 7
 .topbar {
   background: white;
   border-bottom: 1px solid var(--gray-200);
-  padding: 0 28px;
-  height: 64px;
+  padding: env(safe-area-inset-top, 0px) 28px 0;
+  min-height: calc(64px + env(safe-area-inset-top, 0px));
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1386,8 +1386,8 @@ tbody tr:last-child td { border-bottom: none; }
 
   /* Topbar — minimal, title + notif bell only */
   .topbar {
-    padding: 0 16px;
-    height: 56px;
+    padding: env(safe-area-inset-top, 0px) 16px 0;
+    min-height: calc(56px + env(safe-area-inset-top, 0px));
     background: #fff;
     border-bottom: 1px solid var(--gray-200);
     box-shadow: 0 1px 8px rgba(0,0,0,0.05);
@@ -1511,8 +1511,8 @@ tbody tr:last-child td { border-bottom: none; }
   /* Notification panel */
   .notif-panel {
     width: 100%; left: 0; right: 0;
-    top: 56px;
-    max-height: calc(100vh - 56px - 62px - env(safe-area-inset-bottom, 0px));
+    top: calc(56px + env(safe-area-inset-top, 0px));
+    max-height: calc(100vh - 56px - env(safe-area-inset-top, 0px) - 62px - env(safe-area-inset-bottom, 0px));
     border-left: none;
     border-radius: 0;
     border-top: 1px solid var(--gray-200);
