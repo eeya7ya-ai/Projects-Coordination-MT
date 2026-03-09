@@ -2084,6 +2084,7 @@ ${projectCards}
   if (!w) { showToast('Please allow pop-ups to export PDF', 'warning'); return; }
   w.document.write(html);
   w.document.close();
+  w.document.title = `Daily Project Summary — ${formatSummaryDate(dateVal)}`;
   w.focus();
   setTimeout(() => { w.print(); }, 400);
 }
