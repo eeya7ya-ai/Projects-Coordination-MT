@@ -1852,7 +1852,7 @@ async function loadDailySummary() {
 
   const container = document.getElementById('daily-summary-content');
   container.innerHTML = '<div style="text-align:center;padding:40px"><div class="spinner" style="margin:auto"></div></div>';
-  document.getElementById('btn-copy-summary').style.display = 'none';
+  document.getElementById('btn-export-pdf').style.display = 'none';
   const fwdBtn = document.getElementById('btn-forward-planner');
   if (fwdBtn) fwdBtn.style.display = 'none';
 
@@ -1886,7 +1886,7 @@ async function loadDailySummary() {
   let html = `
     <div class="card" style="margin-bottom:20px">
       <div class="card-body" style="padding:20px">
-        <div style="display:flex;gap:24px;flex-wrap:wrap">
+        <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:center">
           <div style="text-align:center;min-width:80px">
             <div style="font-size:32px;font-weight:800;color:var(--red);font-family:'Rajdhani',sans-serif">${data.projects.length}</div>
             <div style="font-size:12px;color:var(--gray-500);font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Projects</div>
@@ -1901,66 +1901,65 @@ async function loadDailySummary() {
           </div>
         </div>
       </div>
-    </div>`;
+    </div>
+    <div class="card">
+      <div class="card-body" style="padding:0;overflow-x:auto">
+        <table id="summary-table" style="width:100%;border-collapse:collapse;min-width:700px">
+          <thead>
+            <tr style="background:var(--red-dark);color:white">
+              <th style="padding:12px 14px;text-align:left;font-size:12px;font-weight:700;white-space:nowrap">#</th>
+              <th style="padding:12px 14px;text-align:left;font-size:12px;font-weight:700;white-space:nowrap">Project</th>
+              <th style="padding:12px 14px;text-align:left;font-size:12px;font-weight:700;white-space:nowrap">Client</th>
+              <th style="padding:12px 14px;text-align:left;font-size:12px;font-weight:700;white-space:nowrap">Location</th>
+              <th style="padding:12px 14px;text-align:left;font-size:12px;font-weight:700;white-space:nowrap">Module</th>
+              <th style="padding:12px 14px;text-align:left;font-size:12px;font-weight:700;white-space:nowrap">Status</th>
+              <th style="padding:12px 14px;text-align:right;font-size:12px;font-weight:700;white-space:nowrap">Progress</th>
+              <th style="padding:12px 14px;text-align:left;font-size:12px;font-weight:700;white-space:nowrap">Devices</th>
+              <th style="padding:12px 14px;text-align:left;font-size:12px;font-weight:700;white-space:nowrap">Assigned To</th>
+            </tr>
+          </thead>
+          <tbody>`;
 
-  html += data.projects.map((proj, idx) => {
-    const modulesHtml = (proj.modules || []).length === 0
-      ? '<p style="font-size:13px;color:var(--gray-400);padding:8px 0">No modules assigned</p>'
-      : (proj.modules || []).map(mod => {
-          const icon = moduleIcons[mod.module_type] || '📋';
-          const color = statusColors[mod.status] || '#999';
-          const devicesHtml = (mod.devices || []).length > 0
-            ? `<div style="margin-top:8px;padding:8px 10px;background:var(--gray-50);border-radius:6px;border-left:3px solid var(--gray-300)">
-                <div style="font-size:11px;font-weight:600;color:var(--gray-500);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">Devices</div>
-                ${mod.devices.map(d => `
-                  <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--gray-700);padding:2px 0">
-                    <span style="color:var(--gray-400)">▪</span>
-                    <span style="font-weight:600">${d.device_model}</span>
-                    <span style="background:var(--gray-200);color:var(--gray-600);padding:1px 7px;border-radius:10px;font-size:11px">×${d.device_qty}</span>
-                    ${d.device_description ? `<span style="color:var(--gray-500)">${d.device_description}</span>` : ''}
-                  </div>`).join('')}
-              </div>`
-            : '';
-          return `
-            <div style="padding:10px 0;border-bottom:1px solid var(--gray-100)">
-              <div style="display:flex;align-items:center;gap:10px">
-                <span style="font-size:18px;flex-shrink:0">${icon}</span>
-                <div style="flex:1">
-                  <div style="font-size:14px;font-weight:600;color:var(--gray-800)">${mod.module_type}</div>
-                  ${mod.scope_of_work ? `<div style="font-size:12px;color:var(--gray-500);margin-top:2px">${mod.scope_of_work.substring(0,80)}${mod.scope_of_work.length>80?'…':''}</div>` : ''}
-                </div>
-                <span style="font-size:11px;font-weight:600;color:white;background:${color};padding:3px 9px;border-radius:20px;white-space:nowrap;flex-shrink:0">${(mod.status||'pending').replace('_',' ')}</span>
-                <span style="font-size:12px;color:var(--gray-500);min-width:35px;text-align:right">${mod.progress||0}%</span>
-              </div>
-              ${devicesHtml}
-            </div>`;
-        }).join('');
+  data.projects.forEach((proj, idx) => {
+    const modules = proj.modules || [];
+    const rowCount = Math.max(modules.length, 1);
+    const team = [proj.user1_name, proj.user2_name].filter(Boolean).join(' & ') || '—';
+    const rowBg = idx % 2 === 0 ? 'white' : 'var(--gray-50)';
 
-    return `
-      <div class="card" style="margin-bottom:16px">
-        <div class="card-header" style="background:linear-gradient(135deg,var(--red-deep),var(--red));color:white;border-radius:var(--radius) var(--radius) 0 0">
-          <div>
-            <div style="font-size:16px;font-weight:700">${idx + 1}. ${proj.project_name}</div>
-            <div style="font-size:12px;opacity:0.8;margin-top:2px">${[proj.client_name_1, proj.location_name].filter(Boolean).join(' · ') || 'No client / location'}</div>
-          </div>
-          <div style="text-align:right">
-            <span style="font-size:11px;background:rgba(255,255,255,0.2);padding:4px 10px;border-radius:12px">${(proj.status||'pending').replace('_',' ')}</span>
-            <div style="font-size:11px;opacity:0.7;margin-top:4px">${proj.modules?.length || 0} module${proj.modules?.length !== 1 ? 's' : ''}</div>
-          </div>
-        </div>
-        <div class="card-body" style="padding:0 20px">
-          ${modulesHtml}
-        </div>
-        ${proj.user1_name || proj.user2_name ? `
-          <div style="padding:10px 20px;border-top:1px solid var(--gray-100);font-size:12px;color:var(--gray-500)">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
-            Assigned: ${[proj.user1_name, proj.user2_name].filter(Boolean).join(' & ')}
-          </div>` : ''}
-      </div>`;
-  }).join('');
+    if (modules.length === 0) {
+      html += `<tr style="border-bottom:1px solid var(--gray-200);background:${rowBg}">
+        <td style="padding:10px 14px;font-weight:700;color:var(--red)">${idx + 1}</td>
+        <td style="padding:10px 14px;font-weight:600">${proj.project_name}</td>
+        <td style="padding:10px 14px;color:var(--gray-600)">${proj.client_name_1 || '—'}</td>
+        <td style="padding:10px 14px;color:var(--gray-600)">${proj.location_name || '—'}</td>
+        <td colspan="4" style="padding:10px 14px;color:var(--gray-400);font-style:italic">No modules assigned</td>
+        <td style="padding:10px 14px;color:var(--gray-600)">${team}</td>
+      </tr>`;
+    } else {
+      modules.forEach((mod, mIdx) => {
+        const devText = (mod.devices || []).map(d => `${d.device_model} ×${d.device_qty}${d.device_description ? ' – ' + d.device_description : ''}`).join('<br>') || '—';
+        const color = statusColors[mod.status] || '#999';
+        const icon = moduleIcons[mod.module_type] || '📋';
+        const isFirst = mIdx === 0;
+        html += `<tr style="border-bottom:1px solid var(--gray-200);background:${rowBg}">
+          ${isFirst ? `<td style="padding:10px 14px;font-weight:700;color:var(--red);vertical-align:top" rowspan="${rowCount}">${idx + 1}</td>` : ''}
+          ${isFirst ? `<td style="padding:10px 14px;font-weight:600;vertical-align:top" rowspan="${rowCount}">${proj.project_name}</td>` : ''}
+          ${isFirst ? `<td style="padding:10px 14px;color:var(--gray-600);vertical-align:top" rowspan="${rowCount}">${proj.client_name_1 || '—'}${proj.client_name_2 ? '<br><span style="font-size:11px;color:var(--gray-400)">' + proj.client_name_2 + '</span>' : ''}</td>` : ''}
+          ${isFirst ? `<td style="padding:10px 14px;color:var(--gray-600);vertical-align:top" rowspan="${rowCount}">${proj.location_name || '—'}</td>` : ''}
+          <td style="padding:10px 14px;font-size:13px">${icon} ${mod.module_type}</td>
+          <td style="padding:10px 14px"><span style="background:${color};color:white;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap">${(mod.status || 'pending').replace('_', ' ')}</span></td>
+          <td style="padding:10px 14px;text-align:right;font-weight:600;color:var(--gray-700)">${mod.progress || 0}%</td>
+          <td style="padding:10px 14px;font-size:12px;color:var(--gray-600);line-height:1.6">${devText}</td>
+          ${isFirst ? `<td style="padding:10px 14px;color:var(--gray-600);vertical-align:top" rowspan="${rowCount}">${team}</td>` : ''}
+        </tr>`;
+      });
+    }
+  });
+
+  html += `</tbody></table></div></div>`;
 
   container.innerHTML = html;
-  document.getElementById('btn-copy-summary').style.display = '';
+  document.getElementById('btn-export-pdf').style.display = '';
   const fwdBtnShow = document.getElementById('btn-forward-planner');
   if (fwdBtnShow) fwdBtnShow.style.display = '';
 }
@@ -1970,60 +1969,93 @@ function formatSummaryDate(dateStr) {
   return d.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 }
 
-function copySummaryText() {
+function exportSummaryPDF() {
   if (!_lastSummaryData) return;
   const d = _lastSummaryData;
-  const moduleIcons = {
-    'Maintenance': '🔧', 'Handover': '🤝', 'Installation and Wiring': '⚡',
-    'Programming and Trouble Shooting': '💻', 'Delivering': '📦', 'Site Survey': '🗺️', 'POC': '🔬'
-  };
+  const dateVal = document.getElementById('summary-date').value;
+  const totalModules = d.projects.reduce((s, p) => s + (p.modules?.length || 0), 0);
+  const statusColors = { pending: '#F39C12', in_progress: '#2980B9', completed: '#27AE60', cancelled: '#95A5A6' };
 
-  let text = `📅 *Daily Project Summary — ${formatSummaryDate(document.getElementById('summary-date').value)}*\n`;
-  text += `📊 ${d.projects.length} project${d.projects.length !== 1 ? 's' : ''} | `;
-  const totalMods = d.projects.reduce((s, p) => s + (p.modules?.length || 0), 0);
-  text += `${totalMods} module${totalMods !== 1 ? 's' : ''}\n`;
-  text += '─'.repeat(35) + '\n\n';
-
+  let rows = '';
   d.projects.forEach((proj, idx) => {
-    text += `📁 *${idx + 1}. ${proj.project_name}*\n`;
-    if (proj.client_name_1) text += `   👤 Client: ${proj.client_name_1}\n`;
-    if (proj.location_name) text += `   📍 ${proj.location_name}${proj.google_map_url ? ' — ' + proj.google_map_url : ''}\n`;
-    if (proj.user1_name || proj.user2_name) {
-      text += `   👷 ${[proj.user1_name, proj.user2_name].filter(Boolean).join(' & ')}\n`;
-    }
-    if (proj.modules?.length) {
-      proj.modules.forEach(mod => {
-        const icon = moduleIcons[mod.module_type] || '📋';
-        const status = (mod.status || 'pending').replace('_', ' ');
-        text += `   ${icon} ${mod.module_type} — ${status} (${mod.progress || 0}%)\n`;
-        if (mod.devices?.length) {
-          mod.devices.forEach(d => {
-            text += `      • ${d.device_model} ×${d.device_qty}${d.device_description ? ' — ' + d.device_description : ''}\n`;
-          });
-        }
-      });
+    const modules = proj.modules || [];
+    const team = [proj.user1_name, proj.user2_name].filter(Boolean).join(' & ') || '—';
+    if (modules.length === 0) {
+      rows += `<tr><td>${idx + 1}</td><td>${proj.project_name}</td><td>${proj.client_name_1 || '—'}</td><td>${proj.location_name || '—'}</td><td colspan="4" style="color:#aaa;font-style:italic">No modules</td><td>${team}</td></tr>`;
     } else {
-      text += `   _(no modules)\n`;
+      modules.forEach((mod, mIdx) => {
+        const devText = (mod.devices || []).map(dv => `${dv.device_model} ×${dv.device_qty}${dv.device_description ? ' – ' + dv.device_description : ''}`).join('\n') || '—';
+        const color = statusColors[mod.status] || '#999';
+        const isFirst = mIdx === 0;
+        rows += `<tr>
+          ${isFirst ? `<td rowspan="${modules.length}" style="vertical-align:top;font-weight:700;color:#8B0000">${idx + 1}</td>` : ''}
+          ${isFirst ? `<td rowspan="${modules.length}" style="vertical-align:top;font-weight:600">${proj.project_name}</td>` : ''}
+          ${isFirst ? `<td rowspan="${modules.length}" style="vertical-align:top">${proj.client_name_1 || '—'}${proj.client_name_2 ? '<br><span style="font-size:9px;color:#666">' + proj.client_name_2 + '</span>' : ''}</td>` : ''}
+          ${isFirst ? `<td rowspan="${modules.length}" style="vertical-align:top">${proj.location_name || '—'}</td>` : ''}
+          <td>${mod.module_type}</td>
+          <td><span style="background:${color};color:white;padding:2px 7px;border-radius:10px;font-size:9px;font-weight:600;white-space:nowrap">${(mod.status || 'pending').replace('_', ' ')}</span></td>
+          <td style="text-align:right;font-weight:600">${mod.progress || 0}%</td>
+          <td style="white-space:pre-line">${devText}</td>
+          ${isFirst ? `<td rowspan="${modules.length}" style="vertical-align:top">${team}</td>` : ''}
+        </tr>`;
+      });
     }
-    text += '\n';
   });
 
-  text += `Generated by ELV Project Coordinator`;
+  const html = `<!DOCTYPE html><html><head>
+<meta charset="UTF-8">
+<title>Daily Summary — ${formatSummaryDate(dateVal)}</title>
+<style>
+  body { font-family: Arial, Helvetica, sans-serif; font-size: 11px; color: #222; margin: 0; padding: 16px; }
+  h1 { font-size: 17px; color: #8B0000; margin: 0 0 4px; }
+  .sub { font-size: 12px; color: #555; margin-bottom: 14px; }
+  .stats { display: flex; gap: 32px; padding: 10px 0 14px; border-bottom: 2px solid #C0392B; margin-bottom: 16px; }
+  .stat-num { font-size: 26px; font-weight: 800; color: #C0392B; line-height: 1; }
+  .stat-lbl { font-size: 9px; color: #777; text-transform: uppercase; letter-spacing: .5px; margin-top: 2px; }
+  table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  col.c-num  { width: 3%; }
+  col.c-proj { width: 16%; }
+  col.c-cli  { width: 12%; }
+  col.c-loc  { width: 13%; }
+  col.c-mod  { width: 16%; }
+  col.c-stat { width: 9%; }
+  col.c-prog { width: 6%; }
+  col.c-dev  { width: 17%; }
+  col.c-team { width: 10%; }
+  thead th { background: #8B0000; color: white; padding: 8px 8px; text-align: left; font-size: 10px; word-wrap: break-word; }
+  tbody td { padding: 6px 8px; border-bottom: 1px solid #e9ecef; vertical-align: top; word-wrap: break-word; }
+  tbody tr:nth-child(even) { background: #f8f9fa; }
+  .footer { margin-top: 20px; font-size: 9px; color: #999; text-align: center; }
+  @page { margin: 12mm; size: A4 landscape; }
+  @media print { body { padding: 0; } }
+</style>
+</head><body>
+<h1>Daily Project Summary</h1>
+<p class="sub">${formatSummaryDate(dateVal)}</p>
+<div class="stats">
+  <div><div class="stat-num">${d.projects.length}</div><div class="stat-lbl">Projects</div></div>
+  <div><div class="stat-num">${totalModules}</div><div class="stat-lbl">Modules</div></div>
+</div>
+<table>
+  <colgroup>
+    <col class="c-num"><col class="c-proj"><col class="c-cli"><col class="c-loc">
+    <col class="c-mod"><col class="c-stat"><col class="c-prog"><col class="c-dev"><col class="c-team">
+  </colgroup>
+  <thead><tr>
+    <th>#</th><th>Project</th><th>Client</th><th>Location</th>
+    <th>Module</th><th>Status</th><th>Progress</th><th>Devices</th><th>Assigned To</th>
+  </tr></thead>
+  <tbody>${rows}</tbody>
+</table>
+<p class="footer">Generated by MagicTech Project Coordinator — ${new Date().toLocaleString()}</p>
+</body></html>`;
 
-  navigator.clipboard.writeText(text).then(() => {
-    showToast('Summary copied to clipboard!', 'success');
-  }).catch(() => {
-    // Fallback for older browsers
-    const ta = document.createElement('textarea');
-    ta.value = text;
-    ta.style.position = 'fixed';
-    ta.style.opacity = '0';
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand('copy');
-    document.body.removeChild(ta);
-    showToast('Summary copied to clipboard!', 'success');
-  });
+  const w = window.open('', '_blank');
+  if (!w) { showToast('Please allow pop-ups to export PDF', 'warning'); return; }
+  w.document.write(html);
+  w.document.close();
+  w.focus();
+  setTimeout(() => { w.print(); }, 400);
 }
 
 async function forwardSummaryToPlanner() {

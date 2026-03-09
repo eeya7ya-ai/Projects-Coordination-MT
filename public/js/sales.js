@@ -387,11 +387,9 @@ async function submitProject() {
     location_name: document.getElementById('p-location-name').value,
     location_lat: parseFloat(document.getElementById('p-lat').value) || null,
     location_lng: parseFloat(document.getElementById('p-lng').value) || null,
-    start_date: document.getElementById('p-start').value,
-    end_date: document.getElementById('p-end').value,
     priority: document.getElementById('p-priority').value,
     modules
-    // Note: user_id_1 and user_id_2 are intentionally omitted; admin assigns team later
+    // Note: user_id_1, user_id_2, start_date, end_date are assigned by admin after creation
   };
 
   const res = await apiFetch('/projects', { method: 'POST', body: JSON.stringify(payload) });
@@ -407,7 +405,7 @@ async function submitProject() {
 }
 
 function resetProjectForm() {
-  ['p-name','p-client1','p-client2','p-client-num','p-location-name','p-lat','p-lng','p-start','p-end'].forEach(id => {
+  ['p-name','p-client1','p-client2','p-client-num','p-location-name','p-lat','p-lng'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });

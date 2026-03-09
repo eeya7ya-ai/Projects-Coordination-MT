@@ -100,9 +100,9 @@ router.get('/', verifyToken, async (req, res) => {
         LEFT JOIN users u2 ON u2.id=p.user_id_2
         LEFT JOIN users sp ON sp.id=p.sales_person_id
         LEFT JOIN users pp ON pp.id=p.presales_person_id
-        WHERE p.user_id_1=? OR p.user_id_2=?
+        WHERE p.user_id_1=? OR p.user_id_2=? OR p.created_by=? OR p.sales_person_id=? OR p.presales_person_id=?
         ORDER BY p.created_at DESC
-      `, [req.user.id, req.user.id]);
+      `, [req.user.id, req.user.id, req.user.id, req.user.id, req.user.id]);
     }
     res.json(projects);
   } catch (err) {
@@ -264,7 +264,10 @@ router.get('/:id', verifyToken, async (req, res) => {
     `, [req.params.id]);
 
     if (!project) return res.status(404).json({ error: 'Project not found' });
-    if (req.user.role !== 'admin' && req.user.role !== 'projects_manager' && project.user_id_1 !== req.user.id && project.user_id_2 !== req.user.id) {
+    const isPrivileged = req.user.role === 'admin' || req.user.role === 'projects_manager';
+    const isAssigned = project.user_id_1 === req.user.id || project.user_id_2 === req.user.id;
+    const isCreatorOrSales = project.created_by === req.user.id || project.sales_person_id === req.user.id || project.presales_person_id === req.user.id;
+    if (!isPrivileged && !isAssigned && !isCreatorOrSales) {
       return res.status(403).json({ error: 'Access denied' });
     }
 
