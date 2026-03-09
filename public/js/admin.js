@@ -1988,46 +1988,71 @@ function exportSummaryPDF() {
   const d = _lastSummaryData;
   const dateVal = document.getElementById('summary-date').value;
   const totalModules = d.projects.reduce((s, p) => s + (p.modules?.length || 0), 0);
-  const statusColors = { pending: '#F39C12', in_progress: '#2980B9', completed: '#27AE60', cancelled: '#95A5A6' };
 
-  let rows = '';
-  d.projects.forEach((proj, idx) => {
+  const moduleIcons = {
+    'Maintenance': '🔧', 'Handover': '🤝', 'Installation and Wiring': '⚡',
+    'Programming and Trouble Shooting': '💻', 'Delivering': '📦', 'Site Survey': '🗺️', 'POC': '🔬'
+  };
+
+  let projectCards = '';
+  d.projects.forEach((proj) => {
     const modules = proj.modules || [];
     const team = [proj.user1_name, proj.user2_name].filter(Boolean).join(' & ') || '—';
-    const rowBg = idx % 2 === 0 ? '#fff' : '#f8f9fa';
+    const modulesList = modules.length
+      ? modules.map(m => (moduleIcons[m.module_type] || '📋') + ' ' + m.module_type).join(', ')
+      : '—';
 
-    if (modules.length === 0) {
-      rows += `
-        <tr style="background:${rowBg};border-top:2px solid #8B0000">
-          <td style="padding:8px;font-weight:700;color:#8B0000;font-size:11px">${idx + 1}</td>
-          <td style="padding:8px;font-weight:700;font-size:11px">${proj.project_name}</td>
-          <td style="padding:8px;font-size:11px">${proj.client_name_1 || '—'}${proj.client_name_2 ? ' / ' + proj.client_name_2 : ''}${proj.client_number ? '<br>' + proj.client_number : ''}</td>
-          <td style="padding:8px;font-size:11px">${proj.location_name || '—'}</td>
-          <td colspan="4" style="padding:8px;color:#aaa;font-style:italic;font-size:11px">No modules</td>
-          <td style="padding:8px;font-size:11px;font-weight:700;color:#2980B9">${team}</td>
-        </tr>`;
+    const allDevices = modules.flatMap(m => m.devices || []);
+
+    let deviceRowsHtml = '';
+    if (allDevices.length === 0) {
+      deviceRowsHtml = `<tr><td colspan="4" style="padding:8px 10px;color:#999;font-style:italic;font-size:12px;text-align:center">No devices</td></tr>`;
     } else {
-      modules.forEach((m, mIdx) => {
-        const statusColor = statusColors[m.status] || '#999';
-        const devices = m.devices || [];
-        const devicesStr = devices.length
-          ? devices.map(dv => `${dv.device_model || '—'} ×${dv.device_qty}`).join('<br>')
-          : '<span style="color:#aaa">—</span>';
-
-        rows += `
-          <tr style="background:${rowBg};${mIdx === 0 ? 'border-top:2px solid #8B0000' : 'border-top:1px solid #eee'}">
-            ${mIdx === 0 ? `<td style="padding:8px;font-weight:700;color:#8B0000;font-size:11px;vertical-align:top" rowspan="${modules.length}">${idx + 1}</td>` : ''}
-            ${mIdx === 0 ? `<td style="padding:8px;font-weight:700;font-size:11px;vertical-align:top" rowspan="${modules.length}">${proj.project_name}</td>` : ''}
-            ${mIdx === 0 ? `<td style="padding:8px;font-size:11px;vertical-align:top" rowspan="${modules.length}">${proj.client_name_1 || '—'}${proj.client_name_2 ? ' / ' + proj.client_name_2 : ''}${proj.client_number ? '<br>' + proj.client_number : ''}</td>` : ''}
-            ${mIdx === 0 ? `<td style="padding:8px;font-size:11px;vertical-align:top" rowspan="${modules.length}">${proj.location_name || '—'}</td>` : ''}
-            <td style="padding:8px;font-size:11px">${m.module_type}</td>
-            <td style="padding:8px"><span style="background:${statusColor};color:white;padding:2px 6px;border-radius:8px;font-size:9px;font-weight:600;white-space:nowrap">${(m.status || 'pending').replace('_', ' ')}</span></td>
-            <td style="padding:8px;text-align:right;font-weight:700;font-size:11px">${m.progress || 0}%</td>
-            <td style="padding:8px;font-size:10px;vertical-align:top">${devicesStr}</td>
-            ${mIdx === 0 ? `<td style="padding:8px;font-size:11px;font-weight:700;color:#2980B9;vertical-align:top" rowspan="${modules.length}">${team}</td>` : ''}
+      for (let i = 0; i < allDevices.length; i += 2) {
+        const d1 = allDevices[i];
+        const d2 = allDevices[i + 1];
+        deviceRowsHtml += `
+          <tr>
+            <td style="padding:7px 10px;font-size:12px;border:1px solid #ccc;background:#e8e8e8">${d1.device_model || '—'}</td>
+            <td style="padding:7px 10px;font-size:12px;font-weight:700;border:1px solid #ccc;background:#e8e8e8;color:#2980B9;text-align:center">${d1.device_qty || 0}</td>
+            <td style="padding:7px 10px;font-size:12px;border:1px solid #ccc;background:#e8e8e8">${d2 ? (d2.device_model || '—') : ''}</td>
+            <td style="padding:7px 10px;font-size:12px;font-weight:700;border:1px solid #ccc;background:#e8e8e8;color:#2980B9;text-align:center">${d2 ? (d2.device_qty || 0) : ''}</td>
           </tr>`;
-      });
+      }
     }
+
+    projectCards += `
+      <div style="border:2px solid #9b59b6;border-radius:6px;overflow:hidden;margin-bottom:20px;page-break-inside:avoid">
+        <table style="width:100%;border-collapse:collapse">
+          <tbody>
+            <tr>
+              <td colspan="4" style="padding:10px 14px;text-align:center;font-weight:700;font-size:14px;border:1px solid #ccc;background:#fff">
+                Project Name: ${proj.project_name}
+              </td>
+            </tr>
+            <tr>
+              <td colspan="2" style="padding:10px 14px;background:#F9E04B;border:1px solid #ccc;vertical-align:top">
+                <div style="font-weight:600;font-size:13px;margin-bottom:6px">Client Name: ${proj.client_name_1 || '—'}${proj.client_name_2 ? ' / ' + proj.client_name_2 : ''}</div>
+                <div style="font-weight:600;font-size:13px">Modules: ${modulesList}</div>
+              </td>
+              <td colspan="2" style="padding:10px 14px;background:#AAEE44;border:1px solid #ccc;vertical-align:top">
+                <div style="font-weight:600;font-size:13px;margin-bottom:6px">Client Number: ${proj.client_number || '—'}</div>
+                <div style="font-weight:600;font-size:13px">Assigned team: ${team}</div>
+              </td>
+            </tr>
+            <tr>
+              <td colspan="4" style="padding:4px;border:1px solid #ccc;background:#fff"></td>
+            </tr>
+            <tr style="background:#fff">
+              <th style="padding:8px 10px;font-size:12px;font-weight:700;border:1px solid #ccc;text-align:left">Model</th>
+              <th style="padding:8px 10px;font-size:12px;font-weight:700;border:1px solid #ccc;text-align:center;color:#2980B9">Number</th>
+              <th style="padding:8px 10px;font-size:12px;font-weight:700;border:1px solid #ccc;text-align:left">Model</th>
+              <th style="padding:8px 10px;font-size:12px;font-weight:700;border:1px solid #ccc;text-align:center;color:#2980B9">Number</th>
+            </tr>
+            ${deviceRowsHtml}
+          </tbody>
+        </table>
+      </div>`;
   });
 
   const html = `<!DOCTYPE html><html><head>
@@ -2040,10 +2065,8 @@ function exportSummaryPDF() {
   .stats { display: flex; gap: 32px; padding: 10px 0 14px; border-bottom: 2px solid #C0392B; margin-bottom: 16px; }
   .stat-num { font-size: 26px; font-weight: 800; color: #C0392B; line-height: 1; }
   .stat-lbl { font-size: 9px; color: #777; text-transform: uppercase; letter-spacing: .5px; margin-top: 2px; }
-  table.outer { width: 100%; border-collapse: collapse; }
-  thead th { background: #8B0000; color: white; padding: 8px 8px; text-align: left; font-size: 10px; }
   .footer { margin-top: 20px; font-size: 9px; color: #999; text-align: center; }
-  @page { margin: 12mm; size: A4 landscape; }
+  @page { margin: 12mm; size: A4 portrait; }
   @media print { body { padding: 0; } }
 </style>
 </head><body>
@@ -2053,13 +2076,7 @@ function exportSummaryPDF() {
   <div><div class="stat-num">${d.projects.length}</div><div class="stat-lbl">Projects</div></div>
   <div><div class="stat-num">${totalModules}</div><div class="stat-lbl">Modules</div></div>
 </div>
-<table class="outer">
-  <thead><tr>
-    <th style="width:3%">#</th><th style="width:16%">Project</th><th style="width:12%">Client</th><th style="width:13%">Location</th>
-    <th style="width:16%">Module</th><th style="width:9%">Status</th><th style="width:6%">Progress</th><th style="width:17%">Devices</th><th style="width:10%">Assigned To</th>
-  </tr></thead>
-  <tbody>${rows}</tbody>
-</table>
+${projectCards}
 <p class="footer">Generated by MagicTech Project Coordinator — ${new Date().toLocaleString()}</p>
 </body></html>`;
 
