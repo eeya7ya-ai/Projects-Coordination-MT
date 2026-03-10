@@ -305,6 +305,12 @@ router.post('/', verifyToken, requireSalesOrAdmin, async (req, res) => {
     if (!project_name) return res.status(400).json({ error: 'Project name is required' });
     if (!modules || !modules.length) return res.status(400).json({ error: 'At least one module required' });
 
+    // Normalise FK fields: JSON delivers them as strings; cast to integer (or null)
+    const uid1    = user_id_1       ? (parseInt(user_id_1, 10)       || null) : null;
+    const uid2    = user_id_2       ? (parseInt(user_id_2, 10)       || null) : null;
+    const salesId = sales_person_id ? (parseInt(sales_person_id, 10) || null) : null;
+    const presId  = presales_person_id ? (parseInt(presales_person_id, 10) || null) : null;
+
     const projectId = await db.transaction(async (tx) => {
       const result = await tx.run(
         `INSERT INTO projects (project_name, client_name_1, client_name_2, client_number,
@@ -313,9 +319,9 @@ router.post('/', verifyToken, requireSalesOrAdmin, async (req, res) => {
           scheduled_date, scheduling_notes, sales_person_id, presales_person_id)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?)`,
         [project_name, client_name_1, client_name_2, client_number,
-          location_name, location_lat, location_lng, google_map_url || null, user_id_1, user_id_2,
+          location_name, location_lat, location_lng, google_map_url || null, uid1, uid2,
           start_date, end_date, priority || 'normal', req.user.id,
-          scheduled_date, scheduling_notes, sales_person_id, presales_person_id]
+          scheduled_date, scheduling_notes, salesId, presId]
       );
 
       const projId = result.lastInsertRowid;
@@ -362,7 +368,7 @@ router.post('/', verifyToken, requireSalesOrAdmin, async (req, res) => {
       }
 
       // Notify assigned technician/engineer users (in-app)
-      const userIds = [user_id_1, user_id_2].filter(Boolean);
+      const userIds = [uid1, uid2].filter(Boolean);
       for (const uid of userIds) {
         await tx.run(
           "INSERT INTO notifications (user_id, title, message, type, notif_key, notif_params) VALUES (?, ?, ?, 'project', ?, ?)",
@@ -373,7 +379,7 @@ router.post('/', verifyToken, requireSalesOrAdmin, async (req, res) => {
       }
 
       // Notify sales/presales persons (in-app)
-      const salesIds = [sales_person_id, presales_person_id].filter(Boolean);
+      const salesIds = [salesId, presId].filter(Boolean);
       for (const uid of salesIds) {
         await tx.run(
           "INSERT INTO notifications (user_id, title, message, type, notif_key, notif_params) VALUES (?, ?, ?, 'project', ?, ?)",
@@ -389,7 +395,7 @@ router.post('/', verifyToken, requireSalesOrAdmin, async (req, res) => {
     res.json({ success: true, id: projectId, message: 'Project created successfully' });
 
     // Send email notifications to ALL stakeholders (non-blocking — runs after response)
-    const allNotifyIds = [user_id_1, user_id_2, sales_person_id, presales_person_id].filter(Boolean);
+    const allNotifyIds = [uid1, uid2, salesId, presId].filter(Boolean);
     if (allNotifyIds.length) {
       const notifSetting = await db.get("SELECT value FROM app_settings WHERE key='email_notifications_enabled'");
       const notifEnabled = !notifSetting || notifSetting.value !== 'false';

@@ -977,6 +977,18 @@ async function loadUsersTable() {
 }
 
 function populateUserDropdowns() {
+  // Preserve current selections before rebuilding innerHTML so that
+  // background refreshes (60-second interval, post-save reload) do not
+  // silently wipe out assignments the user has already chosen.
+  const dropdownIds = ['p-user1','p-user2','p-sales-person','p-presales-person',
+                       'at-user1','at-user2','edit-proj-user1','edit-proj-user2',
+                       'edit-proj-sales','edit-proj-presales'];
+  const savedValues = {};
+  dropdownIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) savedValues[id] = el.value;
+  });
+
   // Technicians/engineers: roles that perform field work
   const fieldUsers = allUsers.filter(u => u.is_active && ['user', 'technical', 'engineer'].includes(u.role));
   const opts = '<option value="">— Select Technician/Engineer —</option>' + fieldUsers.map(u => `<option value="${u.id}">${u.full_name}</option>`).join('');
@@ -1000,6 +1012,14 @@ function populateUserDropdowns() {
   ['p-presales-person', 'edit-proj-presales'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.innerHTML = '<option value="">— Select Presales Person —</option>' + presalesUsers.map(u => `<option value="${u.id}">${u.full_name}</option>`).join('');
+  });
+
+  // Restore selections that existed before the rebuild
+  dropdownIds.forEach(id => {
+    if (savedValues[id]) {
+      const el = document.getElementById(id);
+      if (el) el.value = savedValues[id];
+    }
   });
 }
 
