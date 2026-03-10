@@ -10,23 +10,52 @@ const db = require('../database/db');
 let _transporter = null;
 let _transporterKey = '';
 
+function _isOutlookHost(host) {
+  if (!host) return false;
+  const h = host.toLowerCase();
+  return h.includes('office365.com') || h.includes('outlook.com') || h.includes('hotmail.com') || h.includes('live.com');
+}
+
 function _buildTransporter() {
   const key = `${process.env.SMTP_HOST}|${process.env.SMTP_PORT}|${process.env.SMTP_USER}|${process.env.SMTP_SECURE}`;
   if (_transporter && _transporterKey === key) return _transporter;
   if (_transporter) { try { _transporter.close(); } catch (_) {} }
-  _transporter = nodemailer.createTransport({
-    pool: true,
-    maxConnections: 3,
-    maxMessages: 100,
-    host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT || '587', 10),
-    secure: process.env.SMTP_SECURE === 'true',
+
+  const host     = process.env.SMTP_HOST;
+  const port     = parseInt(process.env.SMTP_PORT || '587', 10);
+  const isSecure = process.env.SMTP_SECURE === 'true'; // true only for port 465
+  const outlook  = _isOutlookHost(host);
+
+  // Office365 / Outlook requires:
+  //  • No persistent connection pool (Microsoft drops idle pooled connections)
+  //  • requireTLS on port 587 to force STARTTLS upgrade
+  //  • authMethod LOGIN instead of the nodemailer default PLAIN
+  const transportOptions = {
+    host,
+    port,
+    secure: isSecure,
     auth: {
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_PASSWORD
     },
-    tls: { rejectUnauthorized: false }
-  });
+    tls: { rejectUnauthorized: false },
+    ...(outlook
+      ? {
+          requireTLS: true,
+          authMethod: 'LOGIN',
+          connectionTimeout: 10000,
+          greetingTimeout:   10000,
+          socketTimeout:     15000
+        }
+      : {
+          pool:           true,
+          maxConnections: 3,
+          maxMessages:    100
+        }
+    )
+  };
+
+  _transporter = nodemailer.createTransport(transportOptions);
   _transporterKey = key;
   return _transporter;
 }
@@ -156,6 +185,16 @@ async function sendMail({ to, subject, html }) {
     console.log(`[Email] Sent "${subject}" → ${to}`);
     return true;
   } catch (err) {
+    // Surface actionable hints for the most common Office365 / Outlook failures
+    const msg = err.message || '';
+    if (msg.includes('535') || msg.includes('Authentication') || msg.includes('credentials')) {
+      console.error('[Email] SMTP authentication failed. If you are using Office365/Outlook, ensure:\n' +
+        '  • SMTP_HOST=smtp.office365.com, SMTP_PORT=587, SMTP_SECURE=false\n' +
+        '  • SMTP AUTH is enabled for the mailbox in Microsoft 365 Admin Center\n' +
+        '  • The account does not require Modern Auth / MFA without an app password');
+    } else if (msg.includes('ETIMEDOUT') || msg.includes('ECONNREFUSED')) {
+      console.error('[Email] SMTP connection failed — check SMTP_HOST and SMTP_PORT, and that the server allows outbound connections on that port.');
+    }
     console.error('[Email] Failed to send to', to, ':', err.message);
     return false;
   }
