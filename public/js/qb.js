@@ -834,92 +834,64 @@ function previewQuotation() {
 }
 
 // ── PDF Export ────────────────────────────────────────────────
-async function exportQBPdf() {
+// Uses a print window — identical rendering to the in-page preview.
+// html2pdf/html2canvas dropped: opacity tricks cause blank pages.
+function exportQBPdf() {
   if (!qbItems.length) { showToast('Add items to the quotation before exporting', 'error'); return; }
 
   const { pagesHTML, info } = buildQuotationHTML();
   const ref = info.ref || 'Quotation';
-  const filename = `MT-Quotation-${ref.replace(/[^a-zA-Z0-9\-]/g, '_')}.pdf`;
+  const title = `MT Quotation — ${ref}`;
 
-  showToast('Preparing PDF…', 'info');
-
-  if (typeof html2pdf !== 'undefined') {
-    // Render container at viewport origin (fixed, transparent) so html2canvas
-    // can capture the full layout — off-screen elements at left:-9999px are clipped.
-    const container = document.createElement('div');
-    container.style.cssText = [
-      'position:fixed;left:0;top:0;z-index:99999',
-      'width:733px',          // A4 content width @ 96dpi minus 8mm L+R margins
-      'height:auto;overflow:visible;pointer-events:none',
-      'font-family:"Segoe UI",Arial,sans-serif;color:#1e2a38;font-size:12px;line-height:1.5;background:#fff',
-      'opacity:0.02'          // nearly invisible but still rendered by html2canvas
-    ].join(';');
-    container.innerHTML = pagesHTML;
-    document.body.appendChild(container);
-    // Let the browser fully paint before capturing
-    await new Promise(r => setTimeout(r, 250));
-    try {
-      await html2pdf().set({
-        margin: [10, 8, 10, 8],
-        filename,
-        image: { type: 'jpeg', quality: 0.97 },
-        html2canvas: {
-          scale: 2, useCORS: true, allowTaint: true, logging: false,
-          windowWidth: 733,
-          ignoreElements: el => el !== container && (el.id === 'chat-panel' || el.id === 'chat-fab')
-        },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak: { mode: ['css', 'legacy'] }
-      }).from(container).save();
-      showToast('✓ PDF downloaded: ' + filename, 'success');
-    } catch (e) {
-      console.error('html2pdf error:', e);
-      exportQBPdfFallback(pagesHTML, filename);
-    } finally {
-      document.body.removeChild(container);
-    }
-  } else {
-    exportQBPdfFallback(pagesHTML, filename);
-  }
-}
-
-function exportQBPdfFallback(pagesHTML) {
   const printWin = window.open('', '_blank');
-  if (!printWin) { showToast('Pop-up blocked — please allow pop-ups and try again', 'error'); return; }
-  const doc = `<!DOCTYPE html>
-<html><head><meta charset="UTF-8"><title>Sales Quotation</title>
+  if (!printWin) { showToast('Pop-up blocked — allow pop-ups and try again', 'error'); return; }
+
+  printWin.document.write(`<!DOCTYPE html>
+<html><head>
+<meta charset="UTF-8">
+<title>${title}</title>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family:'Segoe UI',Arial,sans-serif; color:#1e2a38; font-size:11px; line-height:1.5; background:#fff; }
-  table { width:100% !important; border-collapse:collapse; table-layout:auto !important; }
-  td, th { word-break:break-word; }
-  img { max-width:100%; height:auto; }
-  @media print {
-    body { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-    @page { margin:8mm; size:A4 portrait; }
-    table { page-break-inside:auto; }
-    tr { page-break-inside:avoid; }
+  body {
+    font-family:'Segoe UI',Arial,sans-serif;
+    color:#1e2a38; font-size:12px; line-height:1.5;
+    background:#fff;
+    -webkit-print-color-adjust:exact;
+    print-color-adjust:exact;
   }
-</style></head>
-<body>
-<div style="max-width:100%;font-family:'Segoe UI',Arial,sans-serif;color:#1e2a38;font-size:11px;line-height:1.5;">
+  table  { width:100% !important; border-collapse:collapse; }
+  td, th { word-break:break-word; }
+  img    { display:block; max-width:100%; height:auto; }
+  @media print {
+    @page { size:A4 portrait; margin:8mm; }
+    body  { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    tr    { page-break-inside:avoid; break-inside:avoid; }
+  }
+</style>
+</head><body>
+<div style="font-family:'Segoe UI',Arial,sans-serif;color:#1e2a38;font-size:12px;line-height:1.5;max-width:860px;margin:0 auto">
 ${pagesHTML}
 </div>
 <script>
-  var imgs = document.images, loaded = 0, total = imgs.length;
+  // Wait for all images to load before opening print dialog
+  var imgs = document.images;
+  var total = imgs.length, loaded = 0;
   function tryPrint() { window.focus(); window.print(); }
-  if (total === 0) { setTimeout(tryPrint, 500); }
-  else {
+  if (total === 0) {
+    setTimeout(tryPrint, 400);
+  } else {
     for (var i = 0; i < total; i++) {
-      imgs[i].addEventListener('load',  function(){ if(++loaded >= total) setTimeout(tryPrint, 500); });
-      imgs[i].addEventListener('error', function(){ if(++loaded >= total) setTimeout(tryPrint, 500); });
-      if (imgs[i].complete && ++loaded >= total) { setTimeout(tryPrint, 500); break; }
+      if (imgs[i].complete) { if (++loaded >= total) { setTimeout(tryPrint, 400); break; } }
+      else {
+        imgs[i].onload  = function() { if (++loaded >= total) setTimeout(tryPrint, 400); };
+        imgs[i].onerror = function() { if (++loaded >= total) setTimeout(tryPrint, 400); };
+      }
     }
   }
-<\/script></body></html>`;
-  printWin.document.open();
-  printWin.document.write(doc);
+<\/script>
+</body></html>`);
   printWin.document.close();
+  showToast('Print dialog opened — choose "Save as PDF"', 'info');
 }
 
 // ── Create Project from Quotation ─────────────────────────────
@@ -1650,22 +1622,50 @@ function toggleTTS() {
   else { window.speechSynthesis?.cancel(); showToast('🔇 Voice responses disabled', 'info'); }
 }
 
+// Cache the chosen voice once voices are loaded
+let _ttsVoice = null;
+function _loadTTSVoice() {
+  const voices = window.speechSynthesis.getVoices();
+  if (!voices.length) return null;
+  // Priority: Google cloud voices > Microsoft Neural > Apple > any en-US
+  return voices.find(v => /Google US English/i.test(v.name))
+    || voices.find(v => /Microsoft (Aria|Jenny|Emma|Guy|Brian|Ryan)/i.test(v.name))
+    || voices.find(v => /Samantha|Karen|Moira|Daniel|Serena|Allison/i.test(v.name))
+    || voices.find(v => v.lang === 'en-US' && !v.localService)
+    || voices.find(v => v.lang === 'en-US')
+    || voices.find(v => v.lang.startsWith('en'))
+    || voices[0];
+}
+// Pre-cache as soon as voices are available (Chrome fires this async)
+if (window.speechSynthesis) {
+  if (window.speechSynthesis.getVoices().length) {
+    _ttsVoice = _loadTTSVoice();
+  } else {
+    window.speechSynthesis.addEventListener('voiceschanged', () => {
+      _ttsVoice = _loadTTSVoice();
+    }, { once: true });
+  }
+}
+
 function speakText(text) {
   if (!ttsEnabled || !window.speechSynthesis) return;
   window.speechSynthesis.cancel();
   const clean = text.replace(/[*#_~`]/g, '').replace(/\n+/g, ' ').trim().slice(0, 600);
-  const utt = new SpeechSynthesisUtterance(clean);
-  const voices = window.speechSynthesis.getVoices();
-  // Prefer high-quality natural voices in priority order
-  const preferred = voices.find(v => /Google US English/i.test(v.name))
-    || voices.find(v => /Microsoft (Aria|Jenny|Guy|Emma|Brian|Zira)/i.test(v.name))
-    || voices.find(v => /Samantha|Karen|Moira|Daniel|Serena|Allison/i.test(v.name))
-    || voices.find(v => v.lang === 'en-US' && v.localService === false)
-    || voices.find(v => v.lang === 'en-US')
-    || voices.find(v => v.lang.startsWith('en'));
-  if (preferred) utt.voice = preferred;
-  utt.rate = 0.97;   // slightly slower = clearer and less robotic
-  utt.pitch = 1.02;  // very slight lift — more natural
-  utt.volume = 0.92;
-  window.speechSynthesis.speak(utt);
+
+  function _speak() {
+    const utt  = new SpeechSynthesisUtterance(clean);
+    const voice = _ttsVoice || _loadTTSVoice();
+    if (voice) { utt.voice = voice; _ttsVoice = voice; }
+    utt.rate   = 0.95;
+    utt.pitch  = 1;
+    utt.volume = 0.92;
+    window.speechSynthesis.speak(utt);
+  }
+
+  // If voices still not loaded, wait for the event then speak
+  if (!_ttsVoice && !window.speechSynthesis.getVoices().length) {
+    window.speechSynthesis.addEventListener('voiceschanged', _speak, { once: true });
+  } else {
+    _speak();
+  }
 }
