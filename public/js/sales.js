@@ -86,7 +86,7 @@ function navigate(page) {
   document.getElementById(`page-${page}`).classList.add('active');
   document.querySelectorAll(`[data-page="${page}"]`).forEach(n => n.classList.add('active'));
 
-  const titles = { 'projects': 'All Projects', 'new-project': 'New Project', 'quotation-builder': 'Quotation Builder' };
+  const titles = { 'projects': 'All Projects', 'new-project': 'New Project', 'quotation-builder': 'Quotation Builder', 'my-quotations': 'My Quotations' };
   document.getElementById('page-title').textContent = titles[page] || page;
 
   if (page === 'projects') loadProjects();
@@ -95,6 +95,7 @@ function navigate(page) {
     setTimeout(() => map?.invalidateSize(), 200);
   }
   if (page === 'quotation-builder') initQB();
+  if (page === 'my-quotations') loadMyQuotations();
 
   closeSidebar();
 }

@@ -51,6 +51,10 @@
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 12V22H4V12"/><path d="M22 7H2v5h20V7z"/><path d="M12 22V7"/><path d="M12 7H7.5a2.5 2.5 0 010-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 000-5C13 2 12 7 12 7z"/></svg>
         <span>Quotation Builder</span>
       </a>
+      <a class="nav-item" data-page="my-quotations">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        <span>My Quotations</span>
+      </a>
     </nav>
 
     <div class="sidebar-footer">
@@ -489,11 +493,25 @@
                 <button class="btn btn-sm" style="color:#fff;border:1px solid rgba(255,255,255,.4);background:transparent" onclick="openQBManualModal()">+ Manual Item</button>
                 <button class="btn btn-sm" style="background:var(--info);color:#fff" onclick="previewQuotation()">Preview</button>
                 <button class="btn btn-sm" style="background:var(--warning);color:#fff" onclick="exportQBPdf()">Export PDF</button>
-                <button class="btn btn-sm" style="background:var(--success);color:#fff" onclick="createProjectFromQuotation()">Create as Project</button>
+                <button class="btn btn-sm" style="background:var(--success);color:#fff" onclick="finalizeQuotation()">Save &amp; Finalize</button>
               </div>
             </div>
 
           </div>
+        </div>
+      </div>
+
+      <!-- ── MY QUOTATIONS PAGE ── -->
+      <div class="page" id="page-my-quotations">
+        <div class="section-header">
+          <div class="section-title">My Quotations <span id="my-quotations-count"></span></div>
+          <button class="btn btn-danger" onclick="navigate('quotation-builder')">+ New Quotation</button>
+        </div>
+        <div id="my-quotations-grid" class="projects-grid"></div>
+        <div id="my-quotations-empty" class="qb-empty-state" style="display:none">
+          <div style="font-size:48px;margin-bottom:12px;opacity:.4">📋</div>
+          <p>No quotations yet</p>
+          <small>Build your first quotation using the Quotation Builder</small>
         </div>
       </div>
 
@@ -614,52 +632,110 @@
   </div>
 </div>
 
-<!-- ═══ CREATE PROJECT FROM QUOTATION MODAL ═══ -->
-<div class="modal-overlay" id="qb-create-project-modal">
-  <div class="modal" style="max-width:600px">
+<!-- ═══ FINALIZE QUOTATION MODAL (4 Roads) ═══ -->
+<div class="modal-overlay" id="qb-finalize-modal">
+  <div class="modal" style="max-width:640px">
     <div class="modal-header">
-      <h2>Create Project from Quotation</h2>
-      <button class="modal-close" onclick="closeModal('qb-create-project-modal')">×</button>
+      <h2>Save &amp; Finalize Quotation</h2>
+      <button class="modal-close" onclick="closeModal('qb-finalize-modal')">×</button>
     </div>
     <div class="modal-body">
-      <p style="font-size:13px;color:var(--gray-600);margin-bottom:16px">This will create a new project using your quotation data. You can adjust the details after creation.</p>
-      <div class="form-grid">
-        <div class="form-group form-full">
-          <label>Project Name *</label>
-          <input type="text" id="qbp-name" class="form-control" placeholder="e.g. CCTV Installation — Block A">
+      <p style="font-size:13px;color:var(--gray-600);margin-bottom:20px">
+        Choose what to do with this quotation. It will be saved to your database automatically.
+      </p>
+      <!-- 4 Action Cards -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
+
+        <div class="qb-road-card" id="road-close" onclick="selectRoad('close')" style="border:2px solid var(--gray-200);border-radius:12px;padding:16px;cursor:pointer;transition:all .2s;text-align:center">
+          <div style="font-size:32px;margin-bottom:8px">📁</div>
+          <div style="font-weight:700;font-size:14px;color:var(--gray-700);margin-bottom:4px">Close Quotation</div>
+          <div style="font-size:12px;color:var(--gray-500)">Save and mark as closed. Access later from My Quotations.</div>
         </div>
-        <div class="form-group">
-          <label>Client Name</label>
-          <input type="text" id="qbp-client" class="form-control" readonly>
+
+        <div class="qb-road-card" id="road-new-project" onclick="selectRoad('new-project')" style="border:2px solid var(--gray-200);border-radius:12px;padding:16px;cursor:pointer;transition:all .2s;text-align:center">
+          <div style="font-size:32px;margin-bottom:8px">🚀</div>
+          <div style="font-weight:700;font-size:14px;color:var(--gray-700);margin-bottom:4px">Start New Project</div>
+          <div style="font-size:12px;color:var(--gray-500)">Convert this quotation into a new project for execution.</div>
         </div>
-        <div class="form-group">
-          <label>Client Phone</label>
-          <input type="text" id="qbp-phone" class="form-control" readonly>
+
+        <div class="qb-road-card" id="road-add-project" onclick="selectRoad('add-project')" style="border:2px solid var(--gray-200);border-radius:12px;padding:16px;cursor:pointer;transition:all .2s;text-align:center">
+          <div style="font-size:32px;margin-bottom:8px">📎</div>
+          <div style="font-weight:700;font-size:14px;color:var(--gray-700);margin-bottom:4px">Add to Existing Project</div>
+          <div style="font-size:12px;color:var(--gray-500)">Attach this quotation to a project that already exists.</div>
         </div>
-        <div class="form-group">
-          <label>Priority</label>
-          <select id="qbp-priority" class="form-control">
-            <option value="normal">Normal</option>
-            <option value="high">High</option>
-            <option value="urgent">Urgent</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Location (optional)</label>
-          <input type="text" id="qbp-location" class="form-control" placeholder="Site address or location">
+
+        <div class="qb-road-card" id="road-hold" onclick="selectRoad('hold')" style="border:2px solid var(--gray-200);border-radius:12px;padding:16px;cursor:pointer;transition:all .2s;text-align:center">
+          <div style="font-size:32px;margin-bottom:8px">⏰</div>
+          <div style="font-weight:700;font-size:14px;color:var(--gray-700);margin-bottom:4px">Hold Until Date</div>
+          <div style="font-size:12px;color:var(--gray-500)">Schedule a follow-up date. You'll receive an email notification.</div>
         </div>
       </div>
-      <div style="margin-top:12px">
-        <label style="font-size:11px;font-weight:700;color:var(--gray-500);text-transform:uppercase;letter-spacing:.4px">Modules to Create</label>
-        <div id="qbp-modules" style="margin-top:8px;display:flex;flex-direction:column;gap:8px"></div>
+
+      <!-- Road-specific details -->
+      <div id="road-detail-close" class="road-detail" style="display:none;background:#f8f9fa;border-radius:10px;padding:16px;border:1px solid var(--gray-200)">
+        <p style="font-size:13px;color:var(--gray-600);margin:0">This quotation will be saved and marked as <strong>closed</strong>. You can always reopen it later from My Quotations.</p>
+      </div>
+
+      <div id="road-detail-new-project" class="road-detail" style="display:none;background:#f8f9fa;border-radius:10px;padding:16px;border:1px solid var(--gray-200)">
+        <div class="form-grid">
+          <div class="form-group form-full">
+            <label>Project Name *</label>
+            <input type="text" id="qbp-name" class="form-control" placeholder="e.g. CCTV Installation — Block A">
+          </div>
+          <div class="form-group">
+            <label>Client Name</label>
+            <input type="text" id="qbp-client" class="form-control" readonly>
+          </div>
+          <div class="form-group">
+            <label>Client Phone</label>
+            <input type="text" id="qbp-phone" class="form-control" readonly>
+          </div>
+          <div class="form-group">
+            <label>Priority</label>
+            <select id="qbp-priority" class="form-control">
+              <option value="normal">Normal</option>
+              <option value="high">High</option>
+              <option value="urgent">Urgent</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Location (optional)</label>
+            <input type="text" id="qbp-location" class="form-control" placeholder="Site address or location">
+          </div>
+        </div>
+        <div style="margin-top:12px">
+          <label style="font-size:11px;font-weight:700;color:var(--gray-500);text-transform:uppercase;letter-spacing:.4px">Modules to Create</label>
+          <div id="qbp-modules" style="margin-top:8px;display:flex;flex-direction:column;gap:8px"></div>
+        </div>
+      </div>
+
+      <div id="road-detail-add-project" class="road-detail" style="display:none;background:#f8f9fa;border-radius:10px;padding:16px;border:1px solid var(--gray-200)">
+        <div class="form-group">
+          <label>Select Existing Project</label>
+          <select id="qbp-existing-project" class="form-control">
+            <option value="">Loading projects…</option>
+          </select>
+        </div>
+        <p style="font-size:12px;color:var(--gray-500);margin-top:8px">The quotation items will be added as devices to the selected project's Installation module.</p>
+      </div>
+
+      <div id="road-detail-hold" class="road-detail" style="display:none;background:#f8f9fa;border-radius:10px;padding:16px;border:1px solid var(--gray-200)">
+        <div class="form-group">
+          <label>Follow-up Date *</label>
+          <input type="date" id="qbp-hold-date" class="form-control">
+        </div>
+        <p style="font-size:12px;color:var(--gray-500);margin-top:8px">You will receive an email notification on the selected date to follow up on this quotation.</p>
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('qb-create-project-modal')">Cancel</button>
-      <button class="btn btn-danger" onclick="submitProjectFromQuotation()">Create Project</button>
+      <button class="btn btn-secondary" onclick="closeModal('qb-finalize-modal')">Cancel</button>
+      <button class="btn btn-danger" id="qb-finalize-action-btn" onclick="executeRoadAction()" disabled>Select an option above</button>
     </div>
   </div>
 </div>
+
+<!-- Keep old create project modal for compatibility (hidden) -->
+<div id="qb-create-project-modal" style="display:none"></div>
 
 <!-- ═══ AI CHATBOT FAB + PANEL ═══ -->
 <button id="chat-fab" onclick="toggleChatbot()" title="AI Quotation Assistant">
@@ -698,6 +774,12 @@
       <input type="file" id="chat-image-input" accept="image/*" style="display:none" onchange="chatAttachImage(this)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
     </label>
+    <button id="chat-mic-btn" onclick="toggleVoiceInput()" title="Voice input" style="background:none;border:none;cursor:pointer;color:var(--gray-500);padding:4px;display:flex;align-items:center;justify-content:center;border-radius:50%;transition:all .2s;flex-shrink:0">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8"/></svg>
+    </button>
+    <button id="chat-tts-btn" onclick="toggleTTS()" title="Enable text-to-speech" style="background:none;border:none;cursor:pointer;color:var(--gray-500);padding:4px;display:flex;align-items:center;justify-content:center;border-radius:50%;transition:all .2s;flex-shrink:0">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 010 14.14M15.54 8.46a5 5 0 010 7.07"/></svg>
+    </button>
     <textarea id="chat-input" placeholder="Ask about products, pricing, systems…" rows="1"
       onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChatMsg();}"></textarea>
     <button id="chat-send-btn" onclick="sendChatMsg()">
@@ -734,6 +816,7 @@
 </nav>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script src="/js/i18n.js"></script>
 <script src="/js/sales.js"></script>
 <script src="/js/qb.js"></script>

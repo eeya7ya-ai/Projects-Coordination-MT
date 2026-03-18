@@ -674,7 +674,7 @@ function buildQuotationHTML() {
 
   const logoHTML = logoData
     ? `<img src="${logoData}" style="height:48px;width:auto;display:block;object-fit:contain;" alt="Logo">`
-    : `<img src="/company-logo.jpg" style="height:48px;width:auto;display:block;object-fit:contain;" alt="MT Logo" onerror="this.style.display='none'">`;
+    : `<img src="/Magic Tech Logo.png" style="height:48px;width:auto;display:block;object-fit:contain;" alt="MT Logo" onerror="this.style.display='none'">`;
 
   const dateStr = fmtDate(info.date);
 
@@ -833,15 +833,45 @@ function previewQuotation() {
   openModal('qb-preview-modal');
 }
 
-// ── PDF Export (print-to-PDF via new window — works reliably on all platforms) ──
-function exportQBPdf() {
+// ── PDF Export (direct download, no print dialog) ─────────────
+async function exportQBPdf() {
   if (!qbItems.length) { showToast('Add items to the quotation before exporting', 'error'); return; }
 
-  const { pagesHTML } = buildQuotationHTML();
+  const { pagesHTML, info } = buildQuotationHTML();
+  const ref = info.ref || 'Quotation';
+  const filename = `MT-Quotation-${ref.replace(/[^a-zA-Z0-9\-]/g, '_')}.pdf`;
 
+  // Check if html2pdf.js is available
+  if (typeof html2pdf !== 'undefined') {
+    const container = document.createElement('div');
+    container.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;font-family:Segoe UI,Arial,sans-serif;color:#1e2a38;font-size:13px;line-height:1.5;background:#fff';
+    container.innerHTML = pagesHTML;
+    document.body.appendChild(container);
+    showToast('Preparing PDF download…', 'info');
+    try {
+      await html2pdf().set({
+        margin: [8, 8, 8, 8],
+        filename,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, logging: false, allowTaint: true },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+      }).from(container).save();
+      showToast('✓ PDF downloaded: ' + filename, 'success');
+    } catch (e) {
+      showToast('PDF error: ' + e.message + ' — trying fallback', 'error');
+      exportQBPdfFallback(pagesHTML);
+    } finally {
+      document.body.removeChild(container);
+    }
+  } else {
+    exportQBPdfFallback(pagesHTML);
+  }
+}
+
+function exportQBPdfFallback(pagesHTML) {
   const printWin = window.open('', '_blank');
   if (!printWin) { showToast('Pop-up blocked — please allow pop-ups and try again', 'error'); return; }
-
   printWin.document.write(`<!DOCTYPE html>
 <html><head><meta charset="UTF-8"><title>Sales Quotation</title>
 <style>
@@ -849,7 +879,7 @@ function exportQBPdf() {
   body { font-family:'Segoe UI',Arial,sans-serif; color:#1e2a38; font-size:13px; line-height:1.5; background:#fff; }
   @media print {
     body { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-    @page { margin:10mm; size:A4 portrait; }
+    @page { margin:8mm; size:A4 portrait; }
   }
 </style></head>
 <body>${pagesHTML}</body></html>`);
@@ -981,6 +1011,277 @@ async function submitProjectFromQuotation() {
   }
 }
 
+// ── Finalize Quotation (4-Roads) ─────────────────────────────
+let selectedRoad = null;
+let currentQuotationId = null;
+
+async function finalizeQuotation() {
+  if (!qbItems.length) { showToast('Add items to the quotation first', 'error'); return; }
+
+  // Auto-save quotation to DB first
+  const savedId = await autoSaveQuotation();
+  if (!savedId) { showToast('Failed to save quotation. Please try again.', 'error'); return; }
+  currentQuotationId = savedId;
+
+  // Reset road selection
+  selectedRoad = null;
+  document.getElementById('qb-finalize-action-btn').disabled = true;
+  document.getElementById('qb-finalize-action-btn').textContent = 'Select an option above';
+  document.querySelectorAll('.qb-road-card').forEach(c => c.classList.remove('selected'));
+  document.querySelectorAll('.road-detail').forEach(d => d.style.display = 'none');
+
+  // Pre-fill new project form
+  const info = (() => {
+    try { return JSON.parse(localStorage.getItem('mt_customer_info') || '{}'); } catch (_) { return {}; }
+  })();
+  const nameEl = document.getElementById('qbp-name');
+  if (nameEl) nameEl.value = info.project || '';
+  const clientEl = document.getElementById('qbp-client');
+  if (clientEl) clientEl.value = info.client || info.name || '';
+  const phoneEl = document.getElementById('qbp-phone');
+  if (phoneEl) phoneEl.value = info.phone || '';
+
+  // Build modules preview
+  const systems = [...new Set(qbItems.map(i => i.system || 'General'))];
+  const modulesDiv = document.getElementById('qbp-modules');
+  if (modulesDiv) {
+    modulesDiv.innerHTML = systems.map(sys => {
+      const items = qbItems.filter(i => (i.system || 'General') === sys);
+      const deviceCount = items.reduce((s, i) => s + i.qty, 0);
+      return `<div style="border:1px solid var(--gray-200);border-radius:8px;padding:10px 14px;background:#fff;display:flex;align-items:center;justify-content:space-between">
+        <div><strong style="color:var(--red-dark);font-size:13px">${escHtml(sys)}</strong>
+        <div style="font-size:12px;color:var(--gray-500)">${items.length} item(s), ${deviceCount} unit(s)</div></div>
+        <span style="background:var(--red-pale);color:var(--red);padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700">Installation</span>
+      </div>`;
+    }).join('');
+  }
+
+  // Load existing projects for "add to existing" road
+  loadProjectsForSelect();
+
+  // Set min date for hold
+  const holdDate = document.getElementById('qbp-hold-date');
+  if (holdDate) holdDate.min = new Date().toISOString().split('T')[0];
+
+  openModal('qb-finalize-modal');
+}
+
+function selectRoad(road) {
+  selectedRoad = road;
+  document.querySelectorAll('.qb-road-card').forEach(c => c.classList.remove('selected'));
+  document.querySelectorAll('.road-detail').forEach(d => d.style.display = 'none');
+  const card = document.getElementById('road-' + road);
+  if (card) card.classList.add('selected');
+  const detail = document.getElementById('road-detail-' + road);
+  if (detail) detail.style.display = 'block';
+
+  const actionBtn = document.getElementById('qb-finalize-action-btn');
+  actionBtn.disabled = false;
+  const labels = { 'close': 'Close Quotation', 'new-project': 'Create Project', 'add-project': 'Add to Project', 'hold': 'Set Hold Date' };
+  actionBtn.textContent = labels[road] || 'Confirm';
+}
+
+async function loadProjectsForSelect() {
+  try {
+    const res = await apiFetch('/projects');
+    const data = await res.json();
+    const sel = document.getElementById('qbp-existing-project');
+    if (sel) {
+      sel.innerHTML = '<option value="">— Select a project —</option>';
+      const projects = Array.isArray(data) ? data : (data.projects || []);
+      projects.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p.id; opt.textContent = `${p.project_name} (${p.client_name_1 || 'N/A'})`;
+        sel.appendChild(opt);
+      });
+    }
+  } catch (e) { console.error('Failed to load projects', e); }
+}
+
+async function executeRoadAction() {
+  if (!selectedRoad) return;
+  const btn = document.getElementById('qb-finalize-action-btn');
+  btn.disabled = true;
+  btn.textContent = 'Processing…';
+
+  try {
+    if (selectedRoad === 'close') {
+      await apiFetch(`/quotation/${currentQuotationId}/close`, { method: 'POST' });
+      showToast('Quotation closed and saved to My Quotations', 'success');
+      closeModal('qb-finalize-modal');
+      loadMyQuotations();
+    } else if (selectedRoad === 'new-project') {
+      await submitProjectFromQuotation();
+      if (currentQuotationId) {
+        await apiFetch(`/quotation/${currentQuotationId}/close`, { method: 'POST' });
+      }
+    } else if (selectedRoad === 'add-project') {
+      const projId = document.getElementById('qbp-existing-project')?.value;
+      if (!projId) { showToast('Please select a project', 'error'); btn.disabled = false; btn.textContent = 'Add to Project'; return; }
+      await addQuotationToProject(projId);
+      await apiFetch(`/quotation/${currentQuotationId}/close`, { method: 'POST' });
+      showToast('Quotation items added to existing project!', 'success');
+      closeModal('qb-finalize-modal');
+      loadMyQuotations();
+    } else if (selectedRoad === 'hold') {
+      const holdDate = document.getElementById('qbp-hold-date')?.value;
+      if (!holdDate) { showToast('Please select a follow-up date', 'error'); btn.disabled = false; btn.textContent = 'Set Hold Date'; return; }
+      const res = await apiFetch(`/quotation/${currentQuotationId}/hold`, {
+        method: 'POST', body: JSON.stringify({ hold_until: holdDate })
+      });
+      if (res.ok) {
+        showToast('Quotation placed on hold. You will be notified by email on the selected date.', 'success');
+        closeModal('qb-finalize-modal');
+        loadMyQuotations();
+      } else { showToast('Failed to set hold date', 'error'); }
+    }
+  } catch (err) {
+    showToast('Error: ' + err.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; }
+  }
+}
+
+async function addQuotationToProject(projectId) {
+  const gm = qbGetGlobalMultiplier();
+  const cm = parseFloat(document.getElementById('qb-custom-mult')?.value) || 1;
+  const calcUnit = item => {
+    if (item._fixed_price) return item.unit_price;
+    let base = 0;
+    switch (qbMode) {
+      case 'si': base = +item.si_price || 0; break;
+      case 'contractor': base = (+item.si_price || 0) * 1.25; break;
+      case 'enduser': base = +item.enduser_price || 0; break;
+      case 'custom': base = (+item.si_price || 0) * cm; break;
+      default: base = +item.si_price || 0;
+    }
+    return base * gm;
+  };
+  const currency = document.getElementById('qb-c-currency')?.value || 'JOD';
+  const devices = qbItems.map(item => ({
+    model: item.model,
+    qty: item.qty,
+    description: `${item.description || item.model} | ${currency} ${calcUnit(item).toFixed(2)} x ${item.qty}`,
+    serial: ''
+  }));
+  const payload = { quotation_devices: devices, quotation_ref: currentQuotationId };
+  const res = await apiFetch(`/projects/${projectId}/quotation-devices`, {
+    method: 'POST', body: JSON.stringify(payload)
+  });
+  if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Failed to add devices'); }
+}
+
+async function autoSaveQuotation() {
+  const info = (() => {
+    try { return JSON.parse(localStorage.getItem('mt_customer_info') || '{}'); } catch (_) { return {}; }
+  })();
+  const gm = qbGetGlobalMultiplier();
+  const cm = parseFloat(document.getElementById('qb-custom-mult')?.value) || 1;
+  const calcUnit = item => {
+    if (item._fixed_price) return item.unit_price;
+    let base = 0;
+    switch (qbMode) {
+      case 'si': base = +item.si_price || 0; break;
+      case 'contractor': base = (+item.si_price || 0) * 1.25; break;
+      case 'enduser': base = +item.enduser_price || 0; break;
+      case 'custom': base = (+item.si_price || 0) * cm; break;
+      default: base = +item.si_price || 0;
+    }
+    return base * gm;
+  };
+  let grandTotal = 0;
+  qbItems.forEach(it => { grandTotal += calcUnit(it) * it.qty; });
+
+  const payload = {
+    ref_number: info.ref || '',
+    title: info.project || info.client || info.ref || 'Quotation',
+    customer_info: info,
+    items: qbItems,
+    pricing_mode: qbMode,
+    currency: document.getElementById('qb-c-currency')?.value || 'JOD',
+    grand_total: grandTotal,
+    notes: info.notes || ''
+  };
+
+  try {
+    const res = await apiFetch('/quotation', { method: 'POST', body: JSON.stringify(payload) });
+    const data = await res.json();
+    if (res.ok && data.quotation) return data.quotation.id;
+    return null;
+  } catch (e) { return null; }
+}
+
+// ── My Quotations ─────────────────────────────────────────────
+async function loadMyQuotations() {
+  try {
+    const res = await apiFetch('/quotation/mine');
+    const quotations = await res.json();
+    const grid = document.getElementById('my-quotations-grid');
+    const empty = document.getElementById('my-quotations-empty');
+    const count = document.getElementById('my-quotations-count');
+    if (!grid) return;
+    if (count) count.textContent = quotations.length > 0 ? `(${quotations.length})` : '';
+    if (quotations.length === 0) {
+      grid.innerHTML = '';
+      if (empty) empty.style.display = '';
+      return;
+    }
+    if (empty) empty.style.display = 'none';
+    const statusColors = { draft: 'var(--info)', closed: 'var(--gray-500)', on_hold: 'var(--warning)', sent: 'var(--success)' };
+    grid.innerHTML = quotations.map(q => {
+      const date = new Date(q.updated_at || q.created_at).toLocaleDateString('en-GB');
+      const status = q.status || 'draft';
+      const color = statusColors[status] || 'var(--gray-500)';
+      const holdInfo = q.hold_until ? `<div style="font-size:12px;color:var(--warning);margin-top:4px">⏰ Follow-up: ${new Date(q.hold_until).toLocaleDateString('en-GB')}</div>` : '';
+      return `
+      <div class="project-card" style="cursor:default">
+        <div class="project-card-header">
+          <div>
+            <div class="project-name">${escHtml(q.title || q.ref_number || 'Untitled')}</div>
+            <div style="font-size:12px;color:var(--gray-500);margin-top:2px">${escHtml(q.client_name || '')} · Ref: ${escHtml(q.ref_number || 'N/A')}</div>
+          </div>
+          <span style="background:${color};color:#fff;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;text-transform:capitalize">${status.replace('_', ' ')}</span>
+        </div>
+        <div class="project-meta" style="margin-top:12px;display:flex;flex-wrap:wrap;gap:8px;font-size:12px;color:var(--gray-600)">
+          <span>💰 ${escHtml(q.currency || 'JOD')} ${parseFloat(q.grand_total || 0).toFixed(2)}</span>
+          <span>📅 ${date}</span>
+        </div>
+        ${holdInfo}
+        <div style="margin-top:12px;display:flex;gap:8px">
+          <button class="btn btn-sm btn-secondary" onclick="loadQuotationToBuilder(${q.id})">Edit</button>
+          <button class="btn btn-sm" style="background:var(--red);color:#fff" onclick="deleteMyQuotation(${q.id})">Delete</button>
+        </div>
+      </div>`;
+    }).join('');
+  } catch (e) { console.error('Failed to load quotations', e); }
+}
+
+async function loadQuotationToBuilder(id) {
+  try {
+    const res = await apiFetch(`/quotation/${id}`);
+    const q = await res.json();
+    const customerInfo = typeof q.customer_info === 'string' ? JSON.parse(q.customer_info || '{}') : (q.customer_info || {});
+    const items = typeof q.items === 'string' ? JSON.parse(q.items || '[]') : (q.items || []);
+    localStorage.setItem('mt_customer_info', JSON.stringify(customerInfo));
+    localStorage.setItem('mt_quotation_items', JSON.stringify(items));
+    qbItems = items;
+    loadQBCustomer();
+    qbRenderTable();
+    currentQuotationId = id;
+    navigate('quotation-builder');
+    showToast('Quotation loaded for editing', 'success');
+  } catch (e) { showToast('Failed to load quotation: ' + e.message, 'error'); }
+}
+
+async function deleteMyQuotation(id) {
+  if (!confirm('Delete this quotation? This cannot be undone.')) return;
+  try {
+    const res = await apiFetch(`/quotation/${id}`, { method: 'DELETE' });
+    if (res.ok) { showToast('Quotation deleted', 'success'); loadMyQuotations(); }
+    else showToast('Failed to delete quotation', 'error');
+  } catch (e) { showToast('Error: ' + e.message, 'error'); }
+}
+
 // ── Utility ───────────────────────────────────────────────────
 function qbFmt(val, currency) {
   const n = parseFloat(val) || 0;
@@ -1040,6 +1341,7 @@ async function sendChatMsg() {
   const token = localStorage.getItem('elv_token');
 
   // Show user bubble
+  playChatSound('send');
   if (chatImageData) {
     const imgHtml = `<img class="chat-thumb" src="data:${chatImageData.mimeType};base64,${chatImageData.base64}" alt="attached">`;
     appendChatBubble(text ? imgHtml + '\n' + escHtml(text) : imgHtml, 'user', true);
@@ -1085,6 +1387,7 @@ async function sendChatMsg() {
     const reply = data.reply || '(no response)';
     chatHistory.push({ role: 'assistant', content: reply });
     appendChatBubble(escHtml(reply).replace(/\n/g, '<br>'), 'bot', true);
+    playChatSound('receive'); speakText(reply);
 
   } catch (err) {
     const thinkEl = document.getElementById(thinkId);
@@ -1106,4 +1409,145 @@ function appendChatBubble(htmlContent, type, scroll = true, id = null) {
   msgs.appendChild(div);
   if (scroll) msgs.scrollTop = msgs.scrollHeight;
   return div;
+}
+
+// ── Voice Recognition + TTS ──────────────────────────────────
+let voiceRecognition = null;
+let voiceEnabled = false;
+let ttsEnabled = false;
+let isListening = false;
+
+// Web Audio context for notification sounds
+let audioCtx = null;
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+
+function playChatSound(type) {
+  try {
+    const ctx = getAudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    if (type === 'send') {
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.08);
+      gain.gain.setValueAtTime(0.15, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.15);
+    } else if (type === 'receive') {
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(660, ctx.currentTime);
+      osc.frequency.setValueAtTime(880, ctx.currentTime + 0.08);
+      gain.gain.setValueAtTime(0.12, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.25);
+    } else if (type === 'listen_start') {
+      // Rising beep
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(400, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(800, ctx.currentTime + 0.15);
+      gain.gain.setValueAtTime(0.18, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.2);
+    } else if (type === 'listen_stop') {
+      // Falling beep
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(800, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(300, ctx.currentTime + 0.15);
+      gain.gain.setValueAtTime(0.18, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.2);
+    }
+  } catch (e) { /* audio not supported */ }
+}
+
+function initVoiceRecognition() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) return null;
+  const r = new SR();
+  r.continuous = false;
+  r.interimResults = true;
+  r.lang = 'en-US';
+
+  r.onstart = () => {
+    isListening = true;
+    playChatSound('listen_start');
+    const btn = document.getElementById('chat-mic-btn');
+    if (btn) { btn.classList.add('listening'); btn.title = 'Listening... (click to stop)'; }
+    const input = document.getElementById('chat-input');
+    if (input) input.placeholder = '🎤 Listening...';
+  };
+  r.onend = () => {
+    isListening = false;
+    playChatSound('listen_stop');
+    const btn = document.getElementById('chat-mic-btn');
+    if (btn) { btn.classList.remove('listening'); btn.title = 'Voice input'; }
+    const input = document.getElementById('chat-input');
+    if (input) input.placeholder = 'Ask about products, pricing, systems…';
+  };
+  r.onerror = (e) => {
+    isListening = false;
+    const btn = document.getElementById('chat-mic-btn');
+    if (btn) btn.classList.remove('listening');
+    if (e.error !== 'aborted') showToast('Voice error: ' + e.error, 'error');
+  };
+  r.onresult = (event) => {
+    const input = document.getElementById('chat-input');
+    if (!input) return;
+    let final = '', interim = '';
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      if (event.results[i].isFinal) final += event.results[i][0].transcript;
+      else interim += event.results[i][0].transcript;
+    }
+    input.value = final || interim;
+    if (final) {
+      setTimeout(() => sendChatMsg(), 300);
+    }
+  };
+  return r;
+}
+
+function toggleVoiceInput() {
+  if (!voiceRecognition) {
+    voiceRecognition = initVoiceRecognition();
+    if (!voiceRecognition) { showToast('Voice input not supported in this browser', 'error'); return; }
+  }
+  if (isListening) {
+    voiceRecognition.stop();
+  } else {
+    try { voiceRecognition.start(); } catch (e) { showToast('Could not start voice input', 'error'); }
+  }
+}
+
+function toggleTTS() {
+  ttsEnabled = !ttsEnabled;
+  const btn = document.getElementById('chat-tts-btn');
+  if (btn) {
+    btn.classList.toggle('active', ttsEnabled);
+    btn.title = ttsEnabled ? 'Text-to-speech ON (click to disable)' : 'Enable text-to-speech';
+  }
+  if (ttsEnabled) showToast('🔊 Voice responses enabled', 'success');
+  else { window.speechSynthesis?.cancel(); showToast('🔇 Voice responses disabled', 'info'); }
+}
+
+function speakText(text) {
+  if (!ttsEnabled || !window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+  const clean = text.replace(/[*#_~`]/g, '').replace(/\n+/g, ' ').trim().slice(0, 600);
+  const utt = new SpeechSynthesisUtterance(clean);
+  // Pick a nice voice
+  const voices = window.speechSynthesis.getVoices();
+  const preferred = voices.find(v =>
+    /Google US English|Samantha|Karen|Moira|Daniel|en-US/i.test(v.name + v.lang)
+  ) || voices.find(v => v.lang.startsWith('en')) || voices[0];
+  if (preferred) utt.voice = preferred;
+  utt.rate = 1.05; utt.pitch = 1; utt.volume = 0.95;
+  window.speechSynthesis.speak(utt);
 }

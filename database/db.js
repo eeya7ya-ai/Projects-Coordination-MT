@@ -256,6 +256,26 @@ async function initializeDB() {
     ALTER TABLE notifications ADD COLUMN IF NOT EXISTS notif_params TEXT;
   `);
 
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS quotations (
+      id SERIAL PRIMARY KEY,
+      ref_number TEXT,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      title TEXT,
+      customer_info JSONB DEFAULT '{}',
+      items JSONB DEFAULT '[]',
+      pricing_mode TEXT DEFAULT 'si',
+      currency TEXT DEFAULT 'JOD',
+      grand_total NUMERIC(12,2) DEFAULT 0,
+      status TEXT DEFAULT 'draft',
+      hold_until DATE,
+      project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL,
+      notes TEXT,
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW()
+    );
+  `);
+
   // ── Admin user ────────────────────────────────────────
   const adminExists = await db.get("SELECT id FROM users WHERE role = $1 LIMIT 1", ['admin']);
   let adminId;

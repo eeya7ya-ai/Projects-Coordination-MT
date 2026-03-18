@@ -562,4 +562,104 @@ function inferCategory(system) {
   return MAP[system] || '';
 }
 
+// ─── GET /api/quotation/mine ─── Get current user's quotations ─
+router.get('/mine', verifyToken, async (req, res) => {
+  try {
+    const rows = await db.all(
+      `SELECT id, ref_number, title, currency, grand_total, status, hold_until, created_at, updated_at,
+              customer_info->>'client' as client_name
+       FROM quotations WHERE user_id = $1 ORDER BY updated_at DESC`,
+      [req.user.id]
+    );
+    res.json(rows);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── GET /api/quotation/:id ─── Get single quotation ─
+router.get('/:id(\\d+)', verifyToken, async (req, res) => {
+  try {
+    const row = await db.get(
+      `SELECT * FROM quotations WHERE id = $1 AND user_id = $2`,
+      [req.params.id, req.user.id]
+    );
+    if (!row) return res.status(404).json({ error: 'Quotation not found' });
+    res.json(row);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── POST /api/quotation/ ─── Save quotation ─
+router.post('/', verifyToken, async (req, res) => {
+  const { ref_number, title, customer_info, items, pricing_mode, currency, grand_total, notes } = req.body;
+  try {
+    const result = await db.run(
+      `INSERT INTO quotations (user_id, ref_number, title, customer_info, items, pricing_mode, currency, grand_total, notes, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'draft')`,
+      [req.user.id, ref_number || '', title || ref_number || '',
+       JSON.stringify(customer_info || {}), JSON.stringify(items || []),
+       pricing_mode || 'si', currency || 'JOD', grand_total || 0, notes || '']
+    );
+    const created = await db.get('SELECT * FROM quotations WHERE id = $1', [result.lastInsertRowid]);
+    res.json({ success: true, quotation: created });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── PUT /api/quotation/:id ─── Update quotation ─
+router.put('/:id(\\d+)', verifyToken, async (req, res) => {
+  const { ref_number, title, customer_info, items, pricing_mode, currency, grand_total, notes, status } = req.body;
+  try {
+    const result = await db.run(
+      `UPDATE quotations SET ref_number=$1, title=$2, customer_info=$3, items=$4,
+       pricing_mode=$5, currency=$6, grand_total=$7, notes=$8, status=COALESCE($9, status), updated_at=NOW()
+       WHERE id=$10 AND user_id=$11`,
+      [ref_number || '', title || ref_number || '',
+       JSON.stringify(customer_info || {}), JSON.stringify(items || []),
+       pricing_mode || 'si', currency || 'JOD', grand_total || 0, notes || '',
+       status || null, req.params.id, req.user.id]
+    );
+    if (!result.changes) return res.status(404).json({ error: 'Quotation not found or unauthorized' });
+    const updated = await db.get('SELECT * FROM quotations WHERE id = $1', [req.params.id]);
+    res.json({ success: true, quotation: updated });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── DELETE /api/quotation/:id ─── Delete quotation ─
+router.delete('/:id(\\d+)', verifyToken, async (req, res) => {
+  try {
+    const result = await db.run('DELETE FROM quotations WHERE id = $1 AND user_id = $2', [req.params.id, req.user.id]);
+    if (!result.changes) return res.status(404).json({ error: 'Quotation not found' });
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── POST /api/quotation/:id/hold ─── Hold quotation with date + email notification ─
+const { sendHoldNotificationEmail } = require('../services/email');
+router.post('/:id(\\d+)/hold', verifyToken, async (req, res) => {
+  const { hold_until } = req.body;
+  if (!hold_until) return res.status(400).json({ error: 'hold_until date is required' });
+  try {
+    await db.run(
+      `UPDATE quotations SET status='on_hold', hold_until=$1, updated_at=NOW() WHERE id=$2 AND user_id=$3`,
+      [hold_until, req.params.id, req.user.id]
+    );
+    const q = await db.get('SELECT * FROM quotations WHERE id = $1', [req.params.id]);
+    if (!q) return res.status(404).json({ error: 'Quotation not found' });
+    const user = await db.get('SELECT * FROM users WHERE id = $1', [req.user.id]);
+    if (user?.email) {
+      try { await sendHoldNotificationEmail(user, q, hold_until); } catch (emailErr) { console.error('Hold email error:', emailErr); }
+    }
+    res.json({ success: true, quotation: q });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── POST /api/quotation/:id/close ─── Close quotation ─
+router.post('/:id(\\d+)/close', verifyToken, async (req, res) => {
+  try {
+    await db.run(
+      `UPDATE quotations SET status='closed', updated_at=NOW() WHERE id=$1 AND user_id=$2`,
+      [req.params.id, req.user.id]
+    );
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 module.exports = router;
