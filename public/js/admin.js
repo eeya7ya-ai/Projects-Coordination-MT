@@ -135,6 +135,7 @@ function navigate(page) {
   if (page === 'users') loadUsersTable();
   if (page === 'settings') { loadAdminProfile(); loadEmailSettings(); }
   if (page === 'daily-summary') initDailySummary();
+  if (page === 'price-list') loadPriceList();
   if (page === 'new-project') {
     resetProjectForm();
     populateUserDropdowns();
@@ -2157,4 +2158,342 @@ function reRenderCurrentPage() {
   if (titleEl && pageTitleKeys[pageId]) titleEl.textContent = t(pageTitleKeys[pageId]);
   // Re-render notifications panel so titles/messages reflect new language
   loadNotifications();
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   PRICE LIST MANAGEMENT (MT Sales Quotation — Admin Integration)
+═══════════════════════════════════════════════════════════════ */
+
+// ── State ────────────────────────────────────────────────────
+let plAllProducts = [];
+let plFiltered    = [];
+let plPage        = 1;
+const PL_PAGE_SIZE = 50;
+let plSortCol     = 'category';
+let plSortDir     = 'asc';
+let plEditingId   = null;
+let plExcelFile   = null;
+
+// ── Load & render ────────────────────────────────────────────
+async function loadPriceList() {
+  await loadPLStats();
+  await loadPLProducts();
+}
+
+async function loadPLStats() {
+  try {
+    const res  = await apiFetch('/quotation/stats');
+    if (!res?.ok) return;
+    const data = await res.json();
+    document.getElementById('pl-stat-total').textContent  = data.total      || 0;
+    document.getElementById('pl-stat-cats').textContent   = data.categories || 0;
+    document.getElementById('pl-stat-brands').textContent = data.brands      || 0;
+
+    // Populate filter datalists
+    const dlCat   = document.getElementById('pl-dl-category');
+    const dlBrand = document.getElementById('pl-dl-brand');
+    if (dlCat)   dlCat.innerHTML   = (data.categoryList || []).map(c => `<option value="${escHtml(c)}">`).join('');
+    if (dlBrand) dlBrand.innerHTML = (data.brandList    || []).map(b => `<option value="${escHtml(b)}">`).join('');
+
+    // Filter dropdowns
+    const catSel   = document.getElementById('pl-filter-cat');
+    const brandSel = document.getElementById('pl-filter-brand');
+    if (catSel) {
+      const cur = catSel.value;
+      catSel.innerHTML = '<option value="">All Categories</option>' +
+        (data.categoryList || []).map(c => `<option value="${escHtml(c)}"${c===cur?' selected':''}>${escHtml(c)}</option>`).join('');
+    }
+    if (brandSel) {
+      const cur = brandSel.value;
+      brandSel.innerHTML = '<option value="">All Brands</option>' +
+        (data.brandList || []).map(b => `<option value="${escHtml(b)}"${b===cur?' selected':''}>${escHtml(b)}</option>`).join('');
+    }
+  } catch (e) { console.error('PL stats error:', e); }
+}
+
+async function loadPLProducts() {
+  try {
+    const res  = await apiFetch('/quotation/products');
+    if (!res?.ok) return;
+    plAllProducts = await res.json();
+
+    // Populate system filter
+    const sysSel = document.getElementById('pl-filter-sys');
+    if (sysSel) {
+      const cur     = sysSel.value;
+      const systems = [...new Set(plAllProducts.map(p => p.system).filter(Boolean))].sort();
+      const dlSys   = document.getElementById('pl-dl-system');
+      if (dlSys) dlSys.innerHTML = systems.map(s => `<option value="${escHtml(s)}">`).join('');
+      sysSel.innerHTML = '<option value="">All Systems</option>' +
+        systems.map(s => `<option value="${escHtml(s)}"${s===cur?' selected':''}>${escHtml(s)}</option>`).join('');
+    }
+
+    filterPLProducts();
+  } catch (e) {
+    showToast('Failed to load products: ' + e.message, 'error');
+  }
+}
+
+function filterPLProducts() {
+  const q     = (document.getElementById('pl-search')?.value   || '').toLowerCase();
+  const cat   = document.getElementById('pl-filter-cat')?.value   || '';
+  const brand = document.getElementById('pl-filter-brand')?.value || '';
+  const sys   = document.getElementById('pl-filter-sys')?.value   || '';
+
+  plFiltered = plAllProducts.filter(p => {
+    if (cat   && p.category !== cat)  return false;
+    if (brand && p.brand    !== brand) return false;
+    if (sys   && p.system   !== sys)   return false;
+    if (q) {
+      const hay = `${p.model} ${p.description} ${p.brand} ${p.type} ${p.series} ${p.category}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+
+  plFiltered.sort((a, b) => {
+    let va = a[plSortCol] ?? '', vb = b[plSortCol] ?? '';
+    if (typeof va === 'number') return plSortDir === 'asc' ? va - vb : vb - va;
+    va = String(va).toLowerCase(); vb = String(vb).toLowerCase();
+    return plSortDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+  });
+
+  plPage = 1;
+  renderPLTable();
+  renderPLPagination();
+}
+
+function sortPL(col) {
+  if (plSortCol === col) plSortDir = plSortDir === 'asc' ? 'desc' : 'asc';
+  else { plSortCol = col; plSortDir = 'asc'; }
+  filterPLProducts();
+}
+
+function clearPLFilters() {
+  const s = document.getElementById('pl-search');
+  const c = document.getElementById('pl-filter-cat');
+  const b = document.getElementById('pl-filter-brand');
+  const y = document.getElementById('pl-filter-sys');
+  if (s) s.value = '';
+  if (c) c.value = '';
+  if (b) b.value = '';
+  if (y) y.value = '';
+  filterPLProducts();
+}
+
+function renderPLTable() {
+  const tbody = document.getElementById('pl-table-body');
+  if (!tbody) return;
+
+  const start = (plPage - 1) * PL_PAGE_SIZE;
+  const slice = plFiltered.slice(start, start + PL_PAGE_SIZE);
+
+  if (!slice.length) {
+    tbody.innerHTML = `<tr><td colspan="11" style="text-align:center;padding:40px;color:var(--gray-400)">
+      ${plAllProducts.length ? 'No products match your filters.' : 'No products yet. Upload an Excel file to get started.'}
+    </td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = slice.map(p => `
+    <tr class="pl-row">
+      <td><span class="badge" style="background:#EEF2FF;color:#3730A3;font-weight:500">${escHtml(p.category||'—')}</span></td>
+      <td>${escHtml(p.system||'—')}</td>
+      <td><strong>${escHtml(p.brand||'—')}</strong></td>
+      <td>${escHtml(p.type||'—')}</td>
+      <td style="font-size:12px;color:var(--gray-500)">${escHtml(p.series||'—')}</td>
+      <td><code style="font-size:12px;background:var(--gray-100);padding:2px 6px;border-radius:4px">${escHtml(p.model)}</code></td>
+      <td style="font-size:12px;max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escHtml(p.description||'')}">${escHtml(p.description||'—')}</td>
+      <td style="text-align:right;font-size:12px;color:var(--gray-500)">${fmtPrice(p.dpp_price)}</td>
+      <td style="text-align:right;font-weight:600;color:var(--info)">${fmtPrice(p.si_price)}</td>
+      <td style="text-align:right;font-weight:600;color:var(--success)">${fmtPrice(p.enduser_price)}</td>
+      <td style="text-align:center;white-space:nowrap">
+        <button class="btn btn-sm btn-secondary" onclick="openEditProductModal(${p.id})" title="Edit" style="padding:4px 8px;margin-right:4px">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        </button>
+        <button class="btn btn-sm" onclick="deletePLProduct(${p.id},'${escHtml(p.model)}')" title="Delete" style="padding:4px 8px;background:var(--red);color:#fff;border:none;border-radius:6px;cursor:pointer">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+        </button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function renderPLPagination() {
+  const el = document.getElementById('pl-pagination');
+  if (!el) return;
+  const total = Math.ceil(plFiltered.length / PL_PAGE_SIZE);
+  if (total <= 1) { el.innerHTML = `<span style="font-size:13px;color:var(--gray-400)">${plFiltered.length} products</span>`; return; }
+
+  let html = `<span style="font-size:13px;color:var(--gray-400);margin-right:8px">${plFiltered.length} products</span>`;
+  html += `<button class="btn btn-sm btn-secondary" onclick="goPlPage(${plPage-1})" ${plPage<=1?'disabled':''}>←</button>`;
+  const start = Math.max(1, plPage - 2), end = Math.min(total, plPage + 2);
+  for (let i = start; i <= end; i++) {
+    html += `<button class="btn btn-sm ${i===plPage?'btn-danger':'btn-secondary'}" onclick="goPlPage(${i})">${i}</button>`;
+  }
+  html += `<button class="btn btn-sm btn-secondary" onclick="goPlPage(${plPage+1})" ${plPage>=total?'disabled':''}>→</button>`;
+  el.innerHTML = html;
+}
+
+function goPlPage(p) {
+  const total = Math.ceil(plFiltered.length / PL_PAGE_SIZE);
+  if (p < 1 || p > total) return;
+  plPage = p;
+  renderPLTable();
+  renderPLPagination();
+  document.getElementById('page-price-list').scrollIntoView({ behavior: 'smooth' });
+}
+
+function fmtPrice(v) {
+  return (parseFloat(v) || 0).toFixed(3);
+}
+
+// ── Add / Edit product modal ──────────────────────────────────
+function openAddProductModal() {
+  plEditingId = null;
+  document.getElementById('pl-modal-title').textContent = 'Add Product';
+  ['pl-edit-id','pl-f-category','pl-f-system','pl-f-brand','pl-f-type','pl-f-series',
+   'pl-f-model','pl-f-description','pl-f-specifications','pl-f-dpp','pl-f-si','pl-f-eu'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  document.getElementById('pl-product-alert').innerHTML = '';
+  document.getElementById('pl-product-modal').classList.add('open');
+}
+
+async function openEditProductModal(id) {
+  const p = plAllProducts.find(x => x.id === id);
+  if (!p) return;
+  plEditingId = id;
+  document.getElementById('pl-modal-title').textContent = 'Edit Product';
+  document.getElementById('pl-edit-id').value        = p.id;
+  document.getElementById('pl-f-category').value     = p.category      || '';
+  document.getElementById('pl-f-system').value       = p.system        || '';
+  document.getElementById('pl-f-brand').value        = p.brand         || '';
+  document.getElementById('pl-f-type').value         = p.type          || '';
+  document.getElementById('pl-f-series').value       = p.series        || '';
+  document.getElementById('pl-f-model').value        = p.model         || '';
+  document.getElementById('pl-f-description').value  = p.description   || '';
+  document.getElementById('pl-f-specifications').value = p.specifications || '';
+  document.getElementById('pl-f-dpp').value          = parseFloat(p.dpp_price)     || '';
+  document.getElementById('pl-f-si').value           = parseFloat(p.si_price)      || '';
+  document.getElementById('pl-f-eu').value           = parseFloat(p.enduser_price) || '';
+  document.getElementById('pl-product-alert').innerHTML = '';
+  document.getElementById('pl-product-modal').classList.add('open');
+}
+
+async function savePLProduct() {
+  const model = document.getElementById('pl-f-model').value.trim();
+  if (!model) {
+    document.getElementById('pl-product-alert').innerHTML =
+      '<div class="alert alert-error">Model is required.</div>';
+    return;
+  }
+  const payload = {
+    category:       document.getElementById('pl-f-category').value.trim(),
+    system:         document.getElementById('pl-f-system').value.trim(),
+    brand:          document.getElementById('pl-f-brand').value.trim(),
+    type:           document.getElementById('pl-f-type').value.trim(),
+    series:         document.getElementById('pl-f-series').value.trim(),
+    model,
+    description:    document.getElementById('pl-f-description').value.trim(),
+    specifications: document.getElementById('pl-f-specifications').value.trim(),
+    dpp_price:      parseFloat(document.getElementById('pl-f-dpp').value) || 0,
+    si_price:       parseFloat(document.getElementById('pl-f-si').value)  || 0,
+    enduser_price:  parseFloat(document.getElementById('pl-f-eu').value)  || 0
+  };
+
+  try {
+    const url    = plEditingId ? `/quotation/products/${plEditingId}` : '/quotation/products';
+    const method = plEditingId ? 'PUT' : 'POST';
+    const res    = await apiFetch(url, { method, body: JSON.stringify(payload) });
+    const data   = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Save failed');
+    closeModal('pl-product-modal');
+    showToast(`Product ${plEditingId ? 'updated' : 'added'} successfully`, 'success');
+    await loadPriceList();
+  } catch (e) {
+    document.getElementById('pl-product-alert').innerHTML =
+      `<div class="alert alert-error">${escHtml(e.message)}</div>`;
+  }
+}
+
+async function deletePLProduct(id, model) {
+  if (!confirm(`Delete product "${model}"? This cannot be undone.`)) return;
+  try {
+    const res = await apiFetch(`/quotation/products/${id}`, { method: 'DELETE' });
+    if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Delete failed'); }
+    showToast('Product deleted', 'success');
+    await loadPriceList();
+  } catch (e) {
+    showToast('Delete failed: ' + e.message, 'error');
+  }
+}
+
+// ── Excel upload ──────────────────────────────────────────────
+function openPLUploadModal() {
+  plExcelFile = null;
+  document.getElementById('pl-excel-input').value = '';
+  document.getElementById('pl-upload-status').innerHTML = '';
+  document.getElementById('pl-upload-btn').disabled = true;
+  document.getElementById('pl-upload-modal').classList.add('open');
+
+  const area = document.getElementById('pl-upload-area');
+  area.ondragover = e => { e.preventDefault(); area.classList.add('dragover'); };
+  area.ondragleave = () => area.classList.remove('dragover');
+  area.ondrop = e => {
+    e.preventDefault(); area.classList.remove('dragover');
+    const file = e.dataTransfer.files[0];
+    if (file) setPLExcelFile(file);
+  };
+}
+
+function handlePLExcelSelect(input) {
+  if (input.files[0]) setPLExcelFile(input.files[0]);
+}
+
+function setPLExcelFile(file) {
+  if (!file.name.match(/\.(xlsx|xls)$/i)) {
+    document.getElementById('pl-upload-status').innerHTML =
+      '<div class="alert alert-error">Only .xlsx or .xls files are accepted.</div>';
+    return;
+  }
+  plExcelFile = file;
+  document.getElementById('pl-upload-btn').disabled = false;
+  document.getElementById('pl-upload-status').innerHTML =
+    `<div style="padding:10px 14px;background:#F0FDF4;border:1px solid #86EFAC;border-radius:8px;font-size:13px;color:#166534">
+      <strong>✓ File selected:</strong> ${escHtml(file.name)} (${(file.size/1024/1024).toFixed(1)} MB)
+    </div>`;
+}
+
+async function uploadPLExcel() {
+  if (!plExcelFile) return;
+  const btn = document.getElementById('pl-upload-btn');
+  btn.disabled = true;
+  btn.textContent = 'Uploading…';
+  document.getElementById('pl-upload-status').innerHTML =
+    '<div style="padding:10px;color:var(--gray-500);font-size:13px">Processing file, please wait…</div>';
+  try {
+    const fd = new FormData();
+    fd.append('excel', plExcelFile);
+    const res = await fetch('/api/quotation/upload', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` },
+      body: fd
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Upload failed');
+    closeModal('pl-upload-modal');
+    showToast(`✓ ${data.count} products imported successfully`, 'success');
+    await loadPriceList();
+  } catch (e) {
+    document.getElementById('pl-upload-status').innerHTML =
+      `<div class="alert alert-error">${escHtml(e.message)}</div>`;
+    btn.disabled = false;
+    btn.textContent = 'Upload & Replace';
+  }
+}
+
+async function downloadPLTemplate() {
+  window.location.href = '/api/quotation/template';
 }

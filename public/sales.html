@@ -45,6 +45,12 @@
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
         <span data-i18n="nav.new_project">New Project</span>
       </a>
+
+      <div class="nav-section-label">Quotation</div>
+      <a class="nav-item" data-page="quotation-builder">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 12V22H4V12"/><path d="M22 7H2v5h20V7z"/><path d="M12 22V7"/><path d="M12 7H7.5a2.5 2.5 0 010-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 000-5C13 2 12 7 12 7z"/></svg>
+        <span>Quotation Builder</span>
+      </a>
     </nav>
 
     <div class="sidebar-footer">
@@ -264,6 +270,161 @@
         </div>
       </div>
 
+      <!-- ── QUOTATION BUILDER PAGE ── -->
+      <div class="page" id="page-quotation-builder">
+        <div class="section-header" style="flex-wrap:wrap;gap:10px">
+          <div class="section-title">Quotation Builder <span id="qb-db-status" style="font-size:12px;font-weight:400;color:var(--gray-400)">Loading…</span></div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <div class="qb-pm-group">
+              <button class="qb-pm-btn active" onclick="setQBMode('si',this)">SI Price</button>
+              <button class="qb-pm-btn" onclick="setQBMode('contractor',this)">Contractor</button>
+              <button class="qb-pm-btn" onclick="setQBMode('enduser',this)">End User</button>
+              <button class="qb-pm-btn" onclick="setQBMode('custom',this)">Custom</button>
+            </div>
+            <div id="qb-custom-wrap" style="display:none;align-items:center;gap:6px">
+              <label style="font-size:12px;color:var(--gray-500)">×</label>
+              <input type="number" id="qb-multiplier" value="1.00" step="0.01" min="0.01" style="width:70px;padding:6px 8px;border:2px solid var(--gray-200);border-radius:6px;font-size:13px" oninput="qbRenderTable()">
+            </div>
+            <button class="btn btn-secondary" onclick="openQBCustomer()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              Customer Info
+            </button>
+            <button class="btn btn-secondary" onclick="clearQBItems()" title="Clear quotation">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
+              Clear
+            </button>
+            <button class="btn btn-danger" onclick="exportQBPdf()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Export PDF
+            </button>
+          </div>
+        </div>
+
+        <div class="qb-layout">
+          <!-- Left: Cascading filters -->
+          <div class="qb-filters-panel">
+            <div class="card">
+              <div class="card-header" style="padding:14px 16px"><h3 class="card-title" style="font-size:14px">Select Product</h3></div>
+              <div class="card-body" style="display:flex;flex-direction:column;gap:10px;padding:16px">
+                <div class="qb-step" id="qb-step-category">
+                  <label class="qb-step-label"><span class="qb-badge" id="qb-badge-1">1</span>Category</label>
+                  <select id="qb-sel-category" onchange="onQBFilter('category')" class="form-control">
+                    <option value="">— Select Category —</option>
+                  </select>
+                </div>
+                <div class="qb-step locked" id="qb-step-system">
+                  <label class="qb-step-label"><span class="qb-badge" id="qb-badge-2">2</span>System</label>
+                  <select id="qb-sel-system" onchange="onQBFilter('system')" class="form-control" disabled>
+                    <option value="">— Select System —</option>
+                  </select>
+                </div>
+                <div class="qb-step locked" id="qb-step-brand">
+                  <label class="qb-step-label"><span class="qb-badge" id="qb-badge-3">3</span>Brand</label>
+                  <select id="qb-sel-brand" onchange="onQBFilter('brand')" class="form-control" disabled>
+                    <option value="">— Select Brand —</option>
+                  </select>
+                </div>
+                <div class="qb-step locked" id="qb-step-type">
+                  <label class="qb-step-label"><span class="qb-badge" id="qb-badge-4">4</span>Type</label>
+                  <select id="qb-sel-type" onchange="onQBFilter('type')" class="form-control" disabled>
+                    <option value="">— Select Type —</option>
+                  </select>
+                </div>
+                <div class="qb-step locked" id="qb-step-series">
+                  <label class="qb-step-label"><span class="qb-badge" id="qb-badge-5">5</span>Series</label>
+                  <select id="qb-sel-series" onchange="onQBFilter('series')" class="form-control" disabled>
+                    <option value="">— Select Series —</option>
+                  </select>
+                </div>
+                <div class="qb-step locked" id="qb-step-model">
+                  <label class="qb-step-label"><span class="qb-badge" id="qb-badge-6">6</span>Model</label>
+                  <select id="qb-sel-model" onchange="onQBModelSelect()" class="form-control" disabled>
+                    <option value="">— Select Model —</option>
+                  </select>
+                </div>
+
+                <!-- Product card -->
+                <div id="qb-product-card" style="display:none;margin-top:8px;padding:14px;background:var(--gray-50);border-radius:10px;border:1px solid var(--gray-200)">
+                  <div style="font-size:14px;font-weight:700;margin-bottom:4px" id="qb-pc-model">—</div>
+                  <div style="font-size:12px;color:var(--gray-500);margin-bottom:10px" id="qb-pc-desc">—</div>
+                  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:12px">
+                    <div style="text-align:center;padding:8px;background:#fff;border-radius:8px;border:1px solid var(--gray-200)">
+                      <div style="font-size:10px;color:var(--gray-400);text-transform:uppercase">DPP</div>
+                      <div style="font-size:13px;font-weight:600" id="qb-pc-dpp">—</div>
+                    </div>
+                    <div style="text-align:center;padding:8px;background:#EFF6FF;border-radius:8px;border:1px solid #BFDBFE">
+                      <div style="font-size:10px;color:#1E40AF;text-transform:uppercase">SI</div>
+                      <div style="font-size:13px;font-weight:700;color:#1E40AF" id="qb-pc-si">—</div>
+                    </div>
+                    <div style="text-align:center;padding:8px;background:#F0FDF4;border-radius:8px;border:1px solid #86EFAC">
+                      <div style="font-size:10px;color:#166534;text-transform:uppercase">End User</div>
+                      <div style="font-size:13px;font-weight:700;color:#166534" id="qb-pc-eu">—</div>
+                    </div>
+                  </div>
+                  <div style="display:flex;gap:8px;align-items:center">
+                    <div style="display:flex;align-items:center;gap:6px;border:2px solid var(--gray-200);border-radius:8px;overflow:hidden">
+                      <button onclick="qbAdjQty(-1)" style="border:none;background:none;padding:6px 10px;cursor:pointer;font-size:16px;color:var(--gray-600)">−</button>
+                      <input type="number" id="qb-qty" value="1" min="1" style="width:48px;border:none;text-align:center;font-size:14px;font-weight:600;outline:none" oninput="qbRecalc()">
+                      <button onclick="qbAdjQty(1)" style="border:none;background:none;padding:6px 10px;cursor:pointer;font-size:16px;color:var(--gray-600)">+</button>
+                    </div>
+                    <div style="flex:1;padding:8px 12px;background:#fff;border:1px solid var(--gray-200);border-radius:8px;font-size:13px">
+                      <span style="color:var(--gray-500);font-size:11px">Total </span>
+                      <span style="font-weight:700;color:var(--red)" id="qb-item-total">—</span>
+                    </div>
+                    <button class="btn btn-danger" onclick="addToQB()" style="white-space:nowrap">Add +</button>
+                  </div>
+                </div>
+                <div id="qb-no-product" style="padding:20px;text-align:center;color:var(--gray-400);font-size:13px">Select a model to see product details</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right: Quotation table -->
+          <div class="qb-quote-panel">
+            <div class="card">
+              <div class="card-header" style="padding:14px 16px;display:flex;justify-content:space-between;align-items:center">
+                <h3 class="card-title" style="font-size:14px">Quotation Items <span id="qb-items-count" style="font-weight:400;color:var(--gray-400)">(0 items)</span></h3>
+                <div style="font-size:12px;color:var(--gray-400)" id="qb-mode-label">Mode: SI Price</div>
+              </div>
+              <div class="card-body" style="padding:0;overflow-x:auto">
+                <table style="width:100%;border-collapse:collapse;font-size:13px">
+                  <thead>
+                    <tr style="background:var(--gray-50);border-bottom:1px solid var(--gray-200)">
+                      <th style="padding:10px 12px;text-align:left">#</th>
+                      <th style="padding:10px 12px;text-align:left">Model</th>
+                      <th style="padding:10px 12px;text-align:left">Description</th>
+                      <th style="padding:10px 12px;text-align:right">Unit Price</th>
+                      <th style="padding:10px 12px;text-align:center;width:80px">Qty</th>
+                      <th style="padding:10px 12px;text-align:right">Total</th>
+                      <th style="width:36px"></th>
+                    </tr>
+                  </thead>
+                  <tbody id="qb-items-body">
+                    <tr><td colspan="7" style="text-align:center;padding:40px;color:var(--gray-400)">No items yet. Select a product and click Add +</td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <div style="padding:16px;border-top:1px solid var(--gray-100)">
+                <div style="max-width:260px;margin-left:auto">
+                  <div style="display:flex;justify-content:space-between;padding:6px 0;color:var(--gray-500)">
+                    <span>Subtotal</span><span id="qb-subtotal">0.000</span>
+                  </div>
+                  <div style="display:flex;justify-content:space-between;padding:6px 0;align-items:center">
+                    <span style="color:var(--gray-500)">Discount %</span>
+                    <input type="number" id="qb-discount" value="0" min="0" max="100" step="0.5"
+                      style="width:70px;padding:4px 8px;border:2px solid var(--gray-200);border-radius:6px;font-size:13px;text-align:right"
+                      oninput="qbRenderTable()">
+                  </div>
+                  <div style="display:flex;justify-content:space-between;padding:8px 0;border-top:2px solid var(--gray-200);font-weight:700;font-size:15px;color:var(--red)">
+                    <span>Grand Total</span><span id="qb-grand-total">0.000 JOD</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div><!-- /page-content -->
   </main>
 </div><!-- /app-layout -->
@@ -308,6 +469,58 @@
   </div>
 </div>
 
+<!-- ═══ QUOTATION CUSTOMER INFO MODAL ═══ -->
+<div class="modal-overlay" id="qb-customer-modal">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header">
+      <h2>Customer & Quotation Info</h2>
+      <button class="modal-close" onclick="closeModal('qb-customer-modal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group form-full">
+          <label>Customer / Client Name</label>
+          <input type="text" id="qb-c-name" placeholder="e.g. Jordan Properties Group">
+        </div>
+        <div class="form-group">
+          <label>Attention / Contact</label>
+          <input type="text" id="qb-c-attn" placeholder="Contact person name">
+        </div>
+        <div class="form-group">
+          <label>Quotation Ref #</label>
+          <input type="text" id="qb-c-ref" placeholder="e.g. QyMT-001">
+        </div>
+        <div class="form-group">
+          <label>Date</label>
+          <input type="date" id="qb-c-date">
+        </div>
+        <div class="form-group">
+          <label>Currency</label>
+          <select id="qb-c-currency" class="form-control">
+            <option value="JOD">JOD — Jordanian Dinar</option>
+            <option value="USD">USD — US Dollar</option>
+            <option value="EUR">EUR — Euro</option>
+            <option value="SAR">SAR — Saudi Riyal</option>
+            <option value="AED">AED — UAE Dirham</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Validity (days)</label>
+          <input type="number" id="qb-c-validity" value="30" min="1" placeholder="30">
+        </div>
+        <div class="form-group form-full">
+          <label>Notes</label>
+          <textarea id="qb-c-notes" rows="3" placeholder="Payment terms, delivery notes..." style="width:100%;padding:10px;border:2px solid var(--gray-200);border-radius:8px;font-size:13px;font-family:inherit;resize:vertical"></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('qb-customer-modal')">Cancel</button>
+      <button class="btn btn-danger" onclick="saveQBCustomer()">Save</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast-container"></div>
 <footer class="espark-footer">
   <span>Created by <span class="espark-brand">eSpark</span> Developers</span>
@@ -324,6 +537,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
       <span class="tab-label">New</span>
     </button>
+    <button class="mobile-nav-tab" data-page="quotation-builder" onclick="navigate('quotation-builder')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 12V22H4V12"/><path d="M22 7H2v5h20V7z"/><path d="M12 22V7"/></svg>
+      <span class="tab-label">Quote</span>
+    </button>
     <button class="mobile-nav-tab" onclick="showChangePassword()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
       <span class="tab-label">Me</span>
@@ -332,6 +549,7 @@
 </nav>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script src="/js/i18n.js"></script>
 <script src="/js/sales.js"></script>
 </body>

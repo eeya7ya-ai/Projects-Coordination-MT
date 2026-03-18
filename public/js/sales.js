@@ -80,7 +80,7 @@ function navigate(page) {
   document.getElementById(`page-${page}`).classList.add('active');
   document.querySelectorAll(`[data-page="${page}"]`).forEach(n => n.classList.add('active'));
 
-  const titles = { 'projects': 'All Projects', 'new-project': 'New Project' };
+  const titles = { 'projects': 'All Projects', 'new-project': 'New Project', 'quotation-builder': 'Quotation Builder' };
   document.getElementById('page-title').textContent = titles[page] || page;
 
   if (page === 'projects') loadProjects();
@@ -88,6 +88,7 @@ function navigate(page) {
     resetProjectForm();
     setTimeout(() => map?.invalidateSize(), 200);
   }
+  if (page === 'quotation-builder') initQB();
 
   closeSidebar();
 }
@@ -703,3 +704,495 @@ document.addEventListener('click', e => {
     panel.classList.remove('open');
   }
 });
+
+/* ═══════════════════════════════════════════════════════════════
+   QUOTATION BUILDER (MT Sales Quotation — Sales Integration)
+═══════════════════════════════════════════════════════════════ */
+
+// ── State ────────────────────────────────────────────────────
+let qbAllProducts  = [];
+let qbItems        = [];
+let qbCurrentProd  = null;
+let qbMode         = 'si';
+let qbInitialized  = false;
+const QB_FILTER_ORDER = ['category', 'system', 'brand', 'type', 'series', 'model'];
+const QB_FILTERS      = { category: '', system: '', brand: '', type: '', series: '', model: '' };
+
+// ── Init ─────────────────────────────────────────────────────
+async function initQB() {
+  // Restore saved items
+  try { qbItems = JSON.parse(localStorage.getItem('mt_quotation_items') || '[]'); } catch (_) { qbItems = []; }
+  loadQBCustomer();
+
+  if (!qbInitialized) {
+    qbInitialized = true;
+    await fetchQBProducts();
+  } else {
+    qbRenderTable();
+  }
+}
+
+async function fetchQBProducts() {
+  try {
+    const res = await apiFetch('/quotation/products');
+    if (!res?.ok) throw new Error('Server error');
+    qbAllProducts = await res.json();
+    const count = qbAllProducts.length;
+    const el = document.getElementById('qb-db-status');
+    if (el) el.textContent = count > 0 ? `— ${count} products loaded` : '— No products available';
+    if (count > 0) qbPopulateFilter('category');
+  } catch (e) {
+    const el = document.getElementById('qb-db-status');
+    if (el) el.textContent = '— Failed to load products';
+  }
+  qbRenderTable();
+}
+
+// ── Cascading filters ─────────────────────────────────────────
+function qbPopulateFilter(level) {
+  const idx = QB_FILTER_ORDER.indexOf(level);
+
+  for (let i = idx; i < QB_FILTER_ORDER.length; i++) {
+    const key = QB_FILTER_ORDER[i];
+    const sel = document.getElementById(`qb-sel-${key}`);
+    if (!sel) continue;
+    sel.innerHTML = `<option value="">— Select ${key.charAt(0).toUpperCase() + key.slice(1)} —</option>`;
+    sel.disabled  = true;
+    if (i > idx) QB_FILTERS[key] = '';
+    qbSetStep(key, i === idx ? 'active' : 'locked');
+  }
+
+  let filtered = qbAllProducts;
+  for (let i = 0; i < idx; i++) {
+    const k = QB_FILTER_ORDER[i];
+    if (QB_FILTERS[k]) filtered = filtered.filter(p => p[k] === QB_FILTERS[k]);
+  }
+
+  const key    = QB_FILTER_ORDER[idx];
+  const values = [...new Set(filtered.map(p => p[key]).filter(Boolean))].sort();
+  const sel    = document.getElementById(`qb-sel-${key}`);
+  if (!sel) return;
+
+  values.forEach(v => {
+    const opt = document.createElement('option');
+    opt.value = v; opt.textContent = v;
+    sel.appendChild(opt);
+  });
+  if (QB_FILTERS[key] && values.includes(QB_FILTERS[key])) sel.value = QB_FILTERS[key];
+  sel.disabled = false;
+  qbSetStep(key, 'active');
+}
+
+function onQBFilter(level) {
+  const sel = document.getElementById(`qb-sel-${level}`);
+  const val = sel.value;
+  QB_FILTERS[level] = val;
+  const idx = QB_FILTER_ORDER.indexOf(level);
+  qbSetStep(level, val ? 'done' : 'active');
+
+  if (!val) {
+    for (let i = idx + 1; i < QB_FILTER_ORDER.length; i++) {
+      const k = QB_FILTER_ORDER[i];
+      QB_FILTERS[k] = '';
+      const s = document.getElementById(`qb-sel-${k}`);
+      if (s) { s.innerHTML = `<option value="">— Select ${k.charAt(0).toUpperCase() + k.slice(1)} —</option>`; s.disabled = true; }
+      qbSetStep(k, 'locked');
+    }
+    qbHideProductCard();
+    return;
+  }
+
+  if (idx + 1 < QB_FILTER_ORDER.length) qbPopulateNextLevel(idx + 1);
+}
+
+function qbPopulateNextLevel(idx) {
+  const key = QB_FILTER_ORDER[idx];
+  let filtered = qbAllProducts;
+  for (let i = 0; i < idx; i++) {
+    const k = QB_FILTER_ORDER[i];
+    if (QB_FILTERS[k]) filtered = filtered.filter(p => p[k] === QB_FILTERS[k]);
+  }
+  const values = [...new Set(filtered.map(p => p[key]).filter(Boolean))].sort();
+  const sel    = document.getElementById(`qb-sel-${key}`);
+  if (!sel) return;
+  sel.innerHTML = `<option value="">— Select ${key.charAt(0).toUpperCase() + key.slice(1)} —</option>`;
+  values.forEach(v => {
+    const opt = document.createElement('option'); opt.value = v; opt.textContent = v;
+    sel.appendChild(opt);
+  });
+  sel.disabled = false;
+  qbSetStep(key, 'active');
+
+  for (let i = idx + 1; i < QB_FILTER_ORDER.length; i++) {
+    const k = QB_FILTER_ORDER[i]; QB_FILTERS[k] = '';
+    const s = document.getElementById(`qb-sel-${k}`);
+    if (s) { s.innerHTML = `<option value="">— Select ${k.charAt(0).toUpperCase() + k.slice(1)} —</option>`; s.disabled = true; }
+    qbSetStep(k, 'locked');
+  }
+
+  if (values.length === 1) {
+    sel.value = values[0]; QB_FILTERS[key] = values[0];
+    qbSetStep(key, 'done');
+    if (idx + 1 < QB_FILTER_ORDER.length) qbPopulateNextLevel(idx + 1);
+  }
+  qbHideProductCard();
+}
+
+function onQBModelSelect() {
+  const sel   = document.getElementById('qb-sel-model');
+  const model = sel.value;
+  QB_FILTERS.model = model;
+  qbSetStep('model', model ? 'done' : 'active');
+  if (!model) { qbHideProductCard(); return; }
+  qbCurrentProd = qbAllProducts.find(p => p.model === model) || null;
+  if (qbCurrentProd) qbShowProductCard(qbCurrentProd);
+}
+
+function qbSetStep(level, state) {
+  const step  = document.getElementById(`qb-step-${level}`);
+  const idx   = QB_FILTER_ORDER.indexOf(level);
+  const badge = document.getElementById(`qb-badge-${idx + 1}`);
+  if (!step) return;
+  step.classList.remove('locked', 'active', 'done');
+  step.classList.add(state);
+  if (badge) badge.textContent = state === 'done' ? '✓' : idx + 1;
+}
+
+// ── Product card ──────────────────────────────────────────────
+function qbShowProductCard(p) {
+  document.getElementById('qb-no-product').style.display = 'none';
+  document.getElementById('qb-product-card').style.display = 'block';
+  document.getElementById('qb-pc-model').textContent = p.model;
+  document.getElementById('qb-pc-desc').textContent  = p.description || '—';
+  const currency = document.getElementById('qb-c-currency')?.value || 'JOD';
+  document.getElementById('qb-pc-dpp').textContent = `${(+p.dpp_price || 0).toFixed(3)} ${currency}`;
+  document.getElementById('qb-pc-si').textContent  = `${(+p.si_price  || 0).toFixed(3)} ${currency}`;
+  document.getElementById('qb-pc-eu').textContent  = `${(+p.enduser_price || 0).toFixed(3)} ${currency}`;
+  document.getElementById('qb-qty').value = 1;
+  qbRecalc();
+}
+
+function qbHideProductCard() {
+  qbCurrentProd = null;
+  const el = document.getElementById('qb-product-card');
+  const hint = document.getElementById('qb-no-product');
+  if (el) el.style.display = 'none';
+  if (hint) hint.style.display = 'block';
+}
+
+// ── Pricing mode ─────────────────────────────────────────────
+function setQBMode(mode, btn) {
+  qbMode = mode;
+  document.querySelectorAll('.qb-pm-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const wrap = document.getElementById('qb-custom-wrap');
+  if (wrap) wrap.style.display = mode === 'custom' ? 'flex' : 'none';
+  const lbl = document.getElementById('qb-mode-label');
+  const names = { si: 'SI Price', contractor: 'Contractor Price', enduser: 'End User Price', custom: 'Custom' };
+  if (lbl) lbl.textContent = `Mode: ${names[mode] || mode}`;
+  qbRecalc();
+  qbRenderTable();
+}
+
+function qbGetUnitPrice(p) {
+  if (!p) return 0;
+  const gm = parseFloat(document.getElementById('qb-multiplier')?.value) || 1;
+  let base = 0;
+  switch (qbMode) {
+    case 'si':         base = +p.si_price      || 0; break;
+    case 'contractor': base = (+p.si_price || 0) * 1.25; break;
+    case 'enduser':    base = +p.enduser_price  || 0; break;
+    case 'custom':     base = (+p.si_price || 0) * (parseFloat(document.getElementById('qb-multiplier')?.value) || 1); break;
+    default:           base = +p.si_price || 0;
+  }
+  return base * (qbMode === 'custom' ? 1 : gm);
+}
+
+function qbRecalc() {
+  if (!qbCurrentProd) return;
+  const currency = document.getElementById('qb-c-currency')?.value || 'JOD';
+  const unit = qbGetUnitPrice(qbCurrentProd);
+  const qty  = parseInt(document.getElementById('qb-qty')?.value) || 1;
+  const el   = document.getElementById('qb-item-total');
+  if (el) el.textContent = `${(unit * qty).toFixed(3)} ${currency}`;
+}
+
+function qbAdjQty(delta) {
+  const input = document.getElementById('qb-qty');
+  if (!input) return;
+  input.value = Math.max(1, (parseInt(input.value) || 1) + delta);
+  qbRecalc();
+}
+
+// ── Add to quotation ──────────────────────────────────────────
+function addToQB() {
+  if (!qbCurrentProd) return;
+  const qty  = parseInt(document.getElementById('qb-qty')?.value) || 1;
+  const unit = qbGetUnitPrice(qbCurrentProd);
+  qbItems.push({
+    id:           Date.now(),
+    model:        qbCurrentProd.model,
+    brand:        qbCurrentProd.brand || '',
+    description:  qbCurrentProd.description || '',
+    category:     qbCurrentProd.category || '',
+    system:       qbCurrentProd.system || '',
+    qty,
+    unit_price:   unit,
+    si_price:     +qbCurrentProd.si_price || 0,
+    enduser_price: +qbCurrentProd.enduser_price || 0,
+    dpp_price:    +qbCurrentProd.dpp_price || 0,
+    pricing_mode: qbMode
+  });
+  saveQBItems();
+  qbRenderTable();
+  showToast(`✓ ${qbCurrentProd.model} added`, 'success');
+  document.getElementById('qb-qty').value = 1;
+  qbRecalc();
+}
+
+function removeQBItem(id) {
+  qbItems = qbItems.filter(i => i.id !== id);
+  saveQBItems();
+  qbRenderTable();
+}
+
+function updateQBQty(id, qty) {
+  const item = qbItems.find(i => i.id === id);
+  if (!item) return;
+  item.qty = Math.max(1, parseInt(qty) || 1);
+  saveQBItems();
+  qbRenderTable();
+}
+
+function saveQBItems() {
+  localStorage.setItem('mt_quotation_items', JSON.stringify(qbItems));
+}
+
+function clearQBItems() {
+  if (!qbItems.length || confirm('Clear all quotation items?')) {
+    qbItems = [];
+    saveQBItems();
+    qbRenderTable();
+  }
+}
+
+// ── Render quotation table ────────────────────────────────────
+function qbRenderTable() {
+  const currency = document.getElementById('qb-c-currency')?.value || 'JOD';
+  const discount = parseFloat(document.getElementById('qb-discount')?.value) || 0;
+  const tbody    = document.getElementById('qb-items-body');
+  const countEl  = document.getElementById('qb-items-count');
+  if (!tbody) return;
+
+  if (!qbItems.length) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--gray-400)">No items yet. Select a product and click Add +</td></tr>`;
+    if (countEl) countEl.textContent = '(0 items)';
+    document.getElementById('qb-subtotal').textContent    = `0.000 ${currency}`;
+    document.getElementById('qb-grand-total').textContent = `0.000 ${currency}`;
+    return;
+  }
+
+  let subtotal = 0;
+  tbody.innerHTML = qbItems.map((item, idx) => {
+    // Recalculate unit price based on current mode
+    let unit = 0;
+    const gm = parseFloat(document.getElementById('qb-multiplier')?.value) || 1;
+    switch (qbMode) {
+      case 'si':         unit = (+item.si_price      || 0) * gm; break;
+      case 'contractor': unit = (+item.si_price      || 0) * 1.25 * gm; break;
+      case 'enduser':    unit = (+item.enduser_price  || 0) * gm; break;
+      case 'custom': {
+        const m = parseFloat(document.getElementById('qb-multiplier')?.value) || 1;
+        unit = (+item.si_price || 0) * m;
+        break;
+      }
+      default: unit = +item.si_price || 0;
+    }
+    const total = unit * item.qty;
+    subtotal += total;
+    return `
+      <tr style="border-bottom:1px solid var(--gray-100)">
+        <td style="padding:10px 12px;color:var(--gray-400);font-size:12px">${idx + 1}</td>
+        <td style="padding:10px 12px"><code style="font-size:12px;background:var(--gray-100);padding:2px 6px;border-radius:4px">${escHtml(item.model)}</code>
+          ${item.brand ? `<div style="font-size:11px;color:var(--gray-400)">${escHtml(item.brand)}</div>` : ''}
+        </td>
+        <td style="padding:10px 12px;font-size:12px;color:var(--gray-500);max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(item.description||'—')}</td>
+        <td style="padding:10px 12px;text-align:right;font-size:13px">${unit.toFixed(3)}</td>
+        <td style="padding:10px 12px;text-align:center">
+          <input type="number" value="${item.qty}" min="1" style="width:52px;padding:4px;border:1px solid var(--gray-200);border-radius:6px;text-align:center;font-size:13px"
+            onchange="updateQBQty(${item.id},this.value)">
+        </td>
+        <td style="padding:10px 12px;text-align:right;font-weight:600;color:var(--red)">${total.toFixed(3)}</td>
+        <td style="padding:10px 12px;text-align:center">
+          <button onclick="removeQBItem(${item.id})" style="border:none;background:none;cursor:pointer;color:var(--gray-400);padding:4px" title="Remove">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  const grandTotal = subtotal * (1 - discount / 100);
+  if (countEl) countEl.textContent = `(${qbItems.length} item${qbItems.length !== 1 ? 's' : ''})`;
+  document.getElementById('qb-subtotal').textContent    = `${subtotal.toFixed(3)} ${currency}`;
+  document.getElementById('qb-grand-total').textContent = `${grandTotal.toFixed(3)} ${currency}`;
+}
+
+// ── Customer info ─────────────────────────────────────────────
+function openQBCustomer() {
+  document.getElementById('qb-customer-modal').classList.add('open');
+}
+
+function saveQBCustomer() {
+  const info = {
+    name:     document.getElementById('qb-c-name')?.value     || '',
+    attn:     document.getElementById('qb-c-attn')?.value     || '',
+    ref:      document.getElementById('qb-c-ref')?.value      || '',
+    date:     document.getElementById('qb-c-date')?.value     || '',
+    currency: document.getElementById('qb-c-currency')?.value || 'JOD',
+    validity: document.getElementById('qb-c-validity')?.value || '30',
+    notes:    document.getElementById('qb-c-notes')?.value    || ''
+  };
+  localStorage.setItem('mt_customer_info', JSON.stringify(info));
+  closeModal('qb-customer-modal');
+  qbRenderTable();
+  showToast('Customer info saved', 'success');
+}
+
+function loadQBCustomer() {
+  try {
+    const info = JSON.parse(localStorage.getItem('mt_customer_info') || '{}');
+    const set = (id, v) => { const el = document.getElementById(id); if (el && v) el.value = v; };
+    set('qb-c-name', info.name);
+    set('qb-c-attn', info.attn);
+    set('qb-c-currency', info.currency);
+    set('qb-c-validity', info.validity);
+    set('qb-c-notes', info.notes);
+    if (info.ref)  set('qb-c-ref',  info.ref);
+    if (info.date) set('qb-c-date', info.date);
+    if (!info.ref) {
+      const r = document.getElementById('qb-c-ref');
+      if (r) r.value = 'QyMT-' + String(Math.floor(Math.random() * 900) + 100);
+    }
+    if (!info.date) {
+      const d = document.getElementById('qb-c-date');
+      if (d) d.value = new Date().toISOString().split('T')[0];
+    }
+  } catch (_) {}
+}
+
+// ── PDF Export ────────────────────────────────────────────────
+async function exportQBPdf() {
+  if (!qbItems.length) { showToast('Add items to the quotation before exporting', 'error'); return; }
+  if (typeof html2pdf === 'undefined') { showToast('PDF library not loaded yet, please wait', 'error'); return; }
+
+  const currency = document.getElementById('qb-c-currency')?.value || 'JOD';
+  const discount = parseFloat(document.getElementById('qb-discount')?.value) || 0;
+  const gm       = parseFloat(document.getElementById('qb-multiplier')?.value) || 1;
+  const info     = (() => {
+    try { return JSON.parse(localStorage.getItem('mt_customer_info') || '{}'); } catch (_) { return {}; }
+  })();
+
+  const modeNames = { si: 'SI Price', contractor: 'Contractor', enduser: 'End User', custom: `Custom ×${gm}` };
+
+  let subtotal = 0;
+  const rows = qbItems.map((item, idx) => {
+    let unit = 0;
+    switch (qbMode) {
+      case 'si':         unit = (+item.si_price || 0) * gm; break;
+      case 'contractor': unit = (+item.si_price || 0) * 1.25 * gm; break;
+      case 'enduser':    unit = (+item.enduser_price || 0) * gm; break;
+      case 'custom': {
+        const m = parseFloat(document.getElementById('qb-multiplier')?.value) || 1;
+        unit = (+item.si_price || 0) * m; break;
+      }
+      default: unit = +item.si_price || 0;
+    }
+    const total = unit * item.qty;
+    subtotal += total;
+    return `<tr style="border-bottom:1px solid #eee">
+      <td style="padding:8px 10px;color:#888;font-size:12px">${idx + 1}</td>
+      <td style="padding:8px 10px;font-family:monospace;font-size:12px">${escHtml(item.model)}</td>
+      <td style="padding:8px 10px;font-size:12px;color:#555">${escHtml(item.description || '—')}</td>
+      <td style="padding:8px 10px;text-align:right;font-size:12px">${unit.toFixed(3)}</td>
+      <td style="padding:8px 10px;text-align:center;font-size:12px">${item.qty}</td>
+      <td style="padding:8px 10px;text-align:right;font-weight:700;font-size:12px">${total.toFixed(3)}</td>
+    </tr>`;
+  }).join('');
+
+  const grandTotal = subtotal * (1 - discount / 100);
+
+  const html = `
+    <div style="font-family:'Segoe UI',Arial,sans-serif;color:#1e2a38;padding:32px;max-width:800px;margin:auto">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;border-bottom:3px solid #C0392B;padding-bottom:20px">
+        <div>
+          <div style="font-size:22px;font-weight:800;color:#C0392B;letter-spacing:.5px">MagicTech</div>
+          <div style="font-size:12px;color:#888;margin-top:4px">Sales Quotation</div>
+        </div>
+        <div style="text-align:right;font-size:12px;color:#555">
+          <div><strong>Ref:</strong> ${escHtml(info.ref || '—')}</div>
+          <div><strong>Date:</strong> ${escHtml(info.date || '—')}</div>
+          <div><strong>Valid:</strong> ${escHtml(info.validity || '30')} days</div>
+          <div style="margin-top:4px;padding:4px 8px;background:#FFF0F0;border-radius:4px;color:#C0392B;font-size:11px">${modeNames[qbMode] || qbMode}</div>
+        </div>
+      </div>
+
+      <div style="margin-bottom:20px;font-size:13px">
+        <div><strong>To:</strong> ${escHtml(info.name || '—')}</div>
+        ${info.attn ? `<div><strong>Attn:</strong> ${escHtml(info.attn)}</div>` : ''}
+      </div>
+
+      <table style="width:100%;border-collapse:collapse;margin-bottom:20px;font-size:13px">
+        <thead>
+          <tr style="background:#C0392B;color:#fff">
+            <th style="padding:10px;text-align:left;width:36px">#</th>
+            <th style="padding:10px;text-align:left">Model</th>
+            <th style="padding:10px;text-align:left">Description</th>
+            <th style="padding:10px;text-align:right">Unit (${currency})</th>
+            <th style="padding:10px;text-align:center">Qty</th>
+            <th style="padding:10px;text-align:right">Total (${currency})</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+
+      <div style="max-width:260px;margin-left:auto;font-size:13px">
+        <div style="display:flex;justify-content:space-between;padding:6px 0;color:#666">
+          <span>Subtotal</span><span>${subtotal.toFixed(3)} ${currency}</span>
+        </div>
+        ${discount > 0 ? `<div style="display:flex;justify-content:space-between;padding:6px 0;color:#e67e22">
+          <span>Discount (${discount}%)</span><span>−${(subtotal * discount / 100).toFixed(3)} ${currency}</span>
+        </div>` : ''}
+        <div style="display:flex;justify-content:space-between;padding:10px 0;border-top:2px solid #C0392B;font-weight:800;font-size:15px;color:#C0392B">
+          <span>Grand Total</span><span>${grandTotal.toFixed(3)} ${currency}</span>
+        </div>
+      </div>
+
+      ${info.notes ? `<div style="margin-top:24px;padding:14px;background:#F8F9FA;border-left:4px solid #C0392B;font-size:12px;color:#555">
+        <strong>Notes:</strong> ${escHtml(info.notes)}
+      </div>` : ''}
+
+      <div style="margin-top:32px;font-size:11px;color:#aaa;text-align:center;border-top:1px solid #eee;padding-top:12px">
+        Generated by MagicTech Projects Coordination System
+      </div>
+    </div>`;
+
+  const container = document.createElement('div');
+  container.innerHTML = html;
+  document.body.appendChild(container);
+
+  const refStr = (info.ref || 'quotation').replace(/[^a-z0-9\-]/gi, '_');
+  await html2pdf().set({
+    margin:     [10, 10, 10, 10],
+    filename:   `MT_Quotation_${refStr}.pdf`,
+    html2canvas:{ scale: 2, useCORS: true },
+    jsPDF:      { unit: 'mm', format: 'a4', orientation: 'portrait' }
+  }).from(container).save();
+
+  document.body.removeChild(container);
+}
+
+// ── Utility ───────────────────────────────────────────────────
+function escHtml(str) {
+  return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}

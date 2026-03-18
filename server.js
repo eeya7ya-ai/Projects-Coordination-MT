@@ -29,6 +29,7 @@ app.use('/api', async (req, res, next) => {
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/projects', require('./routes/projects'));
+app.use('/api/quotation', require('./routes/quotation'));
 
 // Frontend Routes
 app.get('/admin', (req, res) => {

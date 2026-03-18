@@ -221,6 +221,24 @@ async function initializeDB() {
       created_at TIMESTAMP DEFAULT NOW(),
       UNIQUE(module_id, prepared_date, prepared_by)
     );
+
+    CREATE TABLE IF NOT EXISTS products (
+      id SERIAL PRIMARY KEY,
+      category VARCHAR(150),
+      system VARCHAR(150),
+      brand VARCHAR(150),
+      type VARCHAR(150),
+      series VARCHAR(200),
+      model VARCHAR(300) NOT NULL,
+      description TEXT,
+      specifications TEXT,
+      dpp_price NUMERIC(12,3) DEFAULT 0,
+      si_price NUMERIC(12,3) DEFAULT 0,
+      enduser_price NUMERIC(12,3) DEFAULT 0,
+      image_data TEXT,
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW()
+    );
   `);
 
   // ── Schema migrations (add new columns if missing) ───

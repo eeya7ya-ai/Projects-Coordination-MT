@@ -84,6 +84,12 @@
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M4.93 19.07l1.41-1.41M19.07 19.07l-1.41-1.41M12 2v2M12 20v2M2 12h2M20 12h2"/></svg>
         <span data-i18n="nav.settings">Settings</span>
       </a>
+
+      <div class="nav-section-label">Price List</div>
+      <a class="nav-item" data-page="price-list" id="nav-price-list">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 12V22H4V12"/><path d="M22 7H2v5h20V7z"/><path d="M12 22V7"/><path d="M12 7H7.5a2.5 2.5 0 010-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 000-5C13 2 12 7 12 7z"/></svg>
+        <span>Product Catalog</span>
+      </a>
     </nav>
 
     <div class="sidebar-footer">
@@ -599,9 +605,179 @@
         </div>
       </div>
 
+      <!-- ── PRICE LIST PAGE (admin only) ── -->
+      <div class="page" id="page-price-list">
+        <div class="section-header">
+          <div class="section-title">Product Catalog <span>Manage the MT Sales price list</span></div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <button class="btn btn-secondary" onclick="downloadPLTemplate()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Template
+            </button>
+            <button class="btn btn-secondary" onclick="openPLUploadModal()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              Upload Excel
+            </button>
+            <button class="btn btn-danger" onclick="openAddProductModal()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Add Product
+            </button>
+          </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="pl-stats-row" id="pl-stats-row">
+          <div class="pl-stat-card"><div class="pl-stat-value" id="pl-stat-total">0</div><div class="pl-stat-label">Total Products</div></div>
+          <div class="pl-stat-card"><div class="pl-stat-value" id="pl-stat-cats">0</div><div class="pl-stat-label">Categories</div></div>
+          <div class="pl-stat-card"><div class="pl-stat-value" id="pl-stat-brands">0</div><div class="pl-stat-label">Brands</div></div>
+        </div>
+
+        <!-- Filters & search -->
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-body" style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;padding:14px 16px">
+            <div class="search-input" style="flex:1;min-width:200px">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input type="text" id="pl-search" placeholder="Search model, brand, description..." oninput="filterPLProducts()">
+            </div>
+            <select id="pl-filter-cat" class="form-control" style="width:140px" onchange="filterPLProducts()">
+              <option value="">All Categories</option>
+            </select>
+            <select id="pl-filter-brand" class="form-control" style="width:140px" onchange="filterPLProducts()">
+              <option value="">All Brands</option>
+            </select>
+            <select id="pl-filter-sys" class="form-control" style="width:140px" onchange="filterPLProducts()">
+              <option value="">All Systems</option>
+            </select>
+            <button class="btn btn-secondary" onclick="clearPLFilters()" style="white-space:nowrap">Clear</button>
+          </div>
+        </div>
+
+        <!-- Table -->
+        <div class="card">
+          <div class="card-body" style="padding:0;overflow-x:auto">
+            <table class="pl-table" id="pl-table">
+              <thead>
+                <tr>
+                  <th onclick="sortPL('category')" style="cursor:pointer">Category</th>
+                  <th onclick="sortPL('system')" style="cursor:pointer">System</th>
+                  <th onclick="sortPL('brand')" style="cursor:pointer">Brand</th>
+                  <th onclick="sortPL('type')" style="cursor:pointer">Type</th>
+                  <th onclick="sortPL('series')" style="cursor:pointer">Series</th>
+                  <th onclick="sortPL('model')" style="cursor:pointer">Model</th>
+                  <th>Description</th>
+                  <th onclick="sortPL('dpp_price')" style="cursor:pointer;text-align:right">DPP</th>
+                  <th onclick="sortPL('si_price')" style="cursor:pointer;text-align:right">SI</th>
+                  <th onclick="sortPL('enduser_price')" style="cursor:pointer;text-align:right">End User</th>
+                  <th style="width:90px;text-align:center">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="pl-table-body">
+                <tr><td colspan="11" style="text-align:center;padding:40px;color:var(--gray-400)">Loading...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Pagination -->
+        <div id="pl-pagination" style="display:flex;justify-content:center;align-items:center;gap:8px;margin-top:16px"></div>
+      </div>
+
     </div><!-- /page-content -->
   </main>
 </div><!-- /app-layout -->
+
+<!-- ═══ PRODUCT ADD/EDIT MODAL ═══ -->
+<div class="modal-overlay" id="pl-product-modal">
+  <div class="modal" style="max-width:680px">
+    <div class="modal-header">
+      <h2 id="pl-modal-title">Add Product</h2>
+      <button class="modal-close" onclick="closeModal('pl-product-modal')">×</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="pl-edit-id">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Category</label>
+          <input type="text" id="pl-f-category" list="pl-dl-category" placeholder="e.g. Security">
+          <datalist id="pl-dl-category"></datalist>
+        </div>
+        <div class="form-group">
+          <label>System</label>
+          <input type="text" id="pl-f-system" list="pl-dl-system" placeholder="e.g. CCTV">
+          <datalist id="pl-dl-system"></datalist>
+        </div>
+        <div class="form-group">
+          <label>Brand</label>
+          <input type="text" id="pl-f-brand" list="pl-dl-brand" placeholder="e.g. Hikvision">
+          <datalist id="pl-dl-brand"></datalist>
+        </div>
+        <div class="form-group">
+          <label>Type</label>
+          <input type="text" id="pl-f-type" placeholder="e.g. IP Camera">
+        </div>
+        <div class="form-group">
+          <label>Series</label>
+          <input type="text" id="pl-f-series" placeholder="e.g. DS-2CD2">
+        </div>
+        <div class="form-group">
+          <label>Model <span style="color:var(--red)">*</span></label>
+          <input type="text" id="pl-f-model" placeholder="e.g. DS-2CD2147G2-LU">
+        </div>
+        <div class="form-group form-full">
+          <label>Description</label>
+          <input type="text" id="pl-f-description" placeholder="Short product description">
+        </div>
+        <div class="form-group form-full">
+          <label>Specifications</label>
+          <textarea id="pl-f-specifications" rows="2" style="width:100%;padding:10px;border:2px solid var(--gray-200);border-radius:8px;font-size:13px;font-family:inherit;resize:vertical" placeholder="Technical specs"></textarea>
+        </div>
+        <div class="form-group">
+          <label>DPP Price (JOD)</label>
+          <input type="number" id="pl-f-dpp" placeholder="0.000" step="0.001" min="0">
+        </div>
+        <div class="form-group">
+          <label>SI Price (JOD)</label>
+          <input type="number" id="pl-f-si" placeholder="0.000" step="0.001" min="0">
+        </div>
+        <div class="form-group">
+          <label>End User Price (JOD)</label>
+          <input type="number" id="pl-f-eu" placeholder="0.000" step="0.001" min="0">
+        </div>
+      </div>
+      <div id="pl-product-alert" style="margin-top:12px"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('pl-product-modal')">Cancel</button>
+      <button class="btn btn-danger" onclick="savePLProduct()">Save Product</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ EXCEL UPLOAD MODAL ═══ -->
+<div class="modal-overlay" id="pl-upload-modal">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header">
+      <h2>Bulk Upload Products</h2>
+      <button class="modal-close" onclick="closeModal('pl-upload-modal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div style="background:#FFF9F0;border:1px solid var(--warning);border-radius:8px;padding:14px;margin-bottom:16px;font-size:13px;color:#7D5A00">
+        <strong>⚠ This will replace ALL existing products.</strong> Download the template first to ensure correct column format.
+      </div>
+      <div id="pl-upload-area" class="pl-upload-area" onclick="document.getElementById('pl-excel-input').click()">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--gray-400)" stroke-width="1.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        <p style="margin-top:12px;color:var(--gray-500);font-size:14px">Click or drag &amp; drop an Excel file here</p>
+        <p style="font-size:12px;color:var(--gray-400)">.xlsx or .xls — up to 300 MB</p>
+      </div>
+      <input type="file" id="pl-excel-input" accept=".xlsx,.xls" style="display:none" onchange="handlePLExcelSelect(this)">
+      <div id="pl-upload-status" style="margin-top:12px"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('pl-upload-modal')">Cancel</button>
+      <button class="btn btn-danger" id="pl-upload-btn" onclick="uploadPLExcel()" disabled>Upload & Replace</button>
+    </div>
+  </div>
+</div>
 
 <!-- ═══ NOTIFICATION PANEL ═══ -->
 <div class="notif-panel" id="notif-panel">
