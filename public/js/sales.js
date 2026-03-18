@@ -1554,7 +1554,7 @@ async function exportQBPdf() {
   const { pagesHTML, info } = buildQuotationHTML();
 
   const wrapper = document.createElement('div');
-  wrapper.style.cssText = 'font-family:"Segoe UI",Arial,sans-serif;color:#1e2a38;font-size:13px;line-height:1.5;background:#fff;padding:0;width:794px;margin:0 auto;box-sizing:border-box';
+  wrapper.style.cssText = 'position:fixed;top:-10000px;left:0;font-family:"Segoe UI",Arial,sans-serif;color:#1e2a38;font-size:13px;line-height:1.5;background:#fff;padding:0;width:794px;margin:0 auto;box-sizing:border-box';
   wrapper.innerHTML = pagesHTML;
   document.body.appendChild(wrapper);
 
