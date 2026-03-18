@@ -124,7 +124,8 @@ function navigate(page) {
   const pageTitleKeys = {
     'dashboard': 'page.dashboard', 'analytics': 'page.analytics', 'projects': 'page.projects',
     'new-project': 'page.new_project', 'assign-team': 'page.assign_team', 'reports': 'page.reports',
-    'users': 'page.users', 'daily-summary': 'page.daily_summary', 'settings': 'page.settings'
+    'users': 'page.users', 'daily-summary': 'page.daily_summary', 'settings': 'page.settings',
+    'price-list': 'Product Catalog', 'quotation-builder': 'Quotation Builder'
   };
   document.getElementById('page-title').textContent = t(pageTitleKeys[page] || page);
 
@@ -136,6 +137,7 @@ function navigate(page) {
   if (page === 'settings') { loadAdminProfile(); loadEmailSettings(); }
   if (page === 'daily-summary') initDailySummary();
   if (page === 'price-list') loadPriceList();
+  if (page === 'quotation-builder') initQB();
   if (page === 'new-project') {
     resetProjectForm();
     populateUserDropdowns();
@@ -2428,6 +2430,20 @@ async function deletePLProduct(id, model) {
     await loadPriceList();
   } catch (e) {
     showToast('Delete failed: ' + e.message, 'error');
+  }
+}
+
+// ── Reset / Clear entire product database ─────────────────────
+async function resetPLDatabase() {
+  if (!confirm('Clear ALL products from the database? This cannot be undone.')) return;
+  if (!confirm('Are you absolutely sure? This will delete every product.')) return;
+  try {
+    const res = await apiFetch('/quotation/reset', { method: 'POST' });
+    if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Reset failed'); }
+    showToast('Product database cleared', 'success');
+    await loadPriceList();
+  } catch (e) {
+    showToast('Reset failed: ' + e.message, 'error');
   }
 }
 
