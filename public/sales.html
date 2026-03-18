@@ -347,19 +347,10 @@
                 <div id="qb-product-card" style="display:none;margin-top:8px;padding:14px;background:var(--gray-50);border-radius:10px;border:1px solid var(--gray-200)">
                   <div style="font-size:14px;font-weight:700;margin-bottom:4px" id="qb-pc-model">—</div>
                   <div style="font-size:12px;color:var(--gray-500);margin-bottom:10px" id="qb-pc-desc">—</div>
-                  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:12px">
-                    <div style="text-align:center;padding:8px;background:#fff;border-radius:8px;border:1px solid var(--gray-200)">
-                      <div style="font-size:10px;color:var(--gray-400);text-transform:uppercase">DPP</div>
-                      <div style="font-size:13px;font-weight:600" id="qb-pc-dpp">—</div>
-                    </div>
-                    <div style="text-align:center;padding:8px;background:#EFF6FF;border-radius:8px;border:1px solid #BFDBFE">
-                      <div style="font-size:10px;color:#1E40AF;text-transform:uppercase">SI</div>
-                      <div style="font-size:13px;font-weight:700;color:#1E40AF" id="qb-pc-si">—</div>
-                    </div>
-                    <div style="text-align:center;padding:8px;background:#F0FDF4;border-radius:8px;border:1px solid #86EFAC">
-                      <div style="font-size:10px;color:#166534;text-transform:uppercase">End User</div>
-                      <div style="font-size:13px;font-weight:700;color:#166534" id="qb-pc-eu">—</div>
-                    </div>
+                  <!-- Single selected-price display -->
+                  <div id="qb-price-display" style="margin-bottom:12px;padding:12px 14px;background:#fff;border-radius:8px;border:2px solid var(--red);display:flex;justify-content:space-between;align-items:center">
+                    <div style="font-size:11px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.5px" id="qb-price-label">SI PRICE</div>
+                    <div style="font-size:18px;font-weight:800;color:var(--red)" id="qb-price-value">—</div>
                   </div>
                   <div style="display:flex;gap:8px;align-items:center">
                     <div style="display:flex;align-items:center;gap:6px;border:2px solid var(--gray-200);border-radius:8px;overflow:hidden">
@@ -478,13 +469,21 @@
     </div>
     <div class="modal-body">
       <div class="form-grid">
-        <div class="form-group form-full">
+        <div class="form-group">
           <label>Customer / Client Name</label>
           <input type="text" id="qb-c-name" placeholder="e.g. Jordan Properties Group">
         </div>
         <div class="form-group">
+          <label>Project Name</label>
+          <input type="text" id="qb-c-project" placeholder="e.g. Villa Security System">
+        </div>
+        <div class="form-group">
           <label>Attention / Contact</label>
           <input type="text" id="qb-c-attn" placeholder="Contact person name">
+        </div>
+        <div class="form-group">
+          <label>Client Phone</label>
+          <input type="text" id="qb-c-phone" placeholder="+962 7x xxx xxxx">
         </div>
         <div class="form-group">
           <label>Quotation Ref #</label>
@@ -493,6 +492,22 @@
         <div class="form-group">
           <label>Date</label>
           <input type="date" id="qb-c-date">
+        </div>
+        <div class="form-group">
+          <label>Presales Engineer</label>
+          <input type="text" id="qb-c-prepared" placeholder="Presales engineer name">
+        </div>
+        <div class="form-group">
+          <label>Presales Phone</label>
+          <input type="text" id="qb-c-prepphone" placeholder="+962 7x xxx xxxx">
+        </div>
+        <div class="form-group">
+          <label>Sales Engineer</label>
+          <input type="text" id="qb-c-saleseng" placeholder="Sales engineer name">
+        </div>
+        <div class="form-group">
+          <label>Sales Phone</label>
+          <input type="text" id="qb-c-salesnumber" placeholder="+962 7x xxx xxxx">
         </div>
         <div class="form-group">
           <label>Currency</label>
