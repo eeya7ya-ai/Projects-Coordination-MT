@@ -68,6 +68,12 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   document.getElementById('loading-overlay').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
+
+  // Auto-navigate to page from URL hash (e.g. /sales#quotation-builder)
+  const hash = window.location.hash.replace('#', '');
+  if (hash && document.getElementById('page-' + hash)) {
+    navigate(hash);
+  }
 });
 
 // ── Mobile Sidebar ─────────────────────────────────────
@@ -1329,11 +1335,8 @@ function confirmQBManual() {
   showToast('\u2713 Item added to quotation', 'success');
 }
 
-// ── PDF Export ────────────────────────────────────────────────
-async function exportQBPdf() {
-  if (!qbItems.length) { showToast('Add items to the quotation before exporting', 'error'); return; }
-  if (typeof html2pdf === 'undefined') { showToast('PDF library not loaded yet, please wait', 'error'); return; }
-
+// ── Build quotation HTML (shared between preview and PDF export) ──
+function buildQuotationHTML() {
   const currency = document.getElementById('qb-c-currency')?.value || 'JOD';
   const gm       = qbGetGlobalMultiplier();
   const info     = (() => {
@@ -1342,22 +1345,21 @@ async function exportQBPdf() {
   const logoData = localStorage.getItem('mt_company_logo') || null;
 
   // ── Colors (Projects-MT red palette instead of navy) ─────
-  const PRIMARY  = '#8B0000';   // dark red header/footer
-  const ACCENT   = '#C0392B';   // section banners & totals
-  const GOLD     = '#f4a832';   // total row border
+  const PRIMARY  = '#8B0000';
+  const ACCENT   = '#C0392B';
+  const GOLD     = '#f4a832';
   const BORDER   = '#d0d8e0';
   const TEXT     = '#1e2a38';
   const TEXTSUB  = '#5a6a7a';
-  const SECBG    = '#C0392B';   // system banner background
+  const SECBG    = '#C0392B';
 
-  // ── Helper ───────────────────────────────────────────────
   const fmtP = v => `${currency} ${(parseFloat(v) || 0).toFixed(2)}`;
   const fmtDate = iso => {
     if (!iso) return new Date().toLocaleDateString('en-GB');
-    const [y, m, d] = iso.split('-'); return `${m}/${d}/${y}`;
+    const [y, m, d] = iso.split('-'); return `${d}/${m}/${y}`;
   };
 
-  // ── Recalculate unit prices at export time ────────────────
+  // ── Recalculate unit prices ────────────────────────────────
   const cm = parseFloat(document.getElementById('qb-custom-mult')?.value) || 1;
   const calcUnit = item => {
     if (item._fixed_price) return item.unit_price;
@@ -1380,19 +1382,15 @@ async function exportQBPdf() {
     grouped[key].push(item);
   });
 
-  // ── Grand total ───────────────────────────────────────────
   let grandTotal = 0;
   qbItems.forEach(it => { grandTotal += calcUnit(it) * it.qty; });
 
-  // ── Logo HTML ─────────────────────────────────────────────
   const logoHTML = logoData
     ? `<img src="${logoData}" style="height:48px;width:auto;display:block;object-fit:contain;" alt="Logo">`
     : `<img src="/company-logo.jpg" style="height:48px;width:auto;display:block;object-fit:contain;" alt="MT Logo" onerror="this.style.display='none'">`;
 
-  // ── Date ──────────────────────────────────────────────────
   const dateStr = fmtDate(info.date);
 
-  // ── Meta section ─────────────────────────────────────────
   const leftRows = [
     ['Date',    dateStr],
     ['Project', info.project  || ''],
@@ -1423,28 +1421,31 @@ async function exportQBPdf() {
       <div style="border-left:1px solid ${BORDER};padding-left:32px">${rightRows}</div>
     </div>`;
 
-  // ── Build pages HTML ──────────────────────────────────────
-  const systems  = Object.entries(grouped);
-  let   itemNum  = 1;
-  let   pagesHTML = '';
+  // ── Build all items into a single continuous page ──────────
+  const systems = Object.entries(grouped);
+  let itemNum = 1;
+  let allTableRows = '';
 
-  systems.forEach(([system, groupItems], pageIndex) => {
-    const isFirst = pageIndex === 0;
-    const isLast  = pageIndex === systems.length - 1;
+  systems.forEach(([system, groupItems], sysIndex) => {
+    // System section banner row
+    allTableRows += `
+      <tr>
+        <td colspan="8" style="background:${SECBG};color:#fff;padding:10px 16px;font-weight:700;font-size:13px;letter-spacing:1px;text-align:center;text-transform:uppercase;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+          ${escHtml(system.toUpperCase())}
+        </td>
+      </tr>`;
 
     let subtotal = 0;
-    let tableRows = '';
-
     groupItems.forEach(item => {
       const unit  = calcUnit(item);
       const total = unit * item.qty;
       subtotal += total;
 
       const imgCell = item.image_data
-        ? `<img src="${item.image_data}" style="width:44px;height:44px;object-fit:contain;border-radius:3px;background:#f5f7fa;border:1px solid ${BORDER};padding:2px;display:block;margin:0 auto;" alt="">`
+        ? `<img src="${item.image_data}" style="width:40px;height:40px;object-fit:contain;border-radius:3px;background:#f5f7fa;border:1px solid ${BORDER};padding:2px;display:block;margin:0 auto;" alt="">`
         : `<div style="width:0;height:0;display:block;"></div>`;
 
-      tableRows += `
+      allTableRows += `
         <tr>
           <td style="padding:6px 8px;text-align:center;color:${TEXTSUB};font-size:11px;border-bottom:1px solid #e8edf2;vertical-align:middle">${itemNum++}</td>
           <td style="padding:6px 8px;font-weight:600;font-size:11px;border-bottom:1px solid #e8edf2;vertical-align:middle;overflow:hidden;text-overflow:ellipsis">${escHtml(item.brand || '')}</td>
@@ -1460,127 +1461,246 @@ async function exportQBPdf() {
         </tr>`;
     });
 
-    // Subtotal / total rows
-    if (isLast && systems.length === 1) {
-      tableRows += `
-        <tr>
-          <td colspan="8" style="background:#fff8e6;font-weight:700;font-size:13px;border-top:2px solid ${GOLD};padding:9px 8px;text-align:center;color:${ACCENT};letter-spacing:.5px">
-            TOTAL MATERIAL COST:&nbsp;&nbsp;${fmtP(grandTotal)}
-          </td>
-        </tr>`;
-    } else if (isLast) {
-      tableRows += `
-        <tr>
-          <td colspan="5" style="background:#f0f5ff;font-weight:600;font-size:11px;border-top:1px solid ${BORDER};padding:6px 8px;text-align:right;padding-right:12px;color:${TEXT};text-transform:uppercase;letter-spacing:.5px">Subtotal — ${escHtml(system)}:</td>
-          <td colspan="3" style="background:#f0f5ff;font-weight:600;font-size:13px;border-top:1px solid ${BORDER};padding:6px 8px;text-align:center;color:${ACCENT}">${fmtP(subtotal)}</td>
-        </tr>
-        <tr>
-          <td colspan="8" style="background:#fff8e6;font-weight:700;font-size:13px;border-top:2px solid ${GOLD};padding:9px 8px;text-align:center;color:${ACCENT};letter-spacing:.5px">
-            TOTAL MATERIAL COST:&nbsp;&nbsp;${fmtP(grandTotal)}
-          </td>
-        </tr>`;
-    } else {
-      tableRows += `
+    // Subtotal for this system
+    if (systems.length > 1) {
+      allTableRows += `
         <tr>
           <td colspan="5" style="background:#f0f5ff;font-weight:600;font-size:11px;border-top:1px solid ${BORDER};padding:6px 8px;text-align:right;padding-right:12px;color:${TEXT};text-transform:uppercase;letter-spacing:.5px">Subtotal — ${escHtml(system)}:</td>
           <td colspan="3" style="background:#f0f5ff;font-weight:600;font-size:13px;border-top:1px solid ${BORDER};padding:6px 8px;text-align:center;color:${ACCENT}">${fmtP(subtotal)}</td>
         </tr>`;
     }
-
-    const pageStyle = !isLast ? 'page-break-after:always;break-after:page;' : '';
-
-    pagesHTML += `
-      <div style="background:#fff;border-radius:8px;overflow:hidden;margin-bottom:32px;box-shadow:0 4px 24px rgba(0,0,0,.12);${pageStyle}">
-
-        <!-- Company header -->
-        <div style="background:${PRIMARY};color:#fff;padding:18px 28px;display:flex;align-items:center;justify-content:space-between;gap:20px;-webkit-print-color-adjust:exact;print-color-adjust:exact">
-          <div style="flex-shrink:0;min-width:130px;min-height:62px;display:flex;align-items:center;justify-content:center">
-            ${logoHTML}
-          </div>
-          <div style="text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:6px">
-            <div style="font-size:18px;font-weight:800;letter-spacing:2px;text-transform:uppercase;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);padding:8px 20px;border-radius:5px;display:inline-block;line-height:1">SALES QUOTATION</div>
-            <div style="font-size:12px;opacity:.75;letter-spacing:.5px;font-weight:500">${escHtml(dateStr)}</div>
-          </div>
-        </div>
-
-        <!-- Meta -->
-        ${isFirst ? metaHTML : `<div style="padding:10px 32px;font-size:12px;color:${TEXTSUB};background:#fafbfc;border-bottom:1px solid ${BORDER}">
-          ${dateStr ? `Date: <strong>${escHtml(dateStr)}</strong>` : ''}
-          ${info.ref ? ` &nbsp;|&nbsp; Ref: <strong>${escHtml(info.ref)}</strong>` : ''}
-          ${(info.client || info.name) ? ` &nbsp;|&nbsp; Client: <strong>${escHtml(info.client || info.name)}</strong>` : ''}
-          ${info.project ? ` &nbsp;|&nbsp; Project: <strong>${escHtml(info.project)}</strong>` : ''}
-        </div>`}
-
-        <!-- System banner -->
-        <div style="background:${SECBG};color:#fff;padding:10px 32px;font-weight:700;font-size:14px;letter-spacing:1px;text-align:center;text-transform:uppercase;-webkit-print-color-adjust:exact;print-color-adjust:exact">
-          ${escHtml(system.toUpperCase())}
-        </div>
-
-        <!-- Items table -->
-        <div style="padding:0 24px 20px">
-          <table style="width:100%;border-collapse:collapse;margin-top:0;font-size:11.5px;table-layout:fixed">
-            <colgroup>
-              <col style="width:28px"><col style="width:56px"><col style="width:62px">
-              <col style="width:110px"><col><col style="width:34px">
-              <col style="width:86px"><col style="width:90px">
-            </colgroup>
-            <thead>
-              <tr style="-webkit-print-color-adjust:exact;print-color-adjust:exact">
-                <th style="background:#edf1f6;color:${TEXT};padding:7px 8px;text-align:center;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;border-bottom:2px solid ${BORDER};white-space:nowrap">#</th>
-                <th style="background:#edf1f6;color:${TEXT};padding:7px 8px;text-align:left;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;border-bottom:2px solid ${BORDER};white-space:nowrap">Brand</th>
-                <th style="background:#edf1f6;color:${TEXT};padding:7px 8px;text-align:center;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;border-bottom:2px solid ${BORDER};white-space:nowrap">Picture</th>
-                <th style="background:#edf1f6;color:${TEXT};padding:7px 8px;text-align:left;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;border-bottom:2px solid ${BORDER};white-space:nowrap">Model</th>
-                <th style="background:#edf1f6;color:${TEXT};padding:7px 8px;text-align:left;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;border-bottom:2px solid ${BORDER};white-space:nowrap">Description</th>
-                <th style="background:#edf1f6;color:${TEXT};padding:7px 8px;text-align:center;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;border-bottom:2px solid ${BORDER};white-space:nowrap">Qty</th>
-                <th style="background:#edf1f6;color:${TEXT};padding:7px 8px;text-align:right;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;border-bottom:2px solid ${BORDER};white-space:nowrap">Unit Price</th>
-                <th style="background:#edf1f6;color:${TEXT};padding:7px 8px;text-align:right;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;border-bottom:2px solid ${BORDER};white-space:nowrap">Total Price</th>
-              </tr>
-            </thead>
-            <tbody>${tableRows}</tbody>
-          </table>
-        </div>
-
-        ${isLast ? `
-          ${info.notes && info.notes.trim() ? `
-          <!-- Notes -->
-          <div style="padding:16px 32px 20px;border-top:1px solid ${BORDER};background:#fafbfc">
-            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:${TEXTSUB};margin-bottom:6px">Notes & Terms</div>
-            <div style="font-size:12px;color:${TEXTSUB};line-height:1.7;white-space:pre-wrap">${escHtml(info.notes)}</div>
-          </div>` : ''}
-
-          <!-- Footer -->
-          <div style="background:${PRIMARY};color:rgba(255,255,255,.65);text-align:center;padding:12px 20px;font-size:11.5px;-webkit-print-color-adjust:exact;print-color-adjust:exact">
-            This quotation is valid for ${escHtml(info.validity || '30')} days. Prices subject to change without prior notice. | MagicTech Projects Coordination
-          </div>
-        ` : ''}
-      </div>`;
   });
 
-  // ── Wrap & export ─────────────────────────────────────────
+  // Grand total row
+  allTableRows += `
+    <tr>
+      <td colspan="8" style="background:#fff8e6;font-weight:700;font-size:13px;border-top:2px solid ${GOLD};padding:9px 8px;text-align:center;color:${ACCENT};letter-spacing:.5px">
+        TOTAL MATERIAL COST:&nbsp;&nbsp;${fmtP(grandTotal)}
+      </td>
+    </tr>`;
+
+  // ── Build single-page continuous layout ───────────────────
+  const pagesHTML = `
+    <div style="background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.12);">
+
+      <!-- Company header -->
+      <div style="background:${PRIMARY};color:#fff;padding:18px 28px;display:flex;align-items:center;justify-content:space-between;gap:20px;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+        <div style="flex-shrink:0;min-width:130px;min-height:62px;display:flex;align-items:center;justify-content:center">
+          ${logoHTML}
+        </div>
+        <div style="text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+          <div style="font-size:18px;font-weight:800;letter-spacing:2px;text-transform:uppercase;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);padding:8px 20px;border-radius:5px;display:inline-block;line-height:1">SALES QUOTATION</div>
+          <div style="font-size:12px;opacity:.75;letter-spacing:.5px;font-weight:500">${escHtml(dateStr)}</div>
+        </div>
+      </div>
+
+      <!-- Meta -->
+      ${metaHTML}
+
+      <!-- Items table -->
+      <div style="padding:0 24px 20px">
+        <table style="width:100%;border-collapse:collapse;margin-top:0;font-size:11.5px;table-layout:fixed">
+          <colgroup>
+            <col style="width:28px"><col style="width:56px"><col style="width:56px">
+            <col style="width:100px"><col><col style="width:34px">
+            <col style="width:82px"><col style="width:86px">
+          </colgroup>
+          <thead>
+            <tr style="-webkit-print-color-adjust:exact;print-color-adjust:exact">
+              <th style="background:#edf1f6;color:${TEXT};padding:7px 8px;text-align:center;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;border-bottom:2px solid ${BORDER};white-space:nowrap">#</th>
+              <th style="background:#edf1f6;color:${TEXT};padding:7px 8px;text-align:left;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;border-bottom:2px solid ${BORDER};white-space:nowrap">Brand</th>
+              <th style="background:#edf1f6;color:${TEXT};padding:7px 8px;text-align:center;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;border-bottom:2px solid ${BORDER};white-space:nowrap">Picture</th>
+              <th style="background:#edf1f6;color:${TEXT};padding:7px 8px;text-align:left;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;border-bottom:2px solid ${BORDER};white-space:nowrap">Model</th>
+              <th style="background:#edf1f6;color:${TEXT};padding:7px 8px;text-align:left;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;border-bottom:2px solid ${BORDER};white-space:nowrap">Description</th>
+              <th style="background:#edf1f6;color:${TEXT};padding:7px 8px;text-align:center;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;border-bottom:2px solid ${BORDER};white-space:nowrap">Qty</th>
+              <th style="background:#edf1f6;color:${TEXT};padding:7px 8px;text-align:right;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;border-bottom:2px solid ${BORDER};white-space:nowrap">Unit Price</th>
+              <th style="background:#edf1f6;color:${TEXT};padding:7px 8px;text-align:right;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;border-bottom:2px solid ${BORDER};white-space:nowrap">Total Price</th>
+            </tr>
+          </thead>
+          <tbody>${allTableRows}</tbody>
+        </table>
+      </div>
+
+      ${info.notes && info.notes.trim() ? `
+      <!-- Notes -->
+      <div style="padding:16px 32px 20px;border-top:1px solid ${BORDER};background:#fafbfc">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:${TEXTSUB};margin-bottom:6px">Notes & Terms</div>
+        <div style="font-size:12px;color:${TEXTSUB};line-height:1.7;white-space:pre-wrap">${escHtml(info.notes)}</div>
+      </div>` : ''}
+
+      <!-- Footer -->
+      <div style="background:${PRIMARY};color:rgba(255,255,255,.65);text-align:center;padding:12px 20px;font-size:11.5px;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+        This quotation is valid for ${escHtml(info.validity || '30')} days. Prices subject to change without prior notice. | MagicTech Projects Coordination
+      </div>
+    </div>`;
+
+  return { pagesHTML, info, grandTotal };
+}
+
+// ── Preview Quotation ─────────────────────────────────────────
+function previewQuotation() {
+  if (!qbItems.length) { showToast('Add items to the quotation before previewing', 'error'); return; }
+  const { pagesHTML } = buildQuotationHTML();
+  const body = document.getElementById('qb-preview-body');
+  body.innerHTML = `<div style="font-family:'Segoe UI',Arial,sans-serif;color:#1e2a38;font-size:13px;line-height:1.5;max-width:860px;margin:0 auto">${pagesHTML}</div>`;
+  openModal('qb-preview-modal');
+}
+
+// ── PDF Export ────────────────────────────────────────────────
+async function exportQBPdf() {
+  if (!qbItems.length) { showToast('Add items to the quotation before exporting', 'error'); return; }
+  if (typeof html2pdf === 'undefined') { showToast('PDF library not loaded yet, please wait', 'error'); return; }
+
+  const { pagesHTML, info } = buildQuotationHTML();
+
   const wrapper = document.createElement('div');
-  wrapper.style.cssText = 'font-family:"Segoe UI",Arial,sans-serif;color:#1e2a38;font-size:13px;line-height:1.5;background:#e8edf2;padding:28px 16px 40px;max-width:900px;margin:0 auto;box-sizing:border-box';
+  wrapper.style.cssText = 'font-family:"Segoe UI",Arial,sans-serif;color:#1e2a38;font-size:13px;line-height:1.5;background:#fff;padding:0;width:794px;margin:0 auto;box-sizing:border-box';
   wrapper.innerHTML = pagesHTML;
   document.body.appendChild(wrapper);
 
   const refStr = (info.ref || 'Quotation').replace(/[^a-z0-9\-]/gi, '_');
   const client = (info.client || info.name || info.project || 'Client').replace(/[^a-z0-9]/gi, '_');
 
-  showToast('Generating PDF…', 'info');
+  showToast('Generating PDF...', 'info');
 
   try {
     await html2pdf().set({
-      margin:      [8, 8, 8, 8],
+      margin:      [6, 6, 6, 6],
       filename:    `Quotation_${refStr}_${client}.pdf`,
-      image:       { type: 'jpeg', quality: 0.96 },
-      html2canvas: { scale: 2, useCORS: true, logging: false },
+      image:       { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, logging: false, width: 794, windowWidth: 794 },
       jsPDF:       { unit: 'mm', format: 'a4', orientation: 'portrait' },
-      pagebreak:   { mode: ['css', 'legacy'] }
+      pagebreak:   { mode: ['avoid-all'], avoid: ['tr', 'td'] }
     }).from(wrapper).save();
     showToast('PDF downloaded!', 'success');
   } catch (err) {
     showToast('PDF export failed: ' + err.message, 'error');
   } finally {
     document.body.removeChild(wrapper);
+  }
+}
+
+// ── Create Project from Quotation ─────────────────────────────
+function createProjectFromQuotation() {
+  if (!qbItems.length) { showToast('Add items to the quotation first', 'error'); return; }
+
+  const info = (() => {
+    try { return JSON.parse(localStorage.getItem('mt_customer_info') || '{}'); } catch (_) { return {}; }
+  })();
+
+  // Pre-fill fields from quotation data
+  document.getElementById('qbp-name').value = info.project || '';
+  document.getElementById('qbp-client').value = info.client || info.name || '';
+  document.getElementById('qbp-phone').value = info.phone || '';
+  document.getElementById('qbp-location').value = '';
+
+  // Build module selection from quotation systems
+  const systems = [...new Set(qbItems.map(i => i.system || 'General'))];
+  const modulesDiv = document.getElementById('qbp-modules');
+  modulesDiv.innerHTML = systems.map(sys => {
+    const items = qbItems.filter(i => (i.system || 'General') === sys);
+    const deviceCount = items.reduce((s, i) => s + i.qty, 0);
+    return `
+      <div style="border:1px solid var(--gray-200);border-radius:8px;padding:12px 14px;background:var(--gray-50)">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div>
+            <strong style="color:var(--red-dark);font-size:13px">${escHtml(sys)}</strong>
+            <div style="font-size:12px;color:var(--gray-500)">${items.length} item(s), ${deviceCount} unit(s)</div>
+          </div>
+          <span style="background:var(--red-pale);color:var(--red);padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700">Installation</span>
+        </div>
+      </div>`;
+  }).join('');
+
+  openModal('qb-create-project-modal');
+}
+
+async function submitProjectFromQuotation() {
+  const name = document.getElementById('qbp-name').value.trim();
+  if (!name) { showToast('Project name is required', 'error'); return; }
+
+  const info = (() => {
+    try { return JSON.parse(localStorage.getItem('mt_customer_info') || '{}'); } catch (_) { return {}; }
+  })();
+
+  // Group items by system to create modules
+  const grouped = {};
+  qbItems.forEach(item => {
+    const key = item.system || 'General';
+    if (!grouped[key]) grouped[key] = [];
+    grouped[key].push(item);
+  });
+
+  const gm = qbGetGlobalMultiplier();
+  const cm = parseFloat(document.getElementById('qb-custom-mult')?.value) || 1;
+  const calcUnit = item => {
+    if (item._fixed_price) return item.unit_price;
+    let base = 0;
+    switch (qbMode) {
+      case 'si':         base = +item.si_price || 0; break;
+      case 'contractor': base = (+item.si_price || 0) * 1.25; break;
+      case 'enduser':    base = +item.enduser_price || 0; break;
+      case 'custom':     base = (+item.si_price || 0) * cm; break;
+      default:           base = +item.si_price || 0;
+    }
+    return base * gm;
+  };
+
+  const currency = document.getElementById('qb-c-currency')?.value || 'JOD';
+
+  const modules = Object.entries(grouped).map(([system, items]) => {
+    const devices = items.map(item => ({
+      model: item.model,
+      qty: item.qty,
+      description: `${item.description || item.model} | ${currency} ${calcUnit(item).toFixed(2)} x ${item.qty}`,
+      serial: ''
+    }));
+
+    // Map system to a reasonable module type
+    let moduleType = 'Installation and Wiring';
+    const sysLower = system.toLowerCase();
+    if (sysLower.includes('survey')) moduleType = 'Site Survey';
+    else if (sysLower.includes('maintenance')) moduleType = 'Maintenance';
+    else if (sysLower.includes('handover')) moduleType = 'Handover';
+    else if (sysLower.includes('deliver')) moduleType = 'Delivering';
+    else if (sysLower.includes('poc') || sysLower.includes('proof')) moduleType = 'POC';
+    else if (sysLower.includes('program') || sysLower.includes('trouble')) moduleType = 'Programming and Trouble Shooting';
+
+    const subtotal = items.reduce((s, i) => s + calcUnit(i) * i.qty, 0);
+
+    return {
+      module_type: moduleType,
+      scope_of_work: `${system} - ${items.length} product(s), total: ${currency} ${subtotal.toFixed(2)}.\nRef: ${info.ref || 'N/A'}`,
+      issue_details: '',
+      devices
+    };
+  });
+
+  const payload = {
+    project_name: name,
+    client_name_1: document.getElementById('qbp-client').value || info.client || '',
+    client_name_2: '',
+    client_number: document.getElementById('qbp-phone').value || info.phone || '',
+    location_name: document.getElementById('qbp-location').value || '',
+    location_lat: null,
+    location_lng: null,
+    priority: document.getElementById('qbp-priority').value || 'normal',
+    modules
+  };
+
+  try {
+    const res = await apiFetch('/projects', { method: 'POST', body: JSON.stringify(payload) });
+    const data = await res.json();
+    if (res.ok) {
+      showToast(`Project "${name}" created from quotation! Admin will assign the team.`, 'success');
+      closeModal('qb-create-project-modal');
+      await loadProjects();
+      navigate('projects');
+    } else {
+      showToast('Error: ' + data.error, 'error');
+    }
+  } catch (err) {
+    showToast('Failed to create project: ' + err.message, 'error');
   }
 }
 
