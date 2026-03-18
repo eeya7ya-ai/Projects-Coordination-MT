@@ -487,7 +487,9 @@
               <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
                 <button class="btn btn-sm" style="color:#fff;border:1px solid rgba(255,255,255,.4);background:transparent" onclick="openQBInstallModal()">+ Service / Installation</button>
                 <button class="btn btn-sm" style="color:#fff;border:1px solid rgba(255,255,255,.4);background:transparent" onclick="openQBManualModal()">+ Manual Item</button>
+                <button class="btn btn-sm" style="background:var(--info);color:#fff" onclick="previewQuotation()">Preview</button>
                 <button class="btn btn-sm" style="background:var(--warning);color:#fff" onclick="exportQBPdf()">Export PDF</button>
+                <button class="btn btn-sm" style="background:var(--success);color:#fff" onclick="createProjectFromQuotation()">Create as Project</button>
               </div>
             </div>
 
@@ -594,6 +596,67 @@
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('qb-manual-modal')">Cancel</button>
       <button class="btn btn-danger" onclick="confirmQBManual()">Add to Quotation</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ QUOTATION PREVIEW MODAL ═══ -->
+<div class="modal-overlay" id="qb-preview-modal">
+  <div class="modal modal-xl" style="max-width:900px;max-height:90vh;display:flex;flex-direction:column">
+    <div class="modal-header" style="display:flex;align-items:center;justify-content:space-between">
+      <h2>Quotation Preview</h2>
+      <div style="display:flex;gap:10px;align-items:center">
+        <button class="btn btn-sm" style="background:var(--warning);color:#fff" onclick="exportQBPdf();closeModal('qb-preview-modal')">Export PDF</button>
+        <button class="modal-close" onclick="closeModal('qb-preview-modal')">×</button>
+      </div>
+    </div>
+    <div class="modal-body" id="qb-preview-body" style="overflow-y:auto;background:#e8edf2;padding:20px"></div>
+  </div>
+</div>
+
+<!-- ═══ CREATE PROJECT FROM QUOTATION MODAL ═══ -->
+<div class="modal-overlay" id="qb-create-project-modal">
+  <div class="modal" style="max-width:600px">
+    <div class="modal-header">
+      <h2>Create Project from Quotation</h2>
+      <button class="modal-close" onclick="closeModal('qb-create-project-modal')">×</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--gray-600);margin-bottom:16px">This will create a new project using your quotation data. You can adjust the details after creation.</p>
+      <div class="form-grid">
+        <div class="form-group form-full">
+          <label>Project Name *</label>
+          <input type="text" id="qbp-name" class="form-control" placeholder="e.g. CCTV Installation — Block A">
+        </div>
+        <div class="form-group">
+          <label>Client Name</label>
+          <input type="text" id="qbp-client" class="form-control" readonly>
+        </div>
+        <div class="form-group">
+          <label>Client Phone</label>
+          <input type="text" id="qbp-phone" class="form-control" readonly>
+        </div>
+        <div class="form-group">
+          <label>Priority</label>
+          <select id="qbp-priority" class="form-control">
+            <option value="normal">Normal</option>
+            <option value="high">High</option>
+            <option value="urgent">Urgent</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Location (optional)</label>
+          <input type="text" id="qbp-location" class="form-control" placeholder="Site address or location">
+        </div>
+      </div>
+      <div style="margin-top:12px">
+        <label style="font-size:11px;font-weight:700;color:var(--gray-500);text-transform:uppercase;letter-spacing:.4px">Modules to Create</label>
+        <div id="qbp-modules" style="margin-top:8px;display:flex;flex-direction:column;gap:8px"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('qb-create-project-modal')">Cancel</button>
+      <button class="btn btn-danger" onclick="submitProjectFromQuotation()">Create Project</button>
     </div>
   </div>
 </div>
