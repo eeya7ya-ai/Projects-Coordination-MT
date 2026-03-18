@@ -833,7 +833,7 @@ function previewQuotation() {
   openModal('qb-preview-modal');
 }
 
-// ── PDF Export (direct download, no print dialog) ─────────────
+// ── PDF Export ────────────────────────────────────────────────
 async function exportQBPdf() {
   if (!qbItems.length) { showToast('Add items to the quotation before exporting', 'error'); return; }
 
@@ -841,38 +841,44 @@ async function exportQBPdf() {
   const ref = info.ref || 'Quotation';
   const filename = `MT-Quotation-${ref.replace(/[^a-zA-Z0-9\-]/g, '_')}.pdf`;
 
-  // Check if html2pdf.js is available
+  showToast('Preparing PDF…', 'info');
+
   if (typeof html2pdf !== 'undefined') {
+    // Wrap in an overflow-hidden shell so the render container is
+    // in the document (required by html2canvas) but invisible to the user.
+    const shell = document.createElement('div');
+    shell.style.cssText = 'position:absolute;top:0;left:0;width:0;height:0;overflow:hidden;';
     const container = document.createElement('div');
-    container.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;font-family:Segoe UI,Arial,sans-serif;color:#1e2a38;font-size:13px;line-height:1.5;background:#fff;';
+    container.style.cssText = 'width:794px;font-family:Segoe UI,Arial,sans-serif;color:#1e2a38;font-size:13px;line-height:1.5;background:#fff;';
     container.innerHTML = pagesHTML;
-    document.body.appendChild(container);
-    showToast('Preparing PDF download…', 'info');
+    shell.appendChild(container);
+    document.body.appendChild(shell);
     try {
       await html2pdf().set({
         margin: [8, 8, 8, 8],
         filename,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, logging: false, allowTaint: true, scrollX: 0, scrollY: 0 },
+        image: { type: 'jpeg', quality: 0.95 },
+        html2canvas: { scale: 2, useCORS: true, allowTaint: true, logging: false,
+                       scrollX: 0, scrollY: 0, windowWidth: 794 },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+        pagebreak: { mode: ['css', 'legacy'] }
       }).from(container).save();
       showToast('✓ PDF downloaded: ' + filename, 'success');
     } catch (e) {
-      showToast('PDF error: ' + e.message + ' — trying fallback', 'error');
-      exportQBPdfFallback(pagesHTML);
+      console.error('html2pdf error:', e);
+      exportQBPdfFallback(pagesHTML, filename);
     } finally {
-      document.body.removeChild(container);
+      document.body.removeChild(shell);
     }
   } else {
-    exportQBPdfFallback(pagesHTML);
+    exportQBPdfFallback(pagesHTML, filename);
   }
 }
 
 function exportQBPdfFallback(pagesHTML) {
   const printWin = window.open('', '_blank');
   if (!printWin) { showToast('Pop-up blocked — please allow pop-ups and try again', 'error'); return; }
-  printWin.document.write(`<!DOCTYPE html>
+  const doc = `<!DOCTYPE html>
 <html><head><meta charset="UTF-8"><title>Sales Quotation</title>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
@@ -882,9 +888,20 @@ function exportQBPdfFallback(pagesHTML) {
     @page { margin:8mm; size:A4 portrait; }
   }
 </style></head>
-<body>${pagesHTML}</body></html>`);
+<body>${pagesHTML}<script>
+  // Wait for images then print
+  var imgs = document.images, loaded = 0, total = imgs.length;
+  function tryPrint() { window.focus(); window.print(); }
+  if (total === 0) { setTimeout(tryPrint, 400); }
+  else { for (var i=0;i<total;i++) {
+    imgs[i].addEventListener('load',  function(){ if(++loaded>=total) setTimeout(tryPrint,400); });
+    imgs[i].addEventListener('error', function(){ if(++loaded>=total) setTimeout(tryPrint,400); });
+    if (imgs[i].complete) { if(++loaded>=total) { setTimeout(tryPrint,400); break; } }
+  }}
+<\/script></body></html>`;
+  printWin.document.open();
+  printWin.document.write(doc);
   printWin.document.close();
-  printWin.onload = () => { printWin.focus(); printWin.print(); };
 }
 
 // ── Create Project from Quotation ─────────────────────────────
