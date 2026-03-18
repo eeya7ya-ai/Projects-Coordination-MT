@@ -733,7 +733,7 @@ function buildQuotationHTML() {
         : `<div style="width:0;height:0;display:block;"></div>`;
 
       allTableRows += `
-        <tr>
+        <tr style="page-break-inside:avoid;break-inside:avoid">
           <td style="padding:6px 8px;text-align:center;color:${TEXTSUB};font-size:11px;border-bottom:1px solid #e8edf2;vertical-align:middle">${itemNum++}</td>
           <td style="padding:6px 8px;font-weight:600;font-size:11px;border-bottom:1px solid #e8edf2;vertical-align:middle;overflow:hidden;text-overflow:ellipsis">${escHtml(item.brand || '')}</td>
           <td style="padding:6px 8px;text-align:center;border-bottom:1px solid #e8edf2;vertical-align:middle">${imgCell}</td>
@@ -844,24 +844,27 @@ async function exportQBPdf() {
   showToast('Preparing PDF…', 'info');
 
   if (typeof html2pdf !== 'undefined') {
-    // Render container off-screen (fixed, left:-9999px) so html2canvas
-    // sees a fully laid-out 794 px element — same mechanism as Sales MT.
+    // Render container off-screen (absolute) so html2canvas sees a
+    // fully laid-out 794 px element at document start.
     const shell = document.createElement('div');
-    shell.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;height:auto;pointer-events:none;z-index:-1;';
+    shell.style.cssText = 'position:absolute;left:-9999px;top:0;width:794px;height:auto;overflow:visible;pointer-events:none;';
     const container = document.createElement('div');
-    container.style.cssText = 'width:794px;font-family:Segoe UI,Arial,sans-serif;color:#1e2a38;font-size:13px;line-height:1.5;background:#fff;';
+    container.style.cssText = 'width:794px;font-family:"Segoe UI",Arial,sans-serif;color:#1e2a38;font-size:13px;line-height:1.5;background:#fff;';
     container.innerHTML = pagesHTML;
     shell.appendChild(container);
     document.body.appendChild(shell);
+    // Brief delay so browser can fully layout and paint
+    await new Promise(r => setTimeout(r, 150));
     try {
       await html2pdf().set({
-        margin: [8, 8, 8, 8],
+        margin: [10, 8, 10, 8],
         filename,
-        image: { type: 'jpeg', quality: 0.96 },
+        image: { type: 'jpeg', quality: 0.97 },
         html2canvas: { scale: 2, useCORS: true, allowTaint: true, logging: false,
-                       scrollX: 0, scrollY: 0, windowWidth: 794 },
+                       scrollX: 0, scrollY: 0, windowWidth: 794,
+                       ignoreElements: el => el.id === 'chat-panel' || el.id === 'chat-fab' },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak: { mode: ['css', 'legacy'] }
+        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
       }).from(container).save();
       showToast('✓ PDF downloaded: ' + filename, 'success');
     } catch (e) {
@@ -1250,6 +1253,63 @@ async function autoSaveQuotation() {
 }
 
 // ── My Quotations ─────────────────────────────────────────────
+// ── Load ALL quotations (Admin only) ──────────────────────────
+async function loadAllQuotations() {
+  try {
+    const res = await apiFetch('/quotation/all');
+    if (!res?.ok) { console.error('Failed to load all quotations'); return; }
+    const quotations = await res.json();
+    const grid  = document.getElementById('all-quotations-grid');
+    const empty = document.getElementById('all-quotations-empty');
+    const count = document.getElementById('all-quotations-count');
+    if (!grid) return;
+    if (count) count.textContent = quotations.length > 0 ? `(${quotations.length})` : '';
+    if (quotations.length === 0) {
+      grid.innerHTML = '';
+      if (empty) empty.style.display = '';
+      return;
+    }
+    if (empty) empty.style.display = 'none';
+    const statusColors = { draft: 'var(--info)', closed: 'var(--gray-500)', on_hold: 'var(--warning)', sent: 'var(--success)' };
+    grid.innerHTML = quotations.map(q => {
+      const date   = new Date(q.updated_at || q.created_at).toLocaleDateString('en-GB');
+      const status = q.status || 'draft';
+      const color  = statusColors[status] || 'var(--gray-500)';
+      const holdInfo = q.hold_until ? `<div style="font-size:12px;color:var(--warning);margin-top:4px">⏰ Follow-up: ${new Date(q.hold_until).toLocaleDateString('en-GB')}</div>` : '';
+      const byUser = q.created_by_name ? `<span>👤 ${escHtml(q.created_by_name)} (${escHtml(q.created_by_role || '')})</span>` : '';
+      return `
+      <div class="project-card" style="cursor:default">
+        <div class="project-card-header">
+          <div>
+            <div class="project-name">${escHtml(q.title || q.ref_number || 'Untitled')}</div>
+            <div style="font-size:12px;color:var(--gray-500);margin-top:2px">${escHtml(q.client_name || '')} · Ref: ${escHtml(q.ref_number || 'N/A')}</div>
+          </div>
+          <span style="background:${color};color:#fff;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;text-transform:capitalize">${status.replace('_', ' ')}</span>
+        </div>
+        <div class="project-meta" style="margin-top:12px;display:flex;flex-wrap:wrap;gap:8px;font-size:12px;color:var(--gray-600)">
+          <span>💰 ${escHtml(q.currency || 'JOD')} ${parseFloat(q.grand_total || 0).toFixed(2)}</span>
+          <span>📅 ${date}</span>
+          ${byUser}
+        </div>
+        ${holdInfo}
+        <div style="margin-top:12px;display:flex;gap:8px">
+          <button class="btn btn-sm btn-secondary" onclick="loadQuotationToBuilder(${q.id})">Edit</button>
+          <button class="btn btn-sm" style="background:var(--red);color:#fff" onclick="adminDeleteQuotation(${q.id})">Delete</button>
+        </div>
+      </div>`;
+    }).join('');
+  } catch (e) { console.error('Failed to load all quotations', e); }
+}
+
+async function adminDeleteQuotation(id) {
+  if (!confirm('Delete this quotation? This cannot be undone.')) return;
+  try {
+    const res = await apiFetch(`/quotation/${id}`, { method: 'DELETE' });
+    if (res.ok) { showToast('Quotation deleted', 'success'); loadAllQuotations(); }
+    else showToast('Failed to delete quotation', 'error');
+  } catch (e) { showToast('Error: ' + e.message, 'error'); }
+}
+
 async function loadMyQuotations() {
   try {
     const res = await apiFetch('/quotation/mine');

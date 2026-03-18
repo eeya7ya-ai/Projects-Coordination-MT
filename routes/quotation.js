@@ -565,6 +565,23 @@ function inferCategory(system) {
   return MAP[system] || '';
 }
 
+// ─── GET /api/quotation/all ─── Get ALL quotations (admin only) ─
+router.get('/all', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    const rows = await db.all(
+      `SELECT q.id, q.ref_number, q.title, q.currency, q.grand_total, q.status,
+              q.hold_until, q.created_at, q.updated_at,
+              q.customer_info->>'client' as client_name,
+              u.full_name as created_by_name, u.role as created_by_role
+       FROM quotations q
+       LEFT JOIN users u ON q.user_id = u.id
+       ORDER BY q.updated_at DESC`,
+      []
+    );
+    res.json(rows);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // ─── GET /api/quotation/mine ─── Get current user's quotations ─
 router.get('/mine', verifyToken, async (req, res) => {
   try {
