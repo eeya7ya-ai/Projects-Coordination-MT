@@ -748,7 +748,7 @@ function buildQuotationHTML() {
 
   // ── Page 1: MT.pdf cover page ─────────────────────────────
   const coverPage = `
-    <div class="qb-page" style="width:100%;height:297mm;page-break-after:always;break-after:page;overflow:hidden;position:relative;display:flex;flex-direction:column">
+    <div class="qb-page" style="width:100%;height:282mm;page-break-after:always;break-after:page;overflow:hidden;position:relative;display:flex;flex-direction:column">
       <embed src="/MT.pdf#toolbar=0&navpanes=0&scrollbar=0" type="application/pdf"
              style="width:100%;flex:1;border:none;display:block;"
              title="MagicTech Company Profile">
@@ -801,7 +801,7 @@ function buildQuotationHTML() {
       </tr>`;
 
     systemPages += `
-      <div class="qb-page" style="page-break-before:${idx === 0 ? 'always' : 'always'};break-before:page;background:#fff;margin-bottom:0">
+      <div class="qb-page" style="page-break-before:${idx === 0 ? 'always' : 'always'};break-before:page;background:#fff;margin-bottom:0;padding-top:10mm">
         ${pageHeaderHTML()}
 
         <!-- System banner -->
@@ -834,7 +834,7 @@ function buildQuotationHTML() {
     </tr>`).join('');
 
   const endPage = `
-    <div class="qb-page" style="page-break-before:always;break-before:page;background:#fff;min-height:297mm;display:flex;flex-direction:column">
+    <div class="qb-page" style="page-break-before:always;break-before:page;background:#fff;min-height:297mm;display:flex;flex-direction:column;padding-top:10mm">
       ${pageHeaderHTML()}
 
       <!-- Thank you section -->
