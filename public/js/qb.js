@@ -748,9 +748,9 @@ function buildQuotationHTML() {
 
   // ── Page 1: MT.pdf cover page ─────────────────────────────
   const coverPage = `
-    <div class="qb-page" style="width:210mm;height:297mm;page-break-after:always;break-after:page;overflow:hidden;position:relative;display:flex;flex-direction:column">
+    <div class="qb-page" style="width:210mm;height:297mm;page-break-after:always;break-after:page;overflow:hidden;position:relative;display:flex;flex-direction:column;border:none;outline:none;box-shadow:none;margin:0;padding:0">
       <embed src="/MT.pdf#toolbar=0&navpanes=0&scrollbar=0" type="application/pdf"
-             style="width:210mm;height:297mm;flex:1;border:none;display:block;"
+             style="width:210mm;height:297mm;flex:1;border:none;outline:none;box-shadow:none;display:block;margin:0;padding:0"
              title="MagicTech Company Profile">
       </embed>
     </div>`;
@@ -946,6 +946,7 @@ function exportQBPdf() {
   table  { width:100% !important; border-collapse:collapse; }
   td, th { word-break:break-word; }
   img    { display:block; max-width:100%; height:auto; }
+  embed  { border:none !important; outline:none !important; box-shadow:none !important; }
   .qb-page { page-break-before:always; break-before:page; }
   .qb-page:first-child { page-break-before:auto; break-before:auto; }
   @media print {
