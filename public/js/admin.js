@@ -125,7 +125,8 @@ function navigate(page) {
     'dashboard': 'page.dashboard', 'analytics': 'page.analytics', 'projects': 'page.projects',
     'new-project': 'page.new_project', 'assign-team': 'page.assign_team', 'reports': 'page.reports',
     'users': 'page.users', 'daily-summary': 'page.daily_summary', 'settings': 'page.settings',
-    'price-list': 'Product Catalog', 'quotation-builder': 'Quotation Builder'
+    'price-list': 'Product Catalog', 'quotation-builder': 'Quotation Builder',
+    'all-quotations': 'All Quotations'
   };
   document.getElementById('page-title').textContent = t(pageTitleKeys[page] || page);
 
@@ -138,6 +139,7 @@ function navigate(page) {
   if (page === 'daily-summary') initDailySummary();
   if (page === 'price-list') loadPriceList();
   if (page === 'quotation-builder') initQB();
+  if (page === 'all-quotations') loadAllQuotations();
   if (page === 'new-project') {
     resetProjectForm();
     populateUserDropdowns();
