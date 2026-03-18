@@ -2275,9 +2275,10 @@ function clearPLFilters() {
   const b = document.getElementById('pl-filter-brand');
   const y = document.getElementById('pl-filter-sys');
   if (s) s.value = '';
-  if (c) c.value = '';
-  if (b) b.value = '';
-  if (y) y.value = '';
+  if (c) { c.selectedIndex = 0; c.value = ''; }
+  if (b) { b.selectedIndex = 0; b.value = ''; }
+  if (y) { y.selectedIndex = 0; y.value = ''; }
+  plPage = 1;
   filterPLProducts();
 }
 
