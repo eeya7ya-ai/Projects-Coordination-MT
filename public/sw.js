@@ -1,7 +1,7 @@
 // Service Worker — MagicTech Projects Coordination
 // Caches the app shell for offline / fast reload support
 
-const CACHE = 'magictech-v1';
+const CACHE = 'magictech-v3';
 const SHELL = [
   '/',
   '/dashboard',
