@@ -844,7 +844,7 @@ async function exportQBPdf() {
   // Check if html2pdf.js is available
   if (typeof html2pdf !== 'undefined') {
     const container = document.createElement('div');
-    container.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;font-family:Segoe UI,Arial,sans-serif;color:#1e2a38;font-size:13px;line-height:1.5;background:#fff';
+    container.style.cssText = 'position:absolute;top:0;left:0;width:794px;font-family:Segoe UI,Arial,sans-serif;color:#1e2a38;font-size:13px;line-height:1.5;background:#fff;z-index:-9999;pointer-events:none;';
     container.innerHTML = pagesHTML;
     document.body.appendChild(container);
     showToast('Preparing PDF download…', 'info');
@@ -853,7 +853,7 @@ async function exportQBPdf() {
         margin: [8, 8, 8, 8],
         filename,
         image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, logging: false, allowTaint: true },
+        html2canvas: { scale: 2, useCORS: true, logging: false, allowTaint: true, scrollX: 0, scrollY: 0 },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
         pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
       }).from(container).save();
