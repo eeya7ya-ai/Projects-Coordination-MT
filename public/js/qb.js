@@ -844,7 +844,7 @@ async function exportQBPdf() {
   // Check if html2pdf.js is available
   if (typeof html2pdf !== 'undefined') {
     const container = document.createElement('div');
-    container.style.cssText = 'position:absolute;top:0;left:0;width:794px;font-family:Segoe UI,Arial,sans-serif;color:#1e2a38;font-size:13px;line-height:1.5;background:#fff;z-index:-9999;pointer-events:none;';
+    container.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;font-family:Segoe UI,Arial,sans-serif;color:#1e2a38;font-size:13px;line-height:1.5;background:#fff;';
     container.innerHTML = pagesHTML;
     document.body.appendChild(container);
     showToast('Preparing PDF download…', 'info');
@@ -1008,6 +1008,27 @@ async function submitProjectFromQuotation() {
     }
   } catch (err) {
     showToast('Failed to create project: ' + err.message, 'error');
+  }
+}
+
+// ── Save Draft Quotation ──────────────────────────────────────
+async function saveDraftQuotation() {
+  if (!qbItems.length) { showToast('Add items to the quotation first', 'error'); return; }
+  const btn = document.querySelector('.qb-save-draft-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+  try {
+    const savedId = await autoSaveQuotation();
+    if (savedId) {
+      currentQuotationId = savedId;
+      showToast('✓ Quotation saved to My Quotations', 'success');
+    } else {
+      showToast('Failed to save quotation', 'error');
+    }
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13" style="vertical-align:middle;margin-right:4px"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>Save Draft';
+    }
   }
 }
 

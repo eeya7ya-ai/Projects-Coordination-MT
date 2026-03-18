@@ -488,11 +488,15 @@
                 <div class="qb-summary-stat"><div class="qb-stat-val" id="qb-sum-qty">0</div><div class="qb-stat-label">Total Units</div></div>
                 <div class="qb-summary-stat"><div class="qb-stat-val" id="qb-sum-total">0.00</div><div class="qb-stat-label">Total Cost</div></div>
               </div>
-              <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
                 <button class="btn btn-sm" style="color:#fff;border:1px solid rgba(255,255,255,.4);background:transparent" onclick="openQBInstallModal()">+ Service / Installation</button>
                 <button class="btn btn-sm" style="color:#fff;border:1px solid rgba(255,255,255,.4);background:transparent" onclick="openQBManualModal()">+ Manual Item</button>
-                <button class="btn btn-sm" style="background:var(--info);color:#fff" onclick="previewQuotation()">Preview</button>
+                <button class="btn btn-sm" style="background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.35)" onclick="previewQuotation()">Preview</button>
                 <button class="btn btn-sm" style="background:var(--warning);color:#fff" onclick="exportQBPdf()">Export PDF</button>
+                <button class="btn btn-sm qb-save-draft-btn" onclick="saveDraftQuotation()" title="Save quotation to My Quotations">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13" style="vertical-align:middle;margin-right:4px"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                  Save Draft
+                </button>
                 <button class="btn btn-sm" style="background:var(--success);color:#fff" onclick="finalizeQuotation()">Save &amp; Finalize</button>
               </div>
             </div>
@@ -738,53 +742,70 @@
 <div id="qb-create-project-modal" style="display:none"></div>
 
 <!-- ═══ AI CHATBOT FAB + PANEL ═══ -->
-<button id="chat-fab" onclick="toggleChatbot()" title="AI Quotation Assistant">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="26" height="26">
-    <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+<button id="chat-fab" onclick="toggleChatbot()" title="MagicTech AI Assistant">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="26" height="26">
+    <path d="M12 2C6.48 2 2 6.48 2 12c0 1.85.5 3.58 1.38 5.06L2 22l5.06-1.36A9.95 9.95 0 0012 22c5.52 0 10-4.48 10-10S17.52 2 12 2z"/>
+    <circle cx="8.5" cy="12" r="1.2" fill="currentColor" stroke="none"/>
+    <circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none"/>
+    <circle cx="15.5" cy="12" r="1.2" fill="currentColor" stroke="none"/>
   </svg>
+  <span id="chat-fab-badge"></span>
 </button>
 
 <div id="chat-panel">
   <div id="chat-header">
-    <div style="display:flex;align-items:center;gap:10px">
-      <div style="width:34px;height:34px;background:rgba(255,255,255,.2);border-radius:50%;display:flex;align-items:center;justify-content:center">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M12 2a10 10 0 110 20A10 10 0 0112 2z"/><path d="M12 8v4l3 3"/></svg>
+    <div style="display:flex;align-items:center;gap:12px">
+      <div class="chat-bot-avatar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="20" height="20">
+          <rect x="3" y="8" width="18" height="12" rx="3"/>
+          <path d="M8 8V6a4 4 0 018 0v2"/>
+          <circle cx="9" cy="14" r="1.5" fill="white" stroke="none"/>
+          <circle cx="15" cy="14" r="1.5" fill="white" stroke="none"/>
+          <path d="M9 18h6" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="12" y1="3" x2="12" y2="5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
       </div>
       <div>
-        <div style="font-weight:700;font-size:14px">MT Quotation AI</div>
-        <div style="font-size:11px;opacity:.8">Ask about products, pricing & more</div>
+        <div style="font-weight:700;font-size:14px;letter-spacing:.2px">MagicTech Assistant</div>
+        <div style="font-size:11px;opacity:.75;display:flex;align-items:center;gap:5px">
+          <span class="chat-online-dot"></span>Online · AI-powered
+        </div>
       </div>
     </div>
-    <button onclick="toggleChatbot()" style="background:none;border:none;color:#fff;cursor:pointer;padding:4px;opacity:.8;font-size:18px;line-height:1">&times;</button>
+    <button onclick="toggleChatbot()" class="chat-close-btn" title="Close">&times;</button>
   </div>
   <div id="chat-messages">
     <div class="chat-bubble bot">
-      Hello! I'm your MT Quotation AI assistant. Ask me about products, pricing, system recommendations, or anything related to your quotation.
+      Hello! I'm <strong>MagicTech Assistant</strong>. Ask me about products, pricing, security systems, or anything related to your quotation.
     </div>
   </div>
   <div id="chat-image-preview" style="display:none">
-    <div style="display:flex;align-items:center;gap:8px;padding:6px 12px;background:var(--gray-100);border-top:1px solid var(--gray-200);font-size:12px;color:var(--gray-600)">
+    <div class="chat-img-preview-bar">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-      <span id="chat-image-name" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
-      <button onclick="chatRemoveImage()" style="background:none;border:none;cursor:pointer;color:var(--red);padding:0;font-size:14px">&times;</button>
+      <span id="chat-image-name"></span>
+      <button onclick="chatRemoveImage()" class="chat-img-remove">&times;</button>
     </div>
   </div>
   <div id="chat-input-area">
-    <label id="chat-img-btn" title="Attach image">
-      <input type="file" id="chat-image-input" accept="image/*" style="display:none" onchange="chatAttachImage(this)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-    </label>
-    <button id="chat-mic-btn" onclick="toggleVoiceInput()" title="Voice input" style="background:none;border:none;cursor:pointer;color:var(--gray-500);padding:4px;display:flex;align-items:center;justify-content:center;border-radius:50%;transition:all .2s;flex-shrink:0">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8"/></svg>
-    </button>
-    <button id="chat-tts-btn" onclick="toggleTTS()" title="Enable text-to-speech" style="background:none;border:none;cursor:pointer;color:var(--gray-500);padding:4px;display:flex;align-items:center;justify-content:center;border-radius:50%;transition:all .2s;flex-shrink:0">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 010 14.14M15.54 8.46a5 5 0 010 7.07"/></svg>
-    </button>
-    <textarea id="chat-input" placeholder="Ask about products, pricing, systems…" rows="1"
-      onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChatMsg();}"></textarea>
-    <button id="chat-send-btn" onclick="sendChatMsg()">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-    </button>
+    <div class="chat-toolbar">
+      <label class="chat-tool-btn" title="Attach image">
+        <input type="file" id="chat-image-input" accept="image/*" style="display:none" onchange="chatAttachImage(this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+      </label>
+      <button id="chat-mic-btn" class="chat-tool-btn" onclick="toggleVoiceInput()" title="Voice input">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8"/></svg>
+      </button>
+      <button id="chat-tts-btn" class="chat-tool-btn" onclick="toggleTTS()" title="Text-to-speech">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 010 14.14M15.54 8.46a5 5 0 010 7.07"/></svg>
+      </button>
+    </div>
+    <div class="chat-input-row">
+      <textarea id="chat-input" placeholder="Ask me anything…" rows="1"
+        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChatMsg();}"></textarea>
+      <button id="chat-send-btn" onclick="sendChatMsg()" title="Send">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      </button>
+    </div>
   </div>
 </div>
 
