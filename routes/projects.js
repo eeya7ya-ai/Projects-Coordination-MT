@@ -1063,4 +1063,37 @@ router.put('/notifications/read-all', verifyToken, async (req, res) => {
   }
 });
 
+// POST /api/projects/:id/quotation-devices — Add devices from quotation to existing project
+router.post('/:id/quotation-devices', verifyToken, requireSalesOrAdmin, async (req, res) => {
+  const projectId = parseInt(req.params.id);
+  const { quotation_devices } = req.body;
+  if (!Array.isArray(quotation_devices) || !quotation_devices.length) {
+    return res.status(400).json({ error: 'quotation_devices array is required' });
+  }
+  try {
+    const project = await db.get('SELECT id FROM projects WHERE id = $1', [projectId]);
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+
+    // Find or create an "Installation and Wiring" module
+    let module = await db.get(
+      "SELECT id FROM project_modules WHERE project_id = $1 AND module_type = 'Installation and Wiring' LIMIT 1",
+      [projectId]
+    );
+    if (!module) {
+      const m = await db.run(
+        `INSERT INTO project_modules (project_id, module_type, scope_of_work, status) VALUES ($1, $2, $3, 'pending')`,
+        [projectId, 'Installation and Wiring', 'Devices from quotation']
+      );
+      module = { id: m.lastInsertRowid };
+    }
+    for (const d of quotation_devices) {
+      await db.run(
+        `INSERT INTO module_devices (module_id, device_model, device_qty, device_description, added_by) VALUES ($1, $2, $3, $4, $5)`,
+        [module.id, d.model || '', d.qty || 1, d.description || '', req.user.id]
+      );
+    }
+    res.json({ success: true, module_id: module.id, devices_added: quotation_devices.length });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 module.exports = router;

@@ -2529,3 +2529,31 @@ tbody tr:last-child td { border-bottom: none; }
   #chat-panel { width: calc(100vw - 24px); right: 12px; bottom: 80px; }
   #chat-fab { bottom: 80px; right: 16px; }
 }
+
+/* Quotation Road Cards */
+.qb-road-card:hover {
+  border-color: var(--red) !important;
+  background: #fff5f5;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(192,57,43,.12);
+}
+.qb-road-card.selected {
+  border-color: var(--red) !important;
+  background: #fff0ee;
+  box-shadow: 0 0 0 3px rgba(192,57,43,.15);
+}
+
+/* Chat voice buttons */
+#chat-mic-btn.listening {
+  color: var(--red) !important;
+  background: rgba(192,57,43,.1) !important;
+  animation: pulse-mic 1.2s infinite;
+}
+#chat-tts-btn.active {
+  color: var(--red) !important;
+  background: rgba(192,57,43,.1) !important;
+}
+@keyframes pulse-mic {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(192,57,43,.4); }
+  50% { box-shadow: 0 0 0 6px rgba(192,57,43,.0); }
+}

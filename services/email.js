@@ -605,4 +605,42 @@ async function sendProjectCompletionEmail({ userEmail, userName, userRole, proje
   });
 }
 
-module.exports = { sendMail, sendProjectAssignmentEmail, sendReportReviewEmail, sendDailySummaryEmail, sendProjectCompletionEmail, clearAdminNameCache, resetTransporter };
+function canSend() {
+  return !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASSWORD);
+}
+
+async function sendHoldNotificationEmail(user, quotation, holdDate) {
+  if (!canSend()) return;
+  const transporter = _buildTransporter();
+  const customerInfo = typeof quotation.customer_info === 'string'
+    ? JSON.parse(quotation.customer_info || '{}') : (quotation.customer_info || {});
+  const clientName = customerInfo.client || customerInfo.name || 'N/A';
+  const formattedDate = new Date(holdDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
+
+  const body = wrapEmail(`
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+      <tr><td style="padding:32px 40px 24px;">
+        <h2 style="margin:0 0 8px;font-size:20px;font-weight:700;color:#1e2a38;">Quotation Hold Reminder</h2>
+        <p style="margin:0 0 20px;font-size:14px;color:#5a6a7a;">Hello ${escEmailStr(user.full_name)}, your quotation has been placed on hold.</p>
+        <table role="presentation" width="100%" cellpadding="8" cellspacing="0" style="background:#f8f9fa;border-radius:8px;margin-bottom:20px;">
+          <tr><td style="font-size:13px;font-weight:600;color:#1e2a38;width:160px">Quotation Ref:</td><td style="font-size:13px;color:#C0392B;font-weight:700">${escEmailStr(quotation.ref_number || 'N/A')}</td></tr>
+          <tr><td style="font-size:13px;font-weight:600;color:#1e2a38;">Client:</td><td style="font-size:13px;color:#1e2a38;">${escEmailStr(clientName)}</td></tr>
+          <tr><td style="font-size:13px;font-weight:600;color:#1e2a38;">Total Value:</td><td style="font-size:13px;color:#1e2a38;">${escEmailStr(quotation.currency || 'JOD')} ${parseFloat(quotation.grand_total || 0).toFixed(2)}</td></tr>
+          <tr><td style="font-size:13px;font-weight:600;color:#1e2a38;">Follow-up Date:</td><td style="font-size:14px;font-weight:700;color:#C0392B;">${escEmailStr(formattedDate)}</td></tr>
+        </table>
+        <p style="margin:0;font-size:13px;color:#5a6a7a;">Please log in to MagicTech Projects Coordination to review and take action on this quotation by the scheduled date.</p>
+      </td></tr>
+    </table>
+  `);
+
+  await transporter.sendMail({
+    from: process.env.SMTP_FROM || process.env.SMTP_USER,
+    to: user.email,
+    subject: `[MagicTech] Quotation ${quotation.ref_number || ''} — Follow-up on ${formattedDate}`,
+    html: body
+  });
+}
+
+function escEmailStr(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+module.exports = { sendMail, sendProjectAssignmentEmail, sendReportReviewEmail, sendDailySummaryEmail, sendProjectCompletionEmail, clearAdminNameCache, resetTransporter, sendHoldNotificationEmail };
