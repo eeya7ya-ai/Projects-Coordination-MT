@@ -2146,74 +2146,238 @@ tbody tr:last-child td { border-bottom: none; }
    QUOTATION BUILDER (Sales — MT Sales Quotation Integration)
 ═══════════════════════════════════════════════════════════════ */
 
-/* Layout */
+/* ═══ QUOTATION BUILDER — Full MT-Sales Layout ═══ */
+
+/* Two-panel layout */
 .qb-layout {
   display: grid;
-  grid-template-columns: 340px 1fr;
-  gap: 20px;
-  align-items: start;
+  grid-template-columns: 420px 1fr;
+  gap: 0;
+  min-height: calc(100vh - 200px);
 }
-@media (max-width: 900px) {
+@media (max-width: 1000px) {
   .qb-layout { grid-template-columns: 1fr; }
 }
 
-/* Filters panel sticky */
-.qb-filters-panel { position: sticky; top: 80px; }
-
-/* Steps */
-.qb-step { display: flex; flex-direction: column; gap: 4px; }
-.qb-step-label {
+/* Left panel */
+.qb-filters-panel {
+  background: var(--white);
+  border-right: 1px solid var(--gray-200);
+  overflow-y: auto;
   display: flex;
-  align-items: center;
-  gap: 6px;
+  flex-direction: column;
+}
+.qb-panel-section {
+  border-bottom: 1px solid var(--gray-200);
+  padding: 18px 20px;
+}
+.qb-panel-section:last-child { border-bottom: none; flex: 1; }
+.qb-section-title {
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: .8px;
+  color: var(--gray-500);
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.qb-section-title::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--gray-200);
+}
+
+/* Right panel */
+.qb-quote-panel {
+  background: var(--gray-50);
+  overflow-y: auto;
+  padding: 20px;
+}
+
+/* Filter steps */
+.qb-step { display: flex; flex-direction: column; gap: 4px; position: relative; transition: .2s ease; }
+.qb-step-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 5px;
+}
+.qb-step-head label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .5px;
   color: var(--gray-500);
 }
-.qb-step.locked .qb-step-label { color: var(--gray-300); }
-.qb-step.done .qb-step-label { color: var(--success); }
+.qb-step.locked .qb-step-head label { color: var(--gray-300); }
+.qb-step.done .qb-step-head label { color: var(--success); }
 
 .qb-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 18px; height: 18px;
   border-radius: 50%;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   background: var(--gray-200);
   color: var(--gray-600);
   flex-shrink: 0;
+  transition: .2s ease;
 }
 .qb-step.active .qb-badge { background: var(--red); color: #fff; }
 .qb-step.done .qb-badge   { background: var(--success); color: #fff; }
 
-.qb-step.locked select { opacity: .5; pointer-events: none; }
+.qb-step.locked select { background-color: var(--gray-100); color: var(--gray-400); cursor: not-allowed; }
+
+.qb-clear-btn {
+  background: none; border: none; color: var(--gray-400);
+  cursor: pointer; font-size: 15px; padding: 0 4px; line-height: 1; transition: .15s;
+}
+.qb-clear-btn:hover { color: var(--red); }
 
 /* Pricing mode buttons */
 .qb-pm-group {
   display: flex;
-  border: 2px solid var(--gray-200);
+  background: var(--gray-100);
   border-radius: 8px;
-  overflow: hidden;
+  padding: 3px;
+  gap: 3px;
 }
 .qb-pm-btn {
   flex: 1;
-  padding: 7px 12px;
+  padding: 7px 6px;
   border: none;
   background: transparent;
-  font-size: 12px;
+  border-radius: 6px;
+  font-size: 11.5px;
   font-weight: 600;
   cursor: pointer;
+  transition: .15s;
   color: var(--gray-600);
-  transition: background .15s, color .15s;
   white-space: nowrap;
 }
-.qb-pm-btn.active { background: var(--red); color: #fff; }
-.qb-pm-btn:hover:not(.active) { background: var(--gray-100); }
+.qb-pm-btn.active {
+  background: var(--red);
+  color: #fff;
+  box-shadow: 0 2px 6px var(--red-glow);
+}
+.qb-pm-btn:hover:not(.active) { background: var(--gray-200); color: var(--red); }
+
+/* Product card */
+.qb-product-card {
+  background: linear-gradient(135deg, #f8fafc 0%, #eef2f8 100%);
+  border: 1.5px solid var(--gray-200);
+  border-radius: var(--radius-sm);
+  padding: 14px;
+  margin-top: 4px;
+  display: none;
+  animation: fadeIn .25s ease;
+}
+.qb-product-card.visible { display: block; }
+.qb-pc-model { font-size: 15px; font-weight: 700; color: var(--red-dark); }
+.qb-pc-desc { font-size: 12.5px; color: var(--gray-500); margin-top: 2px; }
+.qb-pc-series-badge {
+  display: inline-flex; align-items: center; padding: 3px 8px;
+  border-radius: 12px; font-size: 11px; font-weight: 600;
+  background: var(--red-pale); color: var(--red);
+}
+
+/* Price grid */
+.qb-price-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 12px 0; }
+.qb-price-cell {
+  background: var(--white); border: 1px solid var(--gray-200); border-radius: 7px;
+  padding: 8px 10px; text-align: center; transition: .2s ease;
+}
+.qb-price-cell.qb-active-price { border-color: var(--red); background: #FFF0F0; }
+.qb-price-label { font-size: 10px; text-transform: uppercase; letter-spacing: .5px; color: var(--gray-500); margin-bottom: 3px; }
+.qb-price-value { font-size: 15px; font-weight: 700; color: var(--red); }
+
+/* Spec text */
+.qb-spec-text {
+  font-size: 12px; color: var(--gray-500); line-height: 1.6;
+  background: var(--white); border-radius: 6px; padding: 8px 10px; border: 1px solid var(--gray-200);
+}
+
+/* Calculated price row */
+.qb-calc-price-row {
+  display: flex; justify-content: space-between; align-items: center;
+  background: var(--red-dark); color: #fff; border-radius: 7px;
+  padding: 10px 14px; margin-bottom: 12px;
+}
+.qb-cp-label { font-size: 12px; opacity: .85; }
+.qb-cp-value { font-size: 18px; font-weight: 700; }
+
+/* Qty controls */
+.qb-qty-btn {
+  width: 28px; height: 28px; border-radius: 50%;
+  border: 1.5px solid var(--gray-200); background: var(--white);
+  cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center;
+  transition: .15s; font-weight: 700; color: var(--red-dark);
+}
+.qb-qty-btn:hover { background: var(--red); border-color: var(--red); color: #fff; }
+.qb-qty-input {
+  width: 65px; padding: 5px 8px; border: 1.5px solid var(--gray-200);
+  border-radius: 5px; text-align: center; font-size: 13px; font-weight: 600;
+}
+.qb-qty-input:focus { outline: none; border-color: var(--red); }
+
+/* No product hint */
+.qb-no-product-hint { text-align: center; padding: 30px 20px; color: var(--gray-400); font-size: 13px; }
+
+/* Quotation table */
+.qb-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.qb-table th {
+  background: var(--red-dark); color: #fff; padding: 10px 12px; text-align: left;
+  font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .4px; white-space: nowrap;
+}
+.qb-table td { padding: 10px 12px; border-bottom: 1px solid var(--gray-200); vertical-align: middle; }
+.qb-table tr:hover td { background: #f6f8fb; }
+.qb-table .qb-section-header td {
+  background: var(--red); color: #fff; font-weight: 700;
+  font-size: 12px; text-transform: uppercase; letter-spacing: .5px; padding: 7px 12px;
+}
+.qb-table .qb-item-model { font-weight: 600; color: var(--red-dark); }
+.qb-table .qb-item-brand { font-size: 11px; color: var(--gray-500); }
+.qb-table .qb-item-desc { font-size: 12px; color: var(--gray-500); }
+.qb-table .qb-price-badge { font-weight: 700; color: var(--red); }
+.qb-table .qb-total-cell { font-weight: 700; color: var(--red-dark); }
+.qb-table .qb-remove-btn {
+  background: none; border: none; color: #c0392b; cursor: pointer;
+  padding: 4px 6px; border-radius: 4px; font-size: 16px; transition: .15s;
+}
+.qb-table .qb-remove-btn:hover { background: #ffeaea; }
+.qb-table .qb-td-num { text-align: center; color: var(--gray-400); font-size: 12px; width: 30px; }
+.qb-table .qb-td-brand { font-weight: 600; font-size: 11px; color: var(--gray-500); max-width: 80px; overflow: hidden; text-overflow: ellipsis; }
+.qb-table .qb-td-model { font-weight: 700; color: var(--red-dark); font-size: 12px; max-width: 140px; word-break: break-word; line-height: 1.35; }
+.qb-table .qb-td-desc { font-size: 12px; color: var(--gray-500); max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qb-table .qb-td-specs { font-size: 11px; color: var(--gray-400); max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qb-table .qb-td-qty { text-align: center; }
+.qb-table .qb-td-price { text-align: right; white-space: nowrap; font-size: 12px; }
+.qb-table .qb-td-total { text-align: right; font-weight: 700; white-space: nowrap; color: var(--red-dark); font-size: 12px; }
+.qb-table .qb-td-remove { text-align: center; width: 40px; }
+.qb-table .qb-grand-total-row td {
+  background: #fffbea; font-size: 14px; font-weight: 700;
+  color: var(--red-dark); border-top: 2px solid var(--warning);
+}
+
+/* Empty state */
+.qb-empty-state { text-align: center; padding: 48px 20px; color: var(--gray-400); }
+.qb-empty-state p { font-size: 14px; margin-bottom: 6px; }
+.qb-empty-state small { font-size: 12px; opacity: .7; }
+
+/* Summary bar */
+.qb-summary-bar {
+  background: var(--red-dark); color: #fff; border-radius: var(--radius-sm);
+  padding: 16px 20px; display: flex; align-items: center;
+  justify-content: space-between; gap: 20px; flex-wrap: wrap;
+}
+.qb-summary-stat { text-align: center; }
+.qb-stat-val { font-size: 22px; font-weight: 800; line-height: 1; }
+.qb-stat-label { font-size: 11px; opacity: .75; text-transform: uppercase; letter-spacing: .5px; margin-top: 3px; }
 
 /* ═══ AI CHATBOT ═══ */
 #chat-fab {
