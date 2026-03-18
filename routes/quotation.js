@@ -173,9 +173,9 @@ router.get('/template', (req, res) => {
   try {
     const wb = xlsx.utils.book_new();
     const ws = xlsx.utils.aoa_to_sheet([
-      ['Category','System','Brand','Type','Series','Model','Description','Specifications','DPP_Price','SI_Price','EndUser_Price'],
-      ['Security','CCTV','Hikvision','IP Camera','4MP','DS-2CD2047G2','4MP ColorVu Fixed Bullet','4MP, 2.8mm, ColorVu',55,60,70],
-      ['Security','CCTV','Dahua','Dome','2MP','IPC-HDW2831T-AS','2MP IR Fixed-focal Dome','2MP, 2.8mm, IR30m',35,40,48],
+      ['Category','System','Brand','Type','Series','Model','Description','Image_URL','DPP_Price','SI_Price','EndUser_Price'],
+      ['Security','CCTV','Hikvision','IP Camera','4MP','DS-2CD2047G2','4MP ColorVu Fixed Bullet','https://example.com/images/ds-2cd2047g2.jpg',55,60,70],
+      ['Security','CCTV','Dahua','Dome','2MP','IPC-HDW2831T-AS','2MP IR Fixed-focal Dome','https://example.com/images/ipc-hdw2831t-as.jpg',35,40,48],
     ]);
     xlsx.utils.book_append_sheet(wb, ws, 'Products');
     const buf = xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });

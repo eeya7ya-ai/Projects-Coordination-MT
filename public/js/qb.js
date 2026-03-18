@@ -385,7 +385,7 @@ function qbRenderTable() {
           (item.series || item.type ? '<div style="font-size:10px;color:var(--gray-400);margin-top:2px">' + escHtml(item.series || item.type) + '</div>' : '') +
         '</td>' +
         '<td class="qb-td-desc" title="' + escHtml(item.description) + '">' + escHtml(qbTruncate(item.description, 60)) + '</td>' +
-        '<td class="qb-td-specs" title="' + escHtml(item.specifications) + '">' + escHtml(qbTruncate(item.specifications, 55)) + '</td>' +
+        '<td class="qb-td-specs">' + (item.image_data ? '<img src="' + escHtml(item.image_data) + '" style="width:38px;height:38px;object-fit:contain;border-radius:4px;border:1px solid #e2e8f0;background:#f8fafc;padding:2px;display:block;margin:0 auto" alt="">' : '<span style="color:#aaa;font-size:10px">No image</span>') + '</td>' +
         '<td class="qb-td-qty">' +
           '<div style="display:flex;align-items:center;gap:3px;justify-content:center">' +
             '<button class="qb-qty-btn" onclick="updateQBQty(' + item.id + ',' + (item.qty - 1) + ')">−</button>' +
@@ -601,7 +601,7 @@ function confirmQBManual() {
     brand:          document.getElementById('qb-mi-brand').value.trim(),
     model,
     description:    document.getElementById('qb-mi-description').value.trim(),
-    specifications: document.getElementById('qb-mi-specs').value.trim(),
+    specifications: '',
     category:       system,
     system,
     series:         '',
@@ -614,7 +614,7 @@ function confirmQBManual() {
     si_price:       price,
     enduser_price:  price,
     dpp_price:      price,
-    image_data:     ''
+    image_data:     document.getElementById('qb-mi-specs').value.trim()
   });
   saveQBItems();
   qbRenderTable();
@@ -786,11 +786,11 @@ function buildQuotationHTML() {
 
       <!-- Items table -->
       <div style="padding:0 24px 20px">
-        <table style="width:100%;border-collapse:collapse;margin-top:0;font-size:11.5px;table-layout:fixed">
+        <table style="width:100%;border-collapse:collapse;margin-top:0;font-size:11.5px;table-layout:auto">
           <colgroup>
-            <col style="width:28px"><col style="width:56px"><col style="width:56px">
-            <col style="width:100px"><col><col style="width:34px">
-            <col style="width:82px"><col style="width:86px">
+            <col style="width:3%"><col style="width:7%"><col style="width:7%">
+            <col style="width:13%"><col><col style="width:5%">
+            <col style="width:11%"><col style="width:12%">
           </colgroup>
           <thead>
             <tr style="-webkit-print-color-adjust:exact;print-color-adjust:exact">
@@ -844,34 +844,39 @@ async function exportQBPdf() {
   showToast('Preparing PDF…', 'info');
 
   if (typeof html2pdf !== 'undefined') {
-    // Render container off-screen (absolute) so html2canvas sees a
-    // fully laid-out 794 px element at document start.
-    const shell = document.createElement('div');
-    shell.style.cssText = 'position:absolute;left:-9999px;top:0;width:794px;height:auto;overflow:visible;pointer-events:none;';
+    // Render container at viewport origin (fixed, transparent) so html2canvas
+    // can capture the full layout — off-screen elements at left:-9999px are clipped.
     const container = document.createElement('div');
-    container.style.cssText = 'width:794px;font-family:"Segoe UI",Arial,sans-serif;color:#1e2a38;font-size:13px;line-height:1.5;background:#fff;';
+    container.style.cssText = [
+      'position:fixed;left:0;top:0;z-index:99999',
+      'width:733px',          // A4 content width @ 96dpi minus 8mm L+R margins
+      'height:auto;overflow:visible;pointer-events:none',
+      'font-family:"Segoe UI",Arial,sans-serif;color:#1e2a38;font-size:12px;line-height:1.5;background:#fff',
+      'opacity:0.02'          // nearly invisible but still rendered by html2canvas
+    ].join(';');
     container.innerHTML = pagesHTML;
-    shell.appendChild(container);
-    document.body.appendChild(shell);
-    // Brief delay so browser can fully layout and paint
-    await new Promise(r => setTimeout(r, 150));
+    document.body.appendChild(container);
+    // Let the browser fully paint before capturing
+    await new Promise(r => setTimeout(r, 250));
     try {
       await html2pdf().set({
         margin: [10, 8, 10, 8],
         filename,
         image: { type: 'jpeg', quality: 0.97 },
-        html2canvas: { scale: 2, useCORS: true, allowTaint: true, logging: false,
-                       scrollX: 0, scrollY: 0, windowWidth: 794,
-                       ignoreElements: el => el.id === 'chat-panel' || el.id === 'chat-fab' },
+        html2canvas: {
+          scale: 2, useCORS: true, allowTaint: true, logging: false,
+          windowWidth: 733,
+          ignoreElements: el => el !== container && (el.id === 'chat-panel' || el.id === 'chat-fab')
+        },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+        pagebreak: { mode: ['css', 'legacy'] }
       }).from(container).save();
       showToast('✓ PDF downloaded: ' + filename, 'success');
     } catch (e) {
       console.error('html2pdf error:', e);
       exportQBPdfFallback(pagesHTML, filename);
     } finally {
-      document.body.removeChild(shell);
+      document.body.removeChild(container);
     }
   } else {
     exportQBPdfFallback(pagesHTML, filename);
@@ -885,22 +890,32 @@ function exportQBPdfFallback(pagesHTML) {
 <html><head><meta charset="UTF-8"><title>Sales Quotation</title>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family:'Segoe UI',Arial,sans-serif; color:#1e2a38; font-size:13px; line-height:1.5; background:#fff; }
+  body { font-family:'Segoe UI',Arial,sans-serif; color:#1e2a38; font-size:11px; line-height:1.5; background:#fff; }
+  table { width:100% !important; border-collapse:collapse; table-layout:auto !important; }
+  td, th { word-break:break-word; }
+  img { max-width:100%; height:auto; }
   @media print {
     body { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
     @page { margin:8mm; size:A4 portrait; }
+    table { page-break-inside:auto; }
+    tr { page-break-inside:avoid; }
   }
 </style></head>
-<body>${pagesHTML}<script>
-  // Wait for images then print
+<body>
+<div style="max-width:100%;font-family:'Segoe UI',Arial,sans-serif;color:#1e2a38;font-size:11px;line-height:1.5;">
+${pagesHTML}
+</div>
+<script>
   var imgs = document.images, loaded = 0, total = imgs.length;
   function tryPrint() { window.focus(); window.print(); }
-  if (total === 0) { setTimeout(tryPrint, 400); }
-  else { for (var i=0;i<total;i++) {
-    imgs[i].addEventListener('load',  function(){ if(++loaded>=total) setTimeout(tryPrint,400); });
-    imgs[i].addEventListener('error', function(){ if(++loaded>=total) setTimeout(tryPrint,400); });
-    if (imgs[i].complete) { if(++loaded>=total) { setTimeout(tryPrint,400); break; } }
-  }}
+  if (total === 0) { setTimeout(tryPrint, 500); }
+  else {
+    for (var i = 0; i < total; i++) {
+      imgs[i].addEventListener('load',  function(){ if(++loaded >= total) setTimeout(tryPrint, 500); });
+      imgs[i].addEventListener('error', function(){ if(++loaded >= total) setTimeout(tryPrint, 500); });
+      if (imgs[i].complete && ++loaded >= total) { setTimeout(tryPrint, 500); break; }
+    }
+  }
 <\/script></body></html>`;
   printWin.document.open();
   printWin.document.write(doc);
@@ -1522,46 +1537,46 @@ function getAudioCtx() {
   return audioCtx;
 }
 
+// Play a soft bell chime — much more pleasant than raw oscillator beeps
+function playChime(ctx, freq, startTime, duration, vol) {
+  // Fundamental + 2nd harmonic for bell-like timbre
+  [freq, freq * 2.756].forEach((f, i) => {
+    const osc  = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(f, startTime);
+    // Fast attack, slow exponential decay (natural bell)
+    gain.gain.setValueAtTime(0.001, startTime);
+    gain.gain.linearRampToValueAtTime(vol * (i === 0 ? 1 : 0.35), startTime + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(startTime);
+    osc.stop(startTime + duration);
+  });
+}
+
 function playChatSound(type) {
   try {
     const ctx = getAudioCtx();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
+    const t   = ctx.currentTime;
     if (type === 'send') {
-      osc.frequency.setValueAtTime(880, ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.08);
-      gain.gain.setValueAtTime(0.15, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
-      osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + 0.15);
+      // Two ascending notes — light, airy "whoosh-ding"
+      playChime(ctx, 880,  t,        0.6,  0.10);
+      playChime(ctx, 1047, t + 0.08, 0.55, 0.07);
     } else if (type === 'receive') {
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(660, ctx.currentTime);
-      osc.frequency.setValueAtTime(880, ctx.currentTime + 0.08);
-      gain.gain.setValueAtTime(0.12, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
-      osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + 0.25);
+      // Two descending notes — warm, welcoming "ding-dong"
+      playChime(ctx, 1047, t,        0.7,  0.09);
+      playChime(ctx, 784,  t + 0.12, 0.65, 0.07);
     } else if (type === 'listen_start') {
-      // Rising beep
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(400, ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(800, ctx.currentTime + 0.15);
-      gain.gain.setValueAtTime(0.18, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
-      osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + 0.2);
+      // Three rising notes — friendly "ready" chime
+      playChime(ctx, 523,  t,        0.5,  0.08);
+      playChime(ctx, 659,  t + 0.1,  0.5,  0.08);
+      playChime(ctx, 784,  t + 0.2,  0.6,  0.09);
     } else if (type === 'listen_stop') {
-      // Falling beep
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(800, ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(300, ctx.currentTime + 0.15);
-      gain.gain.setValueAtTime(0.18, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
-      osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + 0.2);
+      // Two falling notes — gentle "done" chime
+      playChime(ctx, 784,  t,        0.55, 0.08);
+      playChime(ctx, 523,  t + 0.12, 0.65, 0.07);
     }
   } catch (e) { /* audio not supported */ }
 }
@@ -1640,12 +1655,17 @@ function speakText(text) {
   window.speechSynthesis.cancel();
   const clean = text.replace(/[*#_~`]/g, '').replace(/\n+/g, ' ').trim().slice(0, 600);
   const utt = new SpeechSynthesisUtterance(clean);
-  // Pick a nice voice
   const voices = window.speechSynthesis.getVoices();
-  const preferred = voices.find(v =>
-    /Google US English|Samantha|Karen|Moira|Daniel|en-US/i.test(v.name + v.lang)
-  ) || voices.find(v => v.lang.startsWith('en')) || voices[0];
+  // Prefer high-quality natural voices in priority order
+  const preferred = voices.find(v => /Google US English/i.test(v.name))
+    || voices.find(v => /Microsoft (Aria|Jenny|Guy|Emma|Brian|Zira)/i.test(v.name))
+    || voices.find(v => /Samantha|Karen|Moira|Daniel|Serena|Allison/i.test(v.name))
+    || voices.find(v => v.lang === 'en-US' && v.localService === false)
+    || voices.find(v => v.lang === 'en-US')
+    || voices.find(v => v.lang.startsWith('en'));
   if (preferred) utt.voice = preferred;
-  utt.rate = 1.05; utt.pitch = 1; utt.volume = 0.95;
+  utt.rate = 0.97;   // slightly slower = clearer and less robotic
+  utt.pitch = 1.02;  // very slight lift — more natural
+  utt.volume = 0.92;
   window.speechSynthesis.speak(utt);
 }
