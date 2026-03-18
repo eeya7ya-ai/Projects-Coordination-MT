@@ -1196,3 +1196,115 @@ async function exportQBPdf() {
 function escHtml(str) {
   return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
+
+// ═══════════════════════════════════════════════════════════════
+// ── AI CHATBOT ──────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+let chatHistory = [];
+let chatImageData = null; // { base64, mimeType, name }
+
+function toggleChatbot() {
+  const panel = document.getElementById('chat-panel');
+  panel.classList.toggle('open');
+  if (panel.classList.contains('open')) {
+    setTimeout(() => document.getElementById('chat-input').focus(), 250);
+  }
+}
+
+function chatAttachImage(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const dataUrl = e.target.result;
+    const base64 = dataUrl.split(',')[1];
+    chatImageData = { base64, mimeType: file.type, name: file.name };
+    document.getElementById('chat-image-name').textContent = file.name;
+    document.getElementById('chat-image-preview').style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+  input.value = '';
+}
+
+function chatRemoveImage() {
+  chatImageData = null;
+  document.getElementById('chat-image-preview').style.display = 'none';
+  document.getElementById('chat-image-name').textContent = '';
+}
+
+async function sendChatMsg() {
+  const input = document.getElementById('chat-input');
+  const sendBtn = document.getElementById('chat-send-btn');
+  const text = input.value.trim();
+  if (!text && !chatImageData) return;
+
+  const token = localStorage.getItem('elv_token');
+
+  // Show user bubble
+  if (chatImageData) {
+    const imgHtml = `<img class="chat-thumb" src="data:${chatImageData.mimeType};base64,${chatImageData.base64}" alt="attached">`;
+    appendChatBubble(text ? imgHtml + '\n' + escHtml(text) : imgHtml, 'user', true);
+  } else {
+    appendChatBubble(escHtml(text), 'user', true);
+  }
+
+  input.value = '';
+  sendBtn.disabled = true;
+
+  // Build message for history
+  const userMsg = { role: 'user', content: text || '(image attached)' };
+  chatHistory.push(userMsg);
+
+  // Thinking indicator
+  const thinkId = 'chat-think-' + Date.now();
+  appendChatBubble('Thinking…', 'thinking', false, thinkId);
+
+  try {
+    const body = {
+      message: text || '',
+      history: chatHistory.slice(-12), // last 6 exchanges
+    };
+    if (chatImageData) {
+      body.image = { base64: chatImageData.base64, mimeType: chatImageData.mimeType };
+    }
+
+    const res = await fetch('/api/quotation/chat', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(body)
+    });
+
+    const data = await res.json();
+    const thinkEl = document.getElementById(thinkId);
+    if (thinkEl) thinkEl.remove();
+
+    if (!res.ok) throw new Error(data.error || 'AI request failed');
+
+    const reply = data.reply || '(no response)';
+    chatHistory.push({ role: 'assistant', content: reply });
+    appendChatBubble(escHtml(reply).replace(/\n/g, '<br>'), 'bot', true);
+
+  } catch (err) {
+    const thinkEl = document.getElementById(thinkId);
+    if (thinkEl) thinkEl.remove();
+    appendChatBubble('Sorry, something went wrong: ' + escHtml(err.message), 'bot', true);
+  } finally {
+    sendBtn.disabled = false;
+    chatRemoveImage();
+    input.focus();
+  }
+}
+
+function appendChatBubble(htmlContent, type, scroll = true, id = null) {
+  const msgs = document.getElementById('chat-messages');
+  const div = document.createElement('div');
+  div.className = 'chat-bubble ' + type;
+  div.innerHTML = htmlContent;
+  if (id) div.id = id;
+  msgs.appendChild(div);
+  if (scroll) msgs.scrollTop = msgs.scrollHeight;
+  return div;
+}

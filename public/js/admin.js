@@ -2497,3 +2497,7 @@ async function uploadPLExcel() {
 async function downloadPLTemplate() {
   window.location.href = '/api/quotation/template';
 }
+
+function escHtml(str) {
+  return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
