@@ -844,10 +844,10 @@ async function exportQBPdf() {
   showToast('Preparing PDF…', 'info');
 
   if (typeof html2pdf !== 'undefined') {
-    // Wrap in an overflow-hidden shell so the render container is
-    // in the document (required by html2canvas) but invisible to the user.
+    // Render container off-screen (fixed, left:-9999px) so html2canvas
+    // sees a fully laid-out 794 px element — same mechanism as Sales MT.
     const shell = document.createElement('div');
-    shell.style.cssText = 'position:absolute;top:0;left:0;width:0;height:0;overflow:hidden;';
+    shell.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;height:auto;pointer-events:none;z-index:-1;';
     const container = document.createElement('div');
     container.style.cssText = 'width:794px;font-family:Segoe UI,Arial,sans-serif;color:#1e2a38;font-size:13px;line-height:1.5;background:#fff;';
     container.innerHTML = pagesHTML;
@@ -857,7 +857,7 @@ async function exportQBPdf() {
       await html2pdf().set({
         margin: [8, 8, 8, 8],
         filename,
-        image: { type: 'jpeg', quality: 0.95 },
+        image: { type: 'jpeg', quality: 0.96 },
         html2canvas: { scale: 2, useCORS: true, allowTaint: true, logging: false,
                        scrollX: 0, scrollY: 0, windowWidth: 794 },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
