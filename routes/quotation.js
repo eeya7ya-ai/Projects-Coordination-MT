@@ -169,7 +169,7 @@ router.post('/upload', verifyToken, requireAdmin, upload.single('excel'), async 
 });
 
 // ─── GET /api/quotation/template (admin only) ─────────────────
-router.get('/template', verifyToken, requireAdmin, (req, res) => {
+router.get('/template', (req, res) => {
   try {
     const wb = xlsx.utils.book_new();
     const ws = xlsx.utils.aoa_to_sheet([
