@@ -776,40 +776,7 @@
     <button onclick="toggleChatbot()" class="chat-close-btn" title="Close">&times;</button>
   </div>
   <div id="chat-messages">
-    <div class="chat-bubble bot" style="padding:0;overflow:hidden;border-radius:16px;border:none;box-shadow:0 4px 28px rgba(0,0,0,.18);margin-bottom:4px">
-      <!-- hero banner -->
-      <div style="background:linear-gradient(160deg,#0f172a 0%,#1e293b 50%,#0f2044 100%);padding:28px 18px 30px;text-align:center;position:relative">
-        <div style="font-size:10px;color:rgba(255,255,255,.55);letter-spacing:.8px;text-transform:uppercase;font-weight:600;margin-bottom:14px">MagicTech Assistant</div>
-        <div style="width:64px;height:64px;border-radius:18px;background:linear-gradient(135deg,#3b82f6 0%,#6366f1 100%);display:flex;align-items:center;justify-content:center;margin:0 auto 18px;box-shadow:0 8px 24px rgba(99,102,241,.45)">
-          <svg viewBox="0 0 24 24" fill="none" width="32" height="32">
-            <path d="M12 3l1.5 3.5L17 8l-3.5 1.5L12 13l-1.5-3.5L7 8l3.5-1.5L12 3z" fill="white"/>
-            <path d="M19 14l.8 1.9 1.9.8-1.9.8-.8 1.9-.8-1.9-1.9-.8 1.9-.8L19 14z" fill="rgba(255,255,255,.7)"/>
-            <path d="M6 16l.6 1.4 1.4.6-1.4.6L6 20l-.6-1.4L4 18l1.4-.6L6 16z" fill="rgba(255,255,255,.5)"/>
-          </svg>
-        </div>
-        <div style="color:#fff;font-weight:800;font-size:18px;line-height:1.35;letter-spacing:-.2px;margin-bottom:10px">Hi there! How can I<br><span style="color:#60a5fa">help you</span> today?</div>
-        <div style="color:rgba(255,255,255,.5);font-size:11px;letter-spacing:.1px;line-height:1.5">Powered by AI &mdash; ask me anything about<br>ELV systems &amp; services.</div>
-      </div>
-      <!-- body -->
-      <div style="background:#fff;padding:16px 14px 14px">
-        <p style="margin:0 0 13px;color:#1a202c;font-size:12.5px;font-weight:500;line-height:1.7">👋 Hey there! Ask me anything about ELV systems, products, pricing, or get a quick quotation.</p>
-        <div style="display:flex;flex-direction:column;gap:7px">
-          <button style="display:flex;align-items:center;gap:10px;background:#fdf2f2;border:1px solid rgba(192,57,43,.2);border-radius:10px;padding:9px 12px;font-size:12px;color:#7f1d1d;cursor:pointer;width:100%;text-align:left;font-weight:500" onclick="document.getElementById('chat-input').value='Tell me about your products';sendChatMsg()" onmouseover="this.style.background='#fee2e2'" onmouseout="this.style.background='#fdf2f2'">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#C0392B" stroke-width="2" width="15" height="15" style="flex-shrink:0"><path d="M20 7H4a2 2 0 00-2 2v6a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/></svg>
-            Products &amp; pricing
-          </button>
-          <button style="display:flex;align-items:center;gap:10px;background:#fdf2f2;border:1px solid rgba(192,57,43,.2);border-radius:10px;padding:9px 12px;font-size:12px;color:#7f1d1d;cursor:pointer;width:100%;text-align:left;font-weight:500" onclick="document.getElementById('chat-input').value='What security systems do you offer?';sendChatMsg()" onmouseover="this.style.background='#fee2e2'" onmouseout="this.style.background='#fdf2f2'">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#C0392B" stroke-width="2" width="15" height="15" style="flex-shrink:0"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-            Security systems
-          </button>
-          <button style="display:flex;align-items:center;gap:10px;background:#fdf2f2;border:1px solid rgba(192,57,43,.2);border-radius:10px;padding:9px 12px;font-size:12px;color:#7f1d1d;cursor:pointer;width:100%;text-align:left;font-weight:500" onclick="document.getElementById('chat-input').value='Help me with a quotation';sendChatMsg()" onmouseover="this.style.background='#fee2e2'" onmouseout="this.style.background='#fdf2f2'">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#C0392B" stroke-width="2" width="15" height="15" style="flex-shrink:0"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-            Quotation help
-          </button>
-        </div>
-        <div style="margin-top:13px;text-align:center;font-size:10px;color:#a0aec0">Powered by <a href="https://espark.dev" target="_blank" rel="noopener" style="color:#C0392B;text-decoration:none;font-weight:700">eSpark.dev</a></div>
-      </div>
-    </div>
+    <div class="chat-bubble bot">👋 Hello! I'm MagicTech Assistant. How can I help you today?</div>
   </div>
   <div id="chat-image-preview" style="display:none">
     <div class="chat-img-preview-bar">
