@@ -2480,6 +2480,10 @@ tbody tr:last-child td { border-bottom: none; }
   0%, 100% { opacity: 1; }
   50% { opacity: .5; }
 }
+@keyframes chatPulse {
+  0%, 100% { box-shadow: 0 0 6px #4ade80; opacity: 1; }
+  50% { box-shadow: 0 0 12px #4ade80; opacity: .7; }
+}
 .chat-close-btn {
   background: rgba(255,255,255,.15);
   border: 1px solid rgba(255,255,255,.25);
