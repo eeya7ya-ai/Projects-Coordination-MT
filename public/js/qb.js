@@ -913,7 +913,7 @@ function previewQuotation() {
   if (!qbItems.length) { showToast('Add items to the quotation before previewing', 'error'); return; }
   const { pagesHTML } = buildQuotationHTML();
   const body = document.getElementById('qb-preview-body');
-  body.innerHTML = `<div style="font-family:'Segoe UI',Arial,sans-serif;color:#1e2a38;font-size:13px;line-height:1.5;">${pagesHTML}</div>`;
+  body.innerHTML = `<style>.qb-page{border:none!important;outline:none!important;box-shadow:0 2px 12px rgba(0,0,0,.12)!important;border-radius:2px;margin-bottom:16px;}</style><div style="font-family:'Segoe UI',Arial,sans-serif;color:#1e2a38;font-size:13px;line-height:1.5;">${pagesHTML}</div>`;
   openModal('qb-preview-modal');
 }
 
@@ -947,15 +947,16 @@ function exportQBPdf() {
   td, th { word-break:break-word; }
   img    { display:block; max-width:100%; height:auto; }
   embed  { border:none !important; outline:none !important; box-shadow:none !important; }
-  .qb-page { page-break-before:always; break-before:page; }
+  .qb-page { page-break-before:always; break-before:page; border:none !important; outline:none !important; box-shadow:none !important; }
   .qb-page:first-child { page-break-before:auto; break-before:auto; }
   @media print {
     @page { size:A4 portrait; margin:0; }
+    html, body { border:none !important; outline:none !important; box-shadow:none !important; }
     body  { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
     tr    { page-break-inside:avoid; break-inside:avoid; }
-    .qb-page { page-break-before:always; break-before:page; }
+    .qb-page { page-break-before:always; break-before:page; border:none !important; outline:none !important; box-shadow:none !important; }
     .qb-page:first-child { page-break-before:auto; break-before:auto; }
-    embed { width:210mm !important; height:297mm !important; display:block !important; }
+    embed { width:210mm !important; height:297mm !important; display:block !important; border:none !important; }
   }
 </style>
 </head><body>

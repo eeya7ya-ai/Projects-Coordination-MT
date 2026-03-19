@@ -632,7 +632,7 @@
         <button class="modal-close" onclick="closeModal('qb-preview-modal')">×</button>
       </div>
     </div>
-    <div class="modal-body" id="qb-preview-body" style="overflow-y:auto;background:#e8edf2;padding:20px"></div>
+    <div class="modal-body" id="qb-preview-body" style="overflow-y:auto;background:#f0f0f0;padding:20px">
   </div>
 </div>
 
@@ -776,8 +776,17 @@
     <button onclick="toggleChatbot()" class="chat-close-btn" title="Close">&times;</button>
   </div>
   <div id="chat-messages">
-    <div class="chat-bubble bot">
-      Hello! I'm <strong>MagicTech Assistant</strong>. Ask me about products, pricing, security systems, or anything related to your quotation.
+    <div class="chat-bubble bot" style="background:linear-gradient(135deg,#fff8f8,#fff);border:1px solid rgba(192,57,43,.15);padding:14px 16px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#C0392B" stroke-width="1.8" width="18" height="18"><rect x="3" y="8" width="18" height="12" rx="3"/><path d="M8 8V6a4 4 0 018 0v2"/><circle cx="9" cy="14" r="1.5" fill="#C0392B" stroke="none"/><circle cx="15" cy="14" r="1.5" fill="#C0392B" stroke="none"/><path d="M9 18h6" stroke="#C0392B" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <span style="font-weight:700;color:#8B0000;font-size:13px">MagicTech Assistant</span>
+      </div>
+      <p style="margin:0 0 8px;color:#2d3748;font-size:12.5px;line-height:1.6">Hi there! How can I help you today?</p>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">
+        <span style="background:#fff;border:1px solid #e2e8f0;border-radius:20px;padding:4px 10px;font-size:11px;color:#5a6a7a;cursor:pointer" onclick="document.getElementById('chat-input').value='Tell me about your products';sendChatMsg()">Products &amp; pricing</span>
+        <span style="background:#fff;border:1px solid #e2e8f0;border-radius:20px;padding:4px 10px;font-size:11px;color:#5a6a7a;cursor:pointer" onclick="document.getElementById('chat-input').value='What security systems do you offer?';sendChatMsg()">Security systems</span>
+        <span style="background:#fff;border:1px solid #e2e8f0;border-radius:20px;padding:4px 10px;font-size:11px;color:#5a6a7a;cursor:pointer" onclick="document.getElementById('chat-input').value='Help me with a quotation';sendChatMsg()">Quotation help</span>
+      </div>
     </div>
   </div>
   <div id="chat-image-preview" style="display:none">
