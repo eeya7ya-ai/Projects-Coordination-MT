@@ -742,17 +742,67 @@ function buildQuotationHTML() {
     </thead>`;
 
   const pageFooterHTML = `
-    <div style="background:${PRIMARY};color:rgba(255,255,255,.65);text-align:center;padding:10px 20px;font-size:11px;-webkit-print-color-adjust:exact;print-color-adjust:exact">
-      This quotation is valid for ${escHtml(info.validity || '30')} days. Prices subject to change without prior notice. | MagicTech Projects Coordination
+    <div style="-webkit-print-color-adjust:exact;print-color-adjust:exact">
+      <div style="background:${PRIMARY};color:rgba(255,255,255,.65);text-align:center;padding:10px 20px;font-size:11px;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+        This quotation is valid for ${escHtml(info.validity || '30')} days. Prices subject to change without prior notice. | MagicTech Projects Coordination
+      </div>
+      <div style="background:#f5c6cb;color:#4a1010;text-align:center;padding:7px 20px;font-size:10.5px;font-weight:600;letter-spacing:.2px;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+        Address: Amman- Gardens street- Khawaja Complex No.65&nbsp;&nbsp;&nbsp;Tel: +962 65560272&nbsp;&nbsp;&nbsp;Fax: +962 65560275
+      </div>
     </div>`;
 
-  // ── Page 1: MT.pdf cover page ─────────────────────────────
+  // ── Page 1: HTML cover page (letter-safe, no PDF embed) ───
+  const brandLogos = ['HIKVISION','Legrand','Fanvil','SIB','Tenda','DSSPPA','Schneider','PLANET','EZVIZ','Yeastar','eXTREME'];
   const coverPage = `
-    <div class="qb-page" style="width:210mm;height:297mm;page-break-after:always;break-after:page;overflow:hidden;position:relative;display:flex;flex-direction:column;border:none;outline:none;box-shadow:none;margin:0;padding:0">
-      <embed src="/MT.pdf#toolbar=0&navpanes=0&scrollbar=0" type="application/pdf"
-             style="width:210mm;height:297mm;flex:1;border:none;outline:none;box-shadow:none;display:block;margin:0;padding:0"
-             title="MagicTech Company Profile">
-      </embed>
+    <div class="qb-page" style="width:215.9mm;height:279.4mm;page-break-after:always;break-after:page;overflow:hidden;position:relative;background:#fff;display:flex;flex-direction:column;margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+
+      <!-- Top header -->
+      <div style="background:${PRIMARY};padding:28px 40px 24px;display:flex;align-items:center;justify-content:space-between;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+        <img src="/Magic Tech Logo.png" style="height:64px;width:auto;object-fit:contain;display:block;" alt="MagicTech Logo" onerror="this.style.display='none'">
+        <div style="text-align:right;color:rgba(255,255,255,.75);font-size:13px;font-family:'Segoe UI',Arial,sans-serif;line-height:1.6">
+          <div style="font-size:18px;font-weight:700;color:#fff;letter-spacing:.5px">سحر التقنية</div>
+          <div style="font-size:11px;opacity:.8">MagicTech Projects Coordination</div>
+        </div>
+      </div>
+
+      <!-- Main body -->
+      <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 50px;background:#fff">
+
+        <!-- Network / globe decoration -->
+        <svg viewBox="0 0 340 260" width="320" height="245" style="display:block;margin:0 auto 28px;opacity:.18" aria-hidden="true">
+          <g stroke="${PRIMARY}" stroke-width="1" fill="none">
+            <circle cx="170" cy="130" r="110"/>
+            <circle cx="170" cy="130" r="75"/>
+            <circle cx="170" cy="130" r="40"/>
+            <ellipse cx="170" cy="130" rx="110" ry="48"/>
+            <ellipse cx="170" cy="130" rx="75" ry="32"/>
+            <line x1="60" y1="130" x2="280" y2="130"/>
+            <line x1="170" y1="20" x2="170" y2="240"/>
+            <line x1="90" y1="45" x2="250" y2="215"/>
+            <line x1="250" y1="45" x2="90" y2="215"/>
+          </g>
+          ${[
+            [170,20],[280,130],[170,240],[60,130],
+            [108,52],[232,52],[268,168],[72,168],
+            [140,78],[200,78],[218,182],[122,182],
+            [170,130],[210,110],[155,155]
+          ].map(([cx,cy]) => `<circle cx="${cx}" cy="${cy}" r="5" fill="${PRIMARY}" opacity=".7"/>`).join('')}
+        </svg>
+
+        <div style="font-size:38px;font-weight:800;color:${PRIMARY};letter-spacing:4px;text-transform:uppercase;text-align:center;font-family:'Segoe UI',Arial,sans-serif">SALES QUOTATION</div>
+        <div style="width:80px;height:4px;background:${ACCENT};margin:16px auto 18px;border-radius:2px;-webkit-print-color-adjust:exact;print-color-adjust:exact"></div>
+        <div style="font-size:13px;color:#7a8a9a;letter-spacing:.8px;text-align:center;font-family:'Segoe UI',Arial,sans-serif">MagicTech Projects Coordination — Jordan</div>
+      </div>
+
+      <!-- Brand partners strip -->
+      <div style="padding:14px 30px;border-top:1px solid #e8edf2;display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;justify-content:center;background:#fafbfc">
+        ${brandLogos.map(b => `<span style="font-size:10.5px;font-weight:700;color:#4a5a6a;letter-spacing:.3px;font-family:'Segoe UI',Arial,sans-serif">${b}</span>`).join('<span style="color:#c0c8d0;font-size:10px">|</span>')}
+      </div>
+
+      <!-- Address footer -->
+      <div style="background:#f5c6cb;color:#4a1010;text-align:center;padding:9px 20px;font-size:10.5px;font-weight:600;letter-spacing:.2px;font-family:'Segoe UI',Arial,sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+        Address: Amman- Gardens street- Khawaja Complex No.65&nbsp;&nbsp;&nbsp;Tel: +962 65560272&nbsp;&nbsp;&nbsp;Fax: +962 65560275
+      </div>
     </div>`;
 
   // ── Pages 2..N: One page per system ──────────────────────
@@ -801,25 +851,27 @@ function buildQuotationHTML() {
       </tr>`;
 
     systemPages += `
-      <div class="qb-page" style="page-break-before:${idx === 0 ? 'always' : 'always'};break-before:page;background:#fff;margin-bottom:0;padding-top:10mm">
+      <div class="qb-page" style="page-break-before:always;break-before:page;background:#fff;margin-bottom:0;padding-top:0;width:215.9mm;min-height:279.4mm;display:flex;flex-direction:column;justify-content:space-between">
         ${pageHeaderHTML()}
 
-        <!-- System banner -->
-        <div style="background:${SECBG};color:#fff;padding:12px 28px;font-weight:800;font-size:15px;letter-spacing:2px;text-align:center;text-transform:uppercase;-webkit-print-color-adjust:exact;print-color-adjust:exact">
-          ${escHtml(system.toUpperCase())}
-        </div>
+        <div style="flex:1;display:flex;flex-direction:column">
+          <!-- System banner -->
+          <div style="background:${SECBG};color:#fff;padding:12px 28px;font-weight:800;font-size:15px;letter-spacing:2px;text-align:center;text-transform:uppercase;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+            ${escHtml(system.toUpperCase())}
+          </div>
 
-        <!-- System items table -->
-        <div style="padding:0 24px 16px">
-          <table style="width:100%;border-collapse:collapse;margin-top:0;font-size:11.5px;table-layout:auto">
-            <colgroup>
-              <col style="width:3%"><col style="width:7%"><col style="width:7%">
-              <col style="width:13%"><col><col style="width:5%">
-              <col style="width:11%"><col style="width:12%">
-            </colgroup>
-            ${tableHeaderHTML}
-            <tbody>${tableRows}</tbody>
-          </table>
+          <!-- System items table -->
+          <div style="padding:0 24px 16px;flex:1">
+            <table style="width:100%;border-collapse:collapse;margin-top:0;font-size:11.5px;table-layout:auto">
+              <colgroup>
+                <col style="width:3%"><col style="width:7%"><col style="width:7%">
+                <col style="width:13%"><col><col style="width:5%">
+                <col style="width:11%"><col style="width:12%">
+              </colgroup>
+              ${tableHeaderHTML}
+              <tbody>${tableRows}</tbody>
+            </table>
+          </div>
         </div>
 
         ${pageFooterHTML}
@@ -834,7 +886,7 @@ function buildQuotationHTML() {
     </tr>`).join('');
 
   const endPage = `
-    <div class="qb-page" style="page-break-before:always;break-before:page;background:#fff;min-height:297mm;display:flex;flex-direction:column;padding-top:10mm">
+    <div class="qb-page" style="page-break-before:always;break-before:page;background:#fff;min-height:279.4mm;width:215.9mm;display:flex;flex-direction:column;padding-top:0">
       ${pageHeaderHTML()}
 
       <!-- Thank you section -->
@@ -936,12 +988,13 @@ function exportQBPdf() {
 <title>${title}</title>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
-  body {
+  html, body {
     font-family:'Segoe UI',Arial,sans-serif;
     color:#1e2a38; font-size:12px; line-height:1.5;
-    background:#fff;
+    background:#fff !important;
     -webkit-print-color-adjust:exact;
     print-color-adjust:exact;
+    margin:0; padding:0;
   }
   table  { width:100% !important; border-collapse:collapse; }
   td, th { word-break:break-word; }
@@ -950,13 +1003,12 @@ function exportQBPdf() {
   .qb-page { page-break-before:always; break-before:page; border:none !important; outline:none !important; box-shadow:none !important; }
   .qb-page:first-child { page-break-before:auto; break-before:auto; }
   @media print {
-    @page { size:A4 portrait; margin:0; }
-    html, body { border:none !important; outline:none !important; box-shadow:none !important; }
+    @page { size:letter portrait; margin:0; }
+    html, body { border:none !important; outline:none !important; box-shadow:none !important; background:#fff !important; }
     body  { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
     tr    { page-break-inside:avoid; break-inside:avoid; }
     .qb-page { page-break-before:always; break-before:page; border:none !important; outline:none !important; box-shadow:none !important; }
     .qb-page:first-child { page-break-before:auto; break-before:auto; }
-    embed { width:210mm !important; height:297mm !important; display:block !important; border:none !important; }
   }
 </style>
 </head><body>
