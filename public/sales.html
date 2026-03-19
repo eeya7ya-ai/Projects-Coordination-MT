@@ -776,18 +776,19 @@
     <button onclick="toggleChatbot()" class="chat-close-btn" title="Close">&times;</button>
   </div>
   <div id="chat-messages">
-    <div class="chat-bubble bot" style="padding:0;overflow:hidden;border-radius:16px;border:none;box-shadow:0 4px 28px rgba(139,0,0,.14);margin-bottom:4px">
+    <div class="chat-bubble bot" style="padding:0;overflow:hidden;border-radius:16px;border:none;box-shadow:0 4px 28px rgba(0,0,0,.18);margin-bottom:4px">
       <!-- hero banner -->
-      <div style="background:linear-gradient(135deg,#6d0000 0%,#C0392B 55%,#e8533f 100%);padding:22px 16px 26px;text-align:center;position:relative">
-        <div style="position:absolute;top:11px;right:12px;display:flex;align-items:center;gap:5px;background:rgba(255,255,255,.15);border-radius:20px;padding:3px 9px;backdrop-filter:blur(4px)">
-          <span style="width:7px;height:7px;border-radius:50%;background:#4ade80;display:inline-block;box-shadow:0 0 8px #4ade80;animation:chatPulse 1.8s infinite"></span>
-          <span style="font-size:10px;color:#fff;font-weight:600;letter-spacing:.3px">Online</span>
+      <div style="background:linear-gradient(160deg,#0f172a 0%,#1e293b 50%,#0f2044 100%);padding:28px 18px 30px;text-align:center;position:relative">
+        <div style="font-size:10px;color:rgba(255,255,255,.55);letter-spacing:.8px;text-transform:uppercase;font-weight:600;margin-bottom:14px">MagicTech Assistant</div>
+        <div style="width:64px;height:64px;border-radius:18px;background:linear-gradient(135deg,#3b82f6 0%,#6366f1 100%);display:flex;align-items:center;justify-content:center;margin:0 auto 18px;box-shadow:0 8px 24px rgba(99,102,241,.45)">
+          <svg viewBox="0 0 24 24" fill="none" width="32" height="32">
+            <path d="M12 3l1.5 3.5L17 8l-3.5 1.5L12 13l-1.5-3.5L7 8l3.5-1.5L12 3z" fill="white"/>
+            <path d="M19 14l.8 1.9 1.9.8-1.9.8-.8 1.9-.8-1.9-1.9-.8 1.9-.8L19 14z" fill="rgba(255,255,255,.7)"/>
+            <path d="M6 16l.6 1.4 1.4.6-1.4.6L6 20l-.6-1.4L4 18l1.4-.6L6 16z" fill="rgba(255,255,255,.5)"/>
+          </svg>
         </div>
-        <div style="width:60px;height:60px;border-radius:50%;background:rgba(255,255,255,.18);border:2px solid rgba(255,255,255,.35);display:flex;align-items:center;justify-content:center;margin:0 auto 11px;box-shadow:0 4px 16px rgba(0,0,0,.2)">
-          <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" width="30" height="30"><rect x="3" y="8" width="18" height="12" rx="3"/><path d="M8 8V6a4 4 0 018 0v2"/><circle cx="9" cy="14" r="1.5" fill="white" stroke="none"/><circle cx="15" cy="14" r="1.5" fill="white" stroke="none"/><path d="M9 18h6" stroke="rgba(255,255,255,.5)" stroke-width="1.8" stroke-linecap="round"/><line x1="12" y1="3" x2="12" y2="5" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg>
-        </div>
-        <div style="color:#fff;font-weight:800;font-size:15px;letter-spacing:.4px;margin-bottom:4px;text-shadow:0 1px 4px rgba(0,0,0,.2)">MagicTech Assistant</div>
-        <div style="color:rgba(255,255,255,.72);font-size:10.5px;letter-spacing:.2px">AI-powered ELV expert &mdash; always here to help</div>
+        <div style="color:#fff;font-weight:800;font-size:18px;line-height:1.35;letter-spacing:-.2px;margin-bottom:10px">Hi there! How can I<br><span style="color:#60a5fa">help you</span> today?</div>
+        <div style="color:rgba(255,255,255,.5);font-size:11px;letter-spacing:.1px;line-height:1.5">Powered by AI &mdash; ask me anything about<br>ELV systems &amp; services.</div>
       </div>
       <!-- body -->
       <div style="background:#fff;padding:16px 14px 14px">
