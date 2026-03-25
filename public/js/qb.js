@@ -11,11 +11,31 @@ let qbInitialized  = false;
 const QB_FILTER_ORDER = ['category', 'system', 'brand', 'type', 'series', 'model'];
 const QB_FILTERS      = { category: '', system: '', brand: '', type: '', series: '', model: '' };
 
+// ── Print column preferences ──────────────────────────────────
+function getQBPrintCols() {
+  const defaults = { brand: true, picture: false, description: true, delivery: true };
+  try { return { ...defaults, ...JSON.parse(localStorage.getItem('mt_qb_print_cols') || '{}') }; }
+  catch(_) { return defaults; }
+}
+function qbTogglePrintCol(col, checked) {
+  const cols = getQBPrintCols();
+  cols[col] = !!checked;
+  localStorage.setItem('mt_qb_print_cols', JSON.stringify(cols));
+}
+function initQBPrintColsUI() {
+  const cols = getQBPrintCols();
+  ['brand', 'picture', 'description', 'delivery'].forEach(c => {
+    const el = document.getElementById('qb-col-' + c);
+    if (el) el.checked = !!cols[c];
+  });
+}
+
 // ── Init ─────────────────────────────────────────────────────
 async function initQB() {
   // Restore saved items
   try { qbItems = JSON.parse(localStorage.getItem('mt_quotation_items') || '[]'); } catch (_) { qbItems = []; }
   loadQBCustomer();
+  initQBPrintColsUI();
   qbUpdateModeDesc();
 
   if (!qbInitialized) {
@@ -437,7 +457,9 @@ function qbAutoSaveCustomer() {
     saleseng:    g('qb-c-saleseng'),
     salesnumber: g('qb-c-salesnumber'),
     currency:    g('qb-c-currency') || 'JOD',
-    notes:       g('qb-c-notes')
+    notes:       g('qb-c-notes'),
+    delivery:    g('qb-c-delivery'),
+    validity:    g('qb-c-validity') || '30'
   };
   localStorage.setItem('mt_customer_info', JSON.stringify(info));
 }
@@ -456,6 +478,8 @@ function loadQBCustomer() {
     set('qb-c-prepphone',  info.prepphone);
     set('qb-c-saleseng',   info.saleseng);
     set('qb-c-salesnumber',info.salesnumber);
+    set('qb-c-delivery',   info.delivery);
+    set('qb-c-validity',   info.validity || '30');
     if (info.ref)  set('qb-c-ref',  info.ref);
     if (info.date) set('qb-c-date', info.date);
     if (!info.ref) {
@@ -646,6 +670,10 @@ function buildQuotationHTML() {
     const [y, m, d] = iso.split('-'); return `${d}/${m}/${y}`;
   };
 
+  // ── Print column visibility ────────────────────────────────
+  const cols = getQBPrintCols();
+  const defaultDelivery = info.delivery || '';
+
   // ── Recalculate unit prices ────────────────────────────────
   const cm = parseFloat(document.getElementById('qb-custom-mult')?.value) || 1;
   const calcUnit = item => {
@@ -679,8 +707,8 @@ function buildQuotationHTML() {
   });
 
   const logoHTML = logoData
-    ? `<img src="${logoData}" style="height:48px;width:auto;display:block;object-fit:contain;" alt="Logo">`
-    : `<img src="/Magic Tech Logo.png" style="height:48px;width:auto;display:block;object-fit:contain;" alt="MT Logo" onerror="this.style.display='none'">`;
+    ? `<img src="${logoData}" style="height:44px;width:auto;display:block;object-fit:contain;" alt="Logo">`
+    : `<img src="/Magic Tech Logo.png" style="height:44px;width:auto;display:block;object-fit:contain;" alt="MT Logo" onerror="this.style.display='none'">`;
 
   const dateStr = fmtDate(info.date);
 
@@ -692,117 +720,94 @@ function buildQuotationHTML() {
     ['Att.',    info.att      || info.attn || ''],
     ['Phone',   info.phone    || '']
   ].filter(([,v]) => v).map(([l,v]) => `
-    <div style="display:flex;gap:6px;padding:3px 0;font-size:11.5px;align-items:baseline">
-      <span style="font-weight:700;color:${TEXT};white-space:nowrap;min-width:110px;font-size:11px;flex-shrink:0">${escHtml(l)}:</span>
+    <div style="display:flex;gap:5px;padding:2px 0;font-size:10.5px;align-items:baseline">
+      <span style="font-weight:700;color:${TEXT};white-space:nowrap;min-width:96px;font-size:10px;flex-shrink:0">${escHtml(l)}:</span>
       <span style="color:${TEXT};font-weight:700">${escHtml(v)}</span>
     </div>`).join('');
 
   const rightRows = [
-    ['Ref.',              info.ref         || ''],
-    ['Presales Engineer', info.prepared    || ''],
-    ['Phone',             info.prepphone   || ''],
-    ['Sales Engineer',    info.saleseng    || ''],
-    ['Sales Phone',       info.salesnumber || '']
+    ['Ref.',          info.ref         || ''],
+    ['Presales Eng.', info.prepared    || ''],
+    ['Phone',         info.prepphone   || ''],
+    ['Sales Eng.',    info.saleseng    || ''],
+    ['Sales Phone',   info.salesnumber || '']
   ].filter(([,v]) => v).map(([l,v]) => `
-    <div style="display:flex;gap:6px;padding:3px 0;font-size:11.5px;align-items:baseline">
-      <span style="font-weight:700;color:${TEXT};white-space:nowrap;min-width:110px;font-size:11px;flex-shrink:0">${escHtml(l)}:</span>
+    <div style="display:flex;gap:5px;padding:2px 0;font-size:10.5px;align-items:baseline">
+      <span style="font-weight:700;color:${TEXT};white-space:nowrap;min-width:96px;font-size:10px;flex-shrink:0">${escHtml(l)}:</span>
       <span style="color:${TEXT};font-weight:700">${escHtml(v)}</span>
     </div>`).join('');
 
   const metaHTML = `
-    <div style="padding:14px 28px;display:grid;grid-template-columns:1.1fr 0.9fr;border-bottom:1px solid ${BORDER};background:#fafbfc">
+    <div style="padding:10px 22px;display:grid;grid-template-columns:1.1fr 0.9fr;border-bottom:1px solid ${BORDER};background:#fafbfc">
       <div>${leftRows}</div>
-      <div style="border-left:1px solid ${BORDER};padding-left:32px">${rightRows}</div>
+      <div style="border-left:1px solid ${BORDER};padding-left:22px">${rightRows}</div>
     </div>`;
 
   const pageHeaderHTML = () => `
-    <div style="background:${PRIMARY};color:#fff;padding:18px 28px;display:flex;align-items:center;justify-content:space-between;gap:20px;-webkit-print-color-adjust:exact;print-color-adjust:exact">
-      <div style="flex-shrink:0;min-width:130px;min-height:62px;display:flex;align-items:center;justify-content:center">
+    <div style="background:${PRIMARY};color:#fff;padding:12px 22px;display:flex;align-items:center;justify-content:space-between;gap:16px;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+      <div style="flex-shrink:0;min-width:110px;display:flex;align-items:center;justify-content:center">
         ${logoHTML}
       </div>
-      <div style="text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:6px">
-        <div style="font-size:18px;font-weight:800;letter-spacing:2px;text-transform:uppercase;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);padding:8px 20px;border-radius:5px;display:inline-block;line-height:1">SALES QUOTATION</div>
-        <div style="font-size:12px;opacity:.75;letter-spacing:.5px;font-weight:500">${escHtml(dateStr)}</div>
+      <div style="text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+        <div style="font-size:15px;font-weight:800;letter-spacing:2px;text-transform:uppercase;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);padding:6px 16px;border-radius:4px;display:inline-block;line-height:1">SALES QUOTATION</div>
+        <div style="font-size:10.5px;opacity:.75;letter-spacing:.5px;font-weight:500">${escHtml(dateStr)}</div>
       </div>
     </div>
     ${metaHTML}`;
 
-  const tableHeaderHTML = `
+  // ── Dynamic table columns ──────────────────────────────────
+  const TH = 'background:#edf1f6;color:' + TEXT + ';padding:6px 7px;font-weight:700;font-size:9.5px;text-transform:uppercase;letter-spacing:.4px;border-bottom:2px solid ' + BORDER + ';white-space:nowrap;-webkit-print-color-adjust:exact;print-color-adjust:exact';
+
+  const tableHeaderHTML = () => `
     <thead>
-      <tr style="-webkit-print-color-adjust:exact;print-color-adjust:exact">
-        <th style="background:#edf1f6;color:${TEXT};padding:7px 8px;text-align:center;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;border-bottom:2px solid ${BORDER};white-space:nowrap">#</th>
-        <th style="background:#edf1f6;color:${TEXT};padding:7px 8px;text-align:left;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;border-bottom:2px solid ${BORDER};white-space:nowrap">Brand</th>
-        <th style="background:#edf1f6;color:${TEXT};padding:7px 8px;text-align:center;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;border-bottom:2px solid ${BORDER};white-space:nowrap">Picture</th>
-        <th style="background:#edf1f6;color:${TEXT};padding:7px 8px;text-align:left;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;border-bottom:2px solid ${BORDER};white-space:nowrap">Model</th>
-        <th style="background:#edf1f6;color:${TEXT};padding:7px 8px;text-align:left;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;border-bottom:2px solid ${BORDER};white-space:nowrap">Description</th>
-        <th style="background:#edf1f6;color:${TEXT};padding:7px 8px;text-align:center;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;border-bottom:2px solid ${BORDER};white-space:nowrap">Qty</th>
-        <th style="background:#edf1f6;color:${TEXT};padding:7px 8px;text-align:right;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;border-bottom:2px solid ${BORDER};white-space:nowrap">Unit Price</th>
-        <th style="background:#edf1f6;color:${TEXT};padding:7px 8px;text-align:right;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;border-bottom:2px solid ${BORDER};white-space:nowrap">Total Price</th>
+      <tr>
+        <th style="${TH};text-align:center">#</th>
+        ${cols.brand       ? `<th style="${TH};text-align:left">Brand</th>` : ''}
+        ${cols.picture     ? `<th style="${TH};text-align:center">Picture</th>` : ''}
+        <th style="${TH};text-align:left">Model</th>
+        ${cols.description ? `<th style="${TH};text-align:left">Description</th>` : ''}
+        ${cols.delivery    ? `<th style="${TH};text-align:center">Delivery</th>` : ''}
+        <th style="${TH};text-align:center">Qty</th>
+        <th style="${TH};text-align:right">Unit Price</th>
+        <th style="${TH};text-align:right">Total Price</th>
       </tr>
     </thead>`;
 
+  // Column count for subtotal colspan
+  const leftColCount  = 1 + (cols.brand ? 1 : 0) + (cols.picture ? 1 : 0) + 1 + (cols.description ? 1 : 0) + (cols.delivery ? 1 : 0);
+  const rightColCount = 3; // qty + unit + total
+
+  const colgroupHTML = () => `
+    <colgroup>
+      <col style="width:3%">
+      ${cols.brand       ? '<col style="width:8%">'  : ''}
+      ${cols.picture     ? '<col style="width:7%">'  : ''}
+      <col style="width:${cols.description ? '15' : '32'}%">
+      ${cols.description ? '<col>' : ''}
+      ${cols.delivery    ? '<col style="width:11%">' : ''}
+      <col style="width:5%">
+      <col style="width:12%">
+      <col style="width:12%">
+    </colgroup>`;
+
+  // ── Shared page footer ─────────────────────────────────────
   const pageFooterHTML = `
     <div style="-webkit-print-color-adjust:exact;print-color-adjust:exact">
-      <div style="background:${PRIMARY};color:rgba(255,255,255,.65);text-align:center;padding:10px 20px;font-size:11px;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+      <div style="background:${PRIMARY};color:rgba(255,255,255,.7);text-align:center;padding:7px 16px;font-size:10px;-webkit-print-color-adjust:exact;print-color-adjust:exact">
         This quotation is valid for ${escHtml(info.validity || '30')} days. Prices subject to change without prior notice. | MagicTech Projects Coordination
       </div>
-      <div style="background:#f5c6cb;color:#4a1010;text-align:center;padding:7px 20px;font-size:10.5px;font-weight:600;letter-spacing:.2px;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+      <div style="background:#f5c6cb;color:#4a1010;text-align:center;padding:5px 16px;font-size:9.5px;font-weight:600;letter-spacing:.2px;-webkit-print-color-adjust:exact;print-color-adjust:exact">
         Address: Amman- Gardens street- Khawaja Complex No.65&nbsp;&nbsp;&nbsp;Tel: +962 65560272&nbsp;&nbsp;&nbsp;Fax: +962 65560275
       </div>
     </div>`;
 
-  // ── Page 1: HTML cover page (letter-safe, no PDF embed) ───
-  const brandLogos = ['HIKVISION','Legrand','Fanvil','SIB','Tenda','DSSPPA','Schneider','PLANET','EZVIZ','Yeastar','eXTREME'];
+  // ── Page 1: MT.pdf cover (full-page embed, no borders) ────
   const coverPage = `
-    <div class="qb-page" style="width:215.9mm;height:279.4mm;page-break-after:always;break-after:page;overflow:hidden;position:relative;background:#fff;display:flex;flex-direction:column;margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact">
-
-      <!-- Top header -->
-      <div style="background:${PRIMARY};padding:28px 40px 24px;display:flex;align-items:center;justify-content:space-between;-webkit-print-color-adjust:exact;print-color-adjust:exact">
-        <img src="/Magic Tech Logo.png" style="height:64px;width:auto;object-fit:contain;display:block;" alt="MagicTech Logo" onerror="this.style.display='none'">
-        <div style="text-align:right;color:rgba(255,255,255,.75);font-size:13px;font-family:'Segoe UI',Arial,sans-serif;line-height:1.6">
-          <div style="font-size:18px;font-weight:700;color:#fff;letter-spacing:.5px">سحر التقنية</div>
-          <div style="font-size:11px;opacity:.8">MagicTech Projects Coordination</div>
-        </div>
-      </div>
-
-      <!-- Main body -->
-      <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 50px;background:#fff">
-
-        <!-- Network / globe decoration -->
-        <svg viewBox="0 0 340 260" width="320" height="245" style="display:block;margin:0 auto 28px;opacity:.18" aria-hidden="true">
-          <g stroke="${PRIMARY}" stroke-width="1" fill="none">
-            <circle cx="170" cy="130" r="110"/>
-            <circle cx="170" cy="130" r="75"/>
-            <circle cx="170" cy="130" r="40"/>
-            <ellipse cx="170" cy="130" rx="110" ry="48"/>
-            <ellipse cx="170" cy="130" rx="75" ry="32"/>
-            <line x1="60" y1="130" x2="280" y2="130"/>
-            <line x1="170" y1="20" x2="170" y2="240"/>
-            <line x1="90" y1="45" x2="250" y2="215"/>
-            <line x1="250" y1="45" x2="90" y2="215"/>
-          </g>
-          ${[
-            [170,20],[280,130],[170,240],[60,130],
-            [108,52],[232,52],[268,168],[72,168],
-            [140,78],[200,78],[218,182],[122,182],
-            [170,130],[210,110],[155,155]
-          ].map(([cx,cy]) => `<circle cx="${cx}" cy="${cy}" r="5" fill="${PRIMARY}" opacity=".7"/>`).join('')}
-        </svg>
-
-        <div style="font-size:38px;font-weight:800;color:${PRIMARY};letter-spacing:4px;text-transform:uppercase;text-align:center;font-family:'Segoe UI',Arial,sans-serif">SALES QUOTATION</div>
-        <div style="width:80px;height:4px;background:${ACCENT};margin:16px auto 18px;border-radius:2px;-webkit-print-color-adjust:exact;print-color-adjust:exact"></div>
-        <div style="font-size:13px;color:#7a8a9a;letter-spacing:.8px;text-align:center;font-family:'Segoe UI',Arial,sans-serif">MagicTech Projects Coordination — Jordan</div>
-      </div>
-
-      <!-- Brand partners strip -->
-      <div style="padding:14px 30px;border-top:1px solid #e8edf2;display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;justify-content:center;background:#fafbfc">
-        ${brandLogos.map(b => `<span style="font-size:10.5px;font-weight:700;color:#4a5a6a;letter-spacing:.3px;font-family:'Segoe UI',Arial,sans-serif">${b}</span>`).join('<span style="color:#c0c8d0;font-size:10px">|</span>')}
-      </div>
-
-      <!-- Address footer -->
-      <div style="background:#f5c6cb;color:#4a1010;text-align:center;padding:9px 20px;font-size:10.5px;font-weight:600;letter-spacing:.2px;font-family:'Segoe UI',Arial,sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact">
-        Address: Amman- Gardens street- Khawaja Complex No.65&nbsp;&nbsp;&nbsp;Tel: +962 65560272&nbsp;&nbsp;&nbsp;Fax: +962 65560275
-      </div>
+    <div class="qb-page qb-cover-pdf" style="width:210mm;height:297mm;page-break-after:always;break-after:page;overflow:hidden;position:relative;background:#fff;margin:0;padding:0;display:block;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+      <embed src="/MT.pdf#toolbar=0&navpanes=0&scrollbar=0&view=Fit&zoom=100"
+             type="application/pdf"
+             style="position:absolute;top:0;left:0;width:100%;height:100%;border:none;display:block;"
+             width="100%" height="100%">
     </div>`;
 
   // ── Pages 2..N: One page per system ──────────────────────
@@ -810,7 +815,7 @@ function buildQuotationHTML() {
   let itemNum = 1;
   let systemPages = '';
 
-  systems.forEach(([system, groupItems], idx) => {
+  systems.forEach(([system, groupItems]) => {
     let tableRows = '';
     let subtotal = 0;
 
@@ -820,55 +825,53 @@ function buildQuotationHTML() {
       subtotal += total;
 
       const imgCell = item.image_data
-        ? `<img src="${item.image_data}" style="width:40px;height:40px;object-fit:contain;border-radius:3px;background:#f5f7fa;border:1px solid ${BORDER};padding:2px;display:block;margin:0 auto;" alt="">`
-        : `<div style="width:0;height:0;display:block;"></div>`;
+        ? `<img src="${item.image_data}" style="width:34px;height:34px;object-fit:contain;border-radius:3px;background:#f5f7fa;border:1px solid ${BORDER};padding:2px;display:block;margin:0 auto;" alt="">`
+        : `<span style="color:#bbb;font-size:9px">—</span>`;
+
+      const descText  = item.description || item.model;
+      const specsText = item.specifications ? item.specifications.slice(0, 90) : '';
+      const delivText = item.delivery_time || defaultDelivery;
 
       tableRows += `
         <tr style="page-break-inside:avoid;break-inside:avoid">
-          <td style="padding:6px 8px;text-align:center;color:${TEXTSUB};font-size:11px;border-bottom:1px solid #e8edf2;vertical-align:middle">${itemNum++}</td>
-          <td style="padding:6px 8px;font-weight:600;font-size:11px;border-bottom:1px solid #e8edf2;vertical-align:middle;overflow:hidden;text-overflow:ellipsis">${escHtml(item.brand || '')}</td>
-          <td style="padding:6px 8px;text-align:center;border-bottom:1px solid #e8edf2;vertical-align:middle">${imgCell}</td>
-          <td style="padding:6px 8px;font-weight:700;color:${ACCENT};font-size:11px;border-bottom:1px solid #e8edf2;vertical-align:middle;word-break:break-word;line-height:1.35">${escHtml(item.model)}</td>
-          <td style="padding:6px 8px;font-size:11px;line-height:1.4;border-bottom:1px solid #e8edf2;vertical-align:middle">
-            <strong style="display:block;color:${TEXT};font-weight:600">${escHtml(item.description || item.model)}</strong>
-            ${item.specifications ? `<span style="color:${TEXTSUB};font-size:10.5px;line-height:1.5;display:block;margin-top:1px">${escHtml(item.specifications.slice(0, 120))}</span>` : ''}
-          </td>
-          <td style="padding:6px 8px;text-align:center;font-weight:600;font-size:11.5px;border-bottom:1px solid #e8edf2;vertical-align:middle">${item.qty}</td>
-          <td style="padding:6px 8px;text-align:right;white-space:nowrap;font-size:11px;border-bottom:1px solid #e8edf2;vertical-align:middle">${fmtP(unit)}</td>
-          <td style="padding:6px 8px;text-align:right;font-weight:700;white-space:nowrap;color:${ACCENT};font-size:11.5px;border-bottom:1px solid #e8edf2;vertical-align:middle">${fmtP(total)}</td>
+          <td style="padding:5px 6px;text-align:center;color:${TEXTSUB};font-size:10px;border-bottom:1px solid #e8edf2;vertical-align:middle">${itemNum++}</td>
+          ${cols.brand    ? `<td style="padding:5px 6px;font-weight:600;font-size:10px;border-bottom:1px solid #e8edf2;vertical-align:middle;overflow:hidden">${escHtml(item.brand || '')}</td>` : ''}
+          ${cols.picture  ? `<td style="padding:5px 6px;text-align:center;border-bottom:1px solid #e8edf2;vertical-align:middle">${imgCell}</td>` : ''}
+          <td style="padding:5px 6px;font-weight:700;color:${ACCENT};font-size:10px;border-bottom:1px solid #e8edf2;vertical-align:middle;word-break:break-word;line-height:1.3">${escHtml(item.model)}</td>
+          ${cols.description ? `<td style="padding:5px 6px;font-size:10px;line-height:1.35;border-bottom:1px solid #e8edf2;vertical-align:middle">
+            <span style="display:block;color:${TEXT};font-weight:600;line-height:1.3">${escHtml(descText)}</span>
+            ${specsText ? `<span style="color:${TEXTSUB};font-size:9px;display:block;margin-top:1px;line-height:1.35">${escHtml(specsText)}</span>` : ''}
+          </td>` : ''}
+          ${cols.delivery ? `<td style="padding:5px 6px;text-align:center;font-size:9.5px;color:${TEXTSUB};border-bottom:1px solid #e8edf2;vertical-align:middle;line-height:1.3">${escHtml(delivText)}</td>` : ''}
+          <td style="padding:5px 6px;text-align:center;font-weight:600;font-size:10.5px;border-bottom:1px solid #e8edf2;vertical-align:middle">${item.qty}</td>
+          <td style="padding:5px 6px;text-align:right;white-space:nowrap;font-size:10px;border-bottom:1px solid #e8edf2;vertical-align:middle">${fmtP(unit)}</td>
+          <td style="padding:5px 6px;text-align:right;font-weight:700;white-space:nowrap;color:${ACCENT};font-size:10.5px;border-bottom:1px solid #e8edf2;vertical-align:middle">${fmtP(total)}</td>
         </tr>`;
     });
 
-    // Subtotal row for this system
+    // Subtotal row
     tableRows += `
       <tr>
-        <td colspan="5" style="background:#fff3f3;font-weight:700;font-size:11px;border-top:2px solid ${ACCENT};padding:8px 12px;text-align:right;color:${PRIMARY};text-transform:uppercase;letter-spacing:.5px">
+        <td colspan="${leftColCount}" style="background:#fff3f3;font-weight:700;font-size:10px;border-top:2px solid ${ACCENT};padding:6px 10px;text-align:right;color:${PRIMARY};text-transform:uppercase;letter-spacing:.5px">
           SUBTOTAL — ${escHtml(system.toUpperCase())}:
         </td>
-        <td colspan="3" style="background:#fff3f3;font-weight:700;font-size:13px;border-top:2px solid ${ACCENT};padding:8px 12px;text-align:center;color:${ACCENT}">
+        <td colspan="${rightColCount}" style="background:#fff3f3;font-weight:700;font-size:12px;border-top:2px solid ${ACCENT};padding:6px 10px;text-align:center;color:${ACCENT}">
           ${fmtP(subtotal)}
         </td>
       </tr>`;
 
     systemPages += `
-      <div class="qb-page" style="page-break-before:always;break-before:page;background:#fff;margin-bottom:0;padding-top:0;width:215.9mm;min-height:279.4mm;display:flex;flex-direction:column;justify-content:space-between">
+      <div class="qb-page" style="page-break-before:always;break-before:page;background:#fff;margin-bottom:0;padding-top:0;width:210mm;min-height:297mm;display:flex;flex-direction:column;justify-content:space-between">
         ${pageHeaderHTML()}
 
         <div style="flex:1;display:flex;flex-direction:column">
-          <!-- System banner -->
-          <div style="background:${SECBG};color:#fff;padding:12px 28px;font-weight:800;font-size:15px;letter-spacing:2px;text-align:center;text-transform:uppercase;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+          <div style="background:${SECBG};color:#fff;padding:8px 22px;font-weight:800;font-size:12px;letter-spacing:2px;text-align:center;text-transform:uppercase;-webkit-print-color-adjust:exact;print-color-adjust:exact">
             ${escHtml(system.toUpperCase())}
           </div>
-
-          <!-- System items table -->
-          <div style="padding:0 24px 16px;flex:1">
-            <table style="width:100%;border-collapse:collapse;margin-top:0;font-size:11.5px;table-layout:auto">
-              <colgroup>
-                <col style="width:3%"><col style="width:7%"><col style="width:7%">
-                <col style="width:13%"><col><col style="width:5%">
-                <col style="width:11%"><col style="width:12%">
-              </colgroup>
-              ${tableHeaderHTML}
+          <div style="padding:0 18px 12px;flex:1">
+            <table style="width:100%;border-collapse:collapse;margin-top:0;font-size:10px;table-layout:fixed">
+              ${colgroupHTML()}
+              ${tableHeaderHTML()}
               <tbody>${tableRows}</tbody>
             </table>
           </div>
@@ -878,75 +881,67 @@ function buildQuotationHTML() {
       </div>`;
   });
 
-  // ── Last page: Cost summary + Thank you + T&C ─────────────
+  // ── Last page: Cost summary + T&C ─────────────────────────
   const summaryRows = systems.map(([sys]) => `
     <tr>
-      <td style="padding:10px 16px;font-weight:600;font-size:12px;border-bottom:1px solid ${BORDER};color:${TEXT}">${escHtml(sys)}</td>
-      <td style="padding:10px 16px;font-weight:700;font-size:12px;border-bottom:1px solid ${BORDER};text-align:right;color:${ACCENT}">${fmtP(systemTotals[sys])}</td>
+      <td style="padding:8px 14px;font-weight:600;font-size:11px;border-bottom:1px solid ${BORDER};color:${TEXT}">${escHtml(sys)}</td>
+      <td style="padding:8px 14px;font-weight:700;font-size:11px;border-bottom:1px solid ${BORDER};text-align:right;color:${ACCENT}">${fmtP(systemTotals[sys])}</td>
     </tr>`).join('');
 
   const endPage = `
-    <div class="qb-page" style="page-break-before:always;break-before:page;background:#fff;min-height:279.4mm;width:215.9mm;display:flex;flex-direction:column;padding-top:0">
+    <div class="qb-page" style="page-break-before:always;break-before:page;background:#fff;min-height:297mm;width:210mm;display:flex;flex-direction:column;padding-top:0">
       ${pageHeaderHTML()}
 
-      <!-- Thank you section -->
-      <div style="padding:48px 28px 32px;text-align:center;border-bottom:1px solid ${BORDER}">
-        <div style="font-size:28px;font-weight:800;color:${PRIMARY};letter-spacing:1px;margin-bottom:12px">Thank You for Your Trust</div>
-        <div style="font-size:14px;color:${TEXTSUB};max-width:560px;margin:0 auto;line-height:1.8">
+      <div style="padding:32px 22px 22px;text-align:center;border-bottom:1px solid ${BORDER}">
+        <div style="font-size:22px;font-weight:800;color:${PRIMARY};letter-spacing:1px;margin-bottom:8px">Thank You for Your Trust</div>
+        <div style="font-size:12px;color:${TEXTSUB};max-width:500px;margin:0 auto;line-height:1.8">
           We sincerely appreciate the opportunity to serve you.<br>
           Your confidence in MagicTech drives us to deliver excellence in every project.<br>
           We look forward to a successful partnership.
         </div>
       </div>
 
-      <!-- Cost summary -->
-      <div style="padding:28px 28px 20px">
-        <div style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:${TEXT};margin-bottom:14px;padding-bottom:6px;border-bottom:2px solid ${ACCENT}">
-          Cost Summary
-        </div>
-        <table style="width:100%;border-collapse:collapse;font-size:12px">
+      <div style="padding:20px 22px 14px">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:${TEXT};margin-bottom:10px;padding-bottom:5px;border-bottom:2px solid ${ACCENT}">Cost Summary</div>
+        <table style="width:100%;border-collapse:collapse;font-size:11px">
           <thead>
             <tr style="-webkit-print-color-adjust:exact;print-color-adjust:exact">
-              <th style="background:#edf1f6;color:${TEXT};padding:9px 16px;text-align:left;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.4px;border-bottom:2px solid ${BORDER}">System</th>
-              <th style="background:#edf1f6;color:${TEXT};padding:9px 16px;text-align:right;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.4px;border-bottom:2px solid ${BORDER}">Cost</th>
+              <th style="background:#edf1f6;color:${TEXT};padding:7px 14px;text-align:left;font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:.4px;border-bottom:2px solid ${BORDER}">System</th>
+              <th style="background:#edf1f6;color:${TEXT};padding:7px 14px;text-align:right;font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:.4px;border-bottom:2px solid ${BORDER}">Cost</th>
             </tr>
           </thead>
           <tbody>
             ${summaryRows}
             <tr style="-webkit-print-color-adjust:exact;print-color-adjust:exact">
-              <td style="background:#fff8e6;padding:12px 16px;font-weight:800;font-size:14px;border-top:2px solid ${GOLD};color:${PRIMARY};text-transform:uppercase;letter-spacing:.5px">Total Cost</td>
-              <td style="background:#fff8e6;padding:12px 16px;font-weight:800;font-size:16px;border-top:2px solid ${GOLD};color:${ACCENT};text-align:right">${fmtP(grandTotal)}</td>
+              <td style="background:#fff8e6;padding:10px 14px;font-weight:800;font-size:13px;border-top:2px solid ${GOLD};color:${PRIMARY};text-transform:uppercase;letter-spacing:.5px">Total Cost</td>
+              <td style="background:#fff8e6;padding:10px 14px;font-weight:800;font-size:14px;border-top:2px solid ${GOLD};color:${ACCENT};text-align:right">${fmtP(grandTotal)}</td>
             </tr>
           </tbody>
         </table>
       </div>
 
       ${info.notes && info.notes.trim() ? `
-      <!-- Custom Notes -->
-      <div style="padding:16px 28px 20px;border-top:1px solid ${BORDER};background:#fafbfc">
-        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:${TEXTSUB};margin-bottom:6px">Notes</div>
-        <div style="font-size:12px;color:${TEXTSUB};line-height:1.7;white-space:pre-wrap">${escHtml(info.notes)}</div>
+      <div style="padding:12px 22px 14px;border-top:1px solid ${BORDER};background:#fafbfc">
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:${TEXTSUB};margin-bottom:5px">Notes</div>
+        <div style="font-size:11px;color:${TEXTSUB};line-height:1.7;white-space:pre-wrap">${escHtml(info.notes)}</div>
       </div>` : ''}
 
-      <!-- Terms & Conditions -->
-      <div style="padding:20px 28px 24px;border-top:2px solid ${BORDER};margin-top:auto">
-        <div style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:${TEXT};margin-bottom:12px;padding-bottom:6px;border-bottom:2px solid ${ACCENT}">
-          Terms &amp; Conditions
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 24px">
+      <div style="padding:16px 22px 18px;border-top:2px solid ${BORDER};margin-top:auto">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:${TEXT};margin-bottom:10px;padding-bottom:5px;border-bottom:2px solid ${ACCENT}">Terms &amp; Conditions</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 18px">
           ${[
-            [`Validity`, `This quotation is valid for ${escHtml(info.validity || '30')} days from the date of issue.`],
+            [`Validity`,      `This quotation is valid for ${escHtml(info.validity || '30')} days from the date of issue.`],
             [`Payment Terms`, `50% advance payment upon order confirmation; 50% upon delivery/completion.`],
-            [`Delivery`, `Delivery timelines will be confirmed upon order placement and subject to availability.`],
-            [`Installation`, `Installation charges are quoted separately unless explicitly included above.`],
-            [`Warranty`, `All products carry the manufacturer's standard warranty. Labour warranty is 1 year.`],
-            [`Prices`, `Prices are subject to change without prior notice until a purchase order is confirmed.`],
+            [`Delivery`,      info.delivery ? escHtml(info.delivery) : `Delivery timelines confirmed upon order placement, subject to availability.`],
+            [`Installation`,  `Installation charges are quoted separately unless explicitly included above.`],
+            [`Warranty`,      `All products carry the manufacturer's standard warranty. Labour warranty is 1 year.`],
+            [`Prices`,        `Prices are subject to change without prior notice until a purchase order is confirmed.`],
             [`Governing Law`, `This quotation is governed by the laws of the Hashemite Kingdom of Jordan.`],
-            [`Acceptance`, `Placing a purchase order constitutes acceptance of these terms and conditions.`]
+            [`Acceptance`,    `Placing a purchase order constitutes acceptance of these terms and conditions.`]
           ].map(([title, text]) => `
-            <div style="padding:6px 0;border-bottom:1px solid #f0f3f7">
-              <div style="font-weight:700;font-size:10.5px;color:${TEXT};margin-bottom:2px">${title}</div>
-              <div style="font-size:10.5px;color:${TEXTSUB};line-height:1.5">${text}</div>
+            <div style="padding:4px 0;border-bottom:1px solid #f0f3f7">
+              <div style="font-weight:700;font-size:9.5px;color:${TEXT};margin-bottom:1px">${title}</div>
+              <div style="font-size:9.5px;color:${TEXTSUB};line-height:1.4">${text}</div>
             </div>`).join('')}
         </div>
       </div>
@@ -1003,12 +998,15 @@ function exportQBPdf() {
   .qb-page { page-break-before:always; break-before:page; border:none !important; outline:none !important; box-shadow:none !important; }
   .qb-page:first-child { page-break-before:auto; break-before:auto; }
   @media print {
-    @page { size:letter portrait; margin:0; }
+    @page { size:A4 portrait; margin:0; }
+    @page:first { size:A4 portrait; margin:0; }
     html, body { border:none !important; outline:none !important; box-shadow:none !important; background:#fff !important; }
     body  { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
     tr    { page-break-inside:avoid; break-inside:avoid; }
     .qb-page { page-break-before:always; break-before:page; border:none !important; outline:none !important; box-shadow:none !important; }
     .qb-page:first-child { page-break-before:auto; break-before:auto; }
+    .qb-cover-pdf { padding:0 !important; margin:0 !important; }
+    .qb-cover-pdf embed { width:100% !important; height:100% !important; border:none !important; }
   }
 </style>
 </head><body>
@@ -1016,19 +1014,17 @@ function exportQBPdf() {
 ${pagesHTML}
 </div>
 <script>
-  // Wait for all images to load before opening print dialog
+  function tryPrint() { window.focus(); window.print(); }
+  // Give the PDF embed and images time to load before printing
   var imgs = document.images;
   var total = imgs.length, loaded = 0;
-  function tryPrint() { window.focus(); window.print(); }
+  function imgDone() { if (++loaded >= total) setTimeout(tryPrint, 900); }
   if (total === 0) {
-    setTimeout(tryPrint, 400);
+    setTimeout(tryPrint, 900);
   } else {
     for (var i = 0; i < total; i++) {
-      if (imgs[i].complete) { if (++loaded >= total) { setTimeout(tryPrint, 400); break; } }
-      else {
-        imgs[i].onload  = function() { if (++loaded >= total) setTimeout(tryPrint, 400); };
-        imgs[i].onerror = function() { if (++loaded >= total) setTimeout(tryPrint, 400); };
-      }
+      if (imgs[i].complete) { if (++loaded >= total) { setTimeout(tryPrint, 900); break; } }
+      else { imgs[i].onload = imgs[i].onerror = imgDone; }
     }
   }
 <\/script>
