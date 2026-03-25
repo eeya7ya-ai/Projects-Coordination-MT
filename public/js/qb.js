@@ -782,8 +782,8 @@ function buildQuotationHTML() {
       <col style="width:3%">
       ${cols.brand       ? '<col style="width:8%">'  : ''}
       ${cols.picture     ? '<col style="width:7%">'  : ''}
-      <col style="width:${cols.description ? '15' : '32'}%">
-      ${cols.description ? '<col>' : ''}
+      <col style="width:${cols.description ? '14' : '38'}%">
+      ${cols.description ? '<col style="width:25%">' : ''}
       ${cols.delivery    ? '<col style="width:11%">' : ''}
       <col style="width:5%">
       <col style="width:12%">
@@ -803,10 +803,10 @@ function buildQuotationHTML() {
 
   // ── Page 1: MT.pdf cover (full-page embed, no borders) ────
   const coverPage = `
-    <div class="qb-page qb-cover-pdf" style="width:210mm;height:297mm;page-break-after:always;break-after:page;overflow:hidden;position:relative;background:#fff;margin:0;padding:0;display:block;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+    <div class="qb-page qb-cover-pdf" style="width:210mm;height:297mm;page-break-after:always;break-after:page;overflow:hidden;position:relative;background:#fff;display:block;-webkit-print-color-adjust:exact;print-color-adjust:exact">
       <embed src="/MT.pdf#toolbar=0&navpanes=0&scrollbar=0&view=Fit&zoom=100"
              type="application/pdf"
-             style="position:absolute;top:0;left:0;width:100%;height:100%;border:none;display:block;"
+             style="position:absolute;top:0;left:0;width:100%;height:100%;border:none !important;outline:none !important;box-shadow:none !important;display:block;"
              width="100%" height="100%">
     </div>`;
 
@@ -861,7 +861,7 @@ function buildQuotationHTML() {
       </tr>`;
 
     systemPages += `
-      <div class="qb-page" style="page-break-before:always;break-before:page;background:#fff;margin-bottom:0;padding-top:0;width:210mm;min-height:297mm;display:flex;flex-direction:column;justify-content:space-between">
+      <div class="qb-page" style="page-break-before:always;break-before:page;background:#fff;width:210mm;min-height:297mm;display:flex;flex-direction:column;justify-content:space-between">
         ${pageHeaderHTML()}
 
         <div style="flex:1;display:flex;flex-direction:column">
@@ -889,7 +889,7 @@ function buildQuotationHTML() {
     </tr>`).join('');
 
   const endPage = `
-    <div class="qb-page" style="page-break-before:always;break-before:page;background:#fff;min-height:297mm;width:210mm;display:flex;flex-direction:column;padding-top:0">
+    <div class="qb-page" style="page-break-before:always;break-before:page;background:#fff;min-height:297mm;width:210mm;display:flex;flex-direction:column">
       ${pageHeaderHTML()}
 
       <div style="padding:32px 22px 22px;text-align:center;border-bottom:1px solid ${BORDER}">
@@ -960,7 +960,12 @@ function previewQuotation() {
   if (!qbItems.length) { showToast('Add items to the quotation before previewing', 'error'); return; }
   const { pagesHTML } = buildQuotationHTML();
   const body = document.getElementById('qb-preview-body');
-  body.innerHTML = `<style>.qb-page{border:none!important;outline:none!important;box-shadow:0 2px 12px rgba(0,0,0,.12)!important;border-radius:2px;margin-bottom:16px;}</style><div style="font-family:'Segoe UI',Arial,sans-serif;color:#1e2a38;font-size:13px;line-height:1.5;">${pagesHTML}</div>`;
+  body.innerHTML = `<style>
+    .qb-page{border:none!important;outline:none!important;box-shadow:0 2px 16px rgba(0,0,0,.14)!important;border-radius:3px;margin-bottom:28px!important;overflow:hidden;}
+    .qb-cover-pdf{box-shadow:none!important;border:none!important;outline:none!important;margin-bottom:28px!important;}
+    .qb-cover-pdf embed{border:none!important;outline:none!important;box-shadow:none!important;}
+    embed{border:none!important;outline:none!important;box-shadow:none!important;}
+  </style><div style="font-family:'Segoe UI',Arial,sans-serif;color:#1e2a38;font-size:13px;line-height:1.5;">${pagesHTML}</div>`;
   openModal('qb-preview-modal');
 }
 
@@ -1000,13 +1005,13 @@ function exportQBPdf() {
   @media print {
     @page { size:A4 portrait; margin:0; }
     @page:first { size:A4 portrait; margin:0; }
-    html, body { border:none !important; outline:none !important; box-shadow:none !important; background:#fff !important; }
+    html, body { border:none !important; outline:none !important; box-shadow:none !important; background:#fff !important; margin:0; padding:0; }
     body  { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
     tr    { page-break-inside:avoid; break-inside:avoid; }
-    .qb-page { page-break-before:always; break-before:page; border:none !important; outline:none !important; box-shadow:none !important; }
+    .qb-page { page-break-before:always; break-before:page; border:none !important; outline:none !important; box-shadow:none !important; margin:0 !important; border-radius:0 !important; }
     .qb-page:first-child { page-break-before:auto; break-before:auto; }
-    .qb-cover-pdf { padding:0 !important; margin:0 !important; }
-    .qb-cover-pdf embed { width:100% !important; height:100% !important; border:none !important; }
+    .qb-cover-pdf { padding:0 !important; margin:0 !important; border:none !important; outline:none !important; box-shadow:none !important; }
+    .qb-cover-pdf embed { width:100% !important; height:100% !important; border:none !important; outline:none !important; box-shadow:none !important; }
   }
 </style>
 </head><body>
