@@ -443,10 +443,40 @@
                     </select>
                   </div>
                 </div>
+                <div class="form-grid">
+                  <div class="form-group"><label>Validity (days)</label><input type="number" id="qb-c-validity" class="form-control" value="30" min="1" placeholder="30" oninput="qbAutoSaveCustomer()"></div>
+                  <div class="form-group"><label>Default Delivery Time</label><input type="text" id="qb-c-delivery" class="form-control" placeholder="e.g. 4-6 weeks" oninput="qbAutoSaveCustomer()"></div>
+                </div>
                 <div class="form-group" style="margin-top:4px">
                   <label>Notes / Terms</label>
-                  <textarea id="qb-c-notes" class="form-control" rows="3" placeholder="Payment terms, delivery notes, validity..." oninput="qbAutoSaveCustomer()" style="resize:vertical"></textarea>
+                  <textarea id="qb-c-notes" class="form-control" rows="3" placeholder="Payment terms, delivery notes..." oninput="qbAutoSaveCustomer()" style="resize:vertical"></textarea>
                 </div>
+              </div>
+            </div>
+
+            <!-- Print Options Panel -->
+            <div class="card" style="margin-bottom:14px">
+              <div class="card-header" style="cursor:pointer;user-select:none" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'':'none'">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" style="vertical-align:middle;margin-right:6px"><polyline points="6 9 12 15 18 9"/></svg>
+                Print Column Options
+              </div>
+              <div class="card-body" style="padding:12px 16px">
+                <div style="font-size:12px;color:var(--gray-500);margin-bottom:10px">Choose which columns appear when printing / exporting PDF:</div>
+                <div style="display:flex;flex-wrap:wrap;gap:10px 24px">
+                  <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;font-weight:500">
+                    <input type="checkbox" id="qb-col-brand" onchange="qbTogglePrintCol('brand',this.checked)"> Brand
+                  </label>
+                  <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;font-weight:500">
+                    <input type="checkbox" id="qb-col-picture" onchange="qbTogglePrintCol('picture',this.checked)"> Picture
+                  </label>
+                  <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;font-weight:500">
+                    <input type="checkbox" id="qb-col-description" onchange="qbTogglePrintCol('description',this.checked)"> Description
+                  </label>
+                  <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;font-weight:500">
+                    <input type="checkbox" id="qb-col-delivery" onchange="qbTogglePrintCol('delivery',this.checked)"> Delivery Time
+                  </label>
+                </div>
+                <div style="margin-top:8px;font-size:11px;color:var(--gray-400)">Columns always shown: #, Model, Qty, Unit Price, Total Price</div>
               </div>
             </div>
 
