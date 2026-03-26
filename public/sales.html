@@ -458,25 +458,49 @@
             <div class="card" style="margin-bottom:14px">
               <div class="card-header" style="cursor:pointer;user-select:none" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'':'none'">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" style="vertical-align:middle;margin-right:6px"><polyline points="6 9 12 15 18 9"/></svg>
-                Print Column Options
+                PDF Column Options
               </div>
               <div class="card-body" style="padding:12px 16px">
-                <div style="font-size:12px;color:var(--gray-500);margin-bottom:10px">Choose which columns appear when printing / exporting PDF:</div>
-                <div style="display:flex;flex-wrap:wrap;gap:10px 24px">
-                  <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;font-weight:500">
-                    <input type="checkbox" id="qb-col-brand" onchange="qbTogglePrintCol('brand',this.checked)"> Brand
-                  </label>
-                  <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;font-weight:500">
-                    <input type="checkbox" id="qb-col-picture" onchange="qbTogglePrintCol('picture',this.checked)"> Picture
-                  </label>
-                  <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;font-weight:500">
-                    <input type="checkbox" id="qb-col-description" onchange="qbTogglePrintCol('description',this.checked)"> Description
-                  </label>
-                  <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;font-weight:500">
-                    <input type="checkbox" id="qb-col-delivery" onchange="qbTogglePrintCol('delivery',this.checked)"> Delivery Time
-                  </label>
+                <div style="font-size:12px;color:var(--gray-500);margin-bottom:10px">Toggle columns and rename their headers for the PDF export:</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 16px">
+
+                  <!-- Brand -->
+                  <div style="display:flex;align-items:center;gap:7px">
+                    <input type="checkbox" id="qb-col-brand" onchange="qbTogglePrintCol('brand',this.checked)" style="flex-shrink:0">
+                    <input type="text" id="qb-lbl-brand" placeholder="Brand" onchange="qbSetColLabel('brand',this.value)"
+                           style="flex:1;font-size:12px;border:1px solid var(--gray-200);border-radius:5px;padding:3px 7px;background:var(--gray-50)">
+                  </div>
+
+                  <!-- Picture -->
+                  <div style="display:flex;align-items:center;gap:7px">
+                    <input type="checkbox" id="qb-col-picture" onchange="qbTogglePrintCol('picture',this.checked)" style="flex-shrink:0">
+                    <input type="text" id="qb-lbl-picture" placeholder="Picture" onchange="qbSetColLabel('picture',this.value)"
+                           style="flex:1;font-size:12px;border:1px solid var(--gray-200);border-radius:5px;padding:3px 7px;background:var(--gray-50)">
+                  </div>
+
+                  <!-- Description -->
+                  <div style="display:flex;align-items:center;gap:7px">
+                    <input type="checkbox" id="qb-col-description" onchange="qbTogglePrintCol('description',this.checked)" style="flex-shrink:0">
+                    <input type="text" id="qb-lbl-description" placeholder="Description" onchange="qbSetColLabel('description',this.value)"
+                           style="flex:1;font-size:12px;border:1px solid var(--gray-200);border-radius:5px;padding:3px 7px;background:var(--gray-50)">
+                  </div>
+
+                  <!-- Specifications -->
+                  <div style="display:flex;align-items:center;gap:7px">
+                    <input type="checkbox" id="qb-col-specs" onchange="qbTogglePrintCol('specs',this.checked)" style="flex-shrink:0">
+                    <input type="text" id="qb-lbl-specs" placeholder="Specifications" onchange="qbSetColLabel('specs',this.value)"
+                           style="flex:1;font-size:12px;border:1px solid var(--gray-200);border-radius:5px;padding:3px 7px;background:var(--gray-50)">
+                  </div>
+
+                  <!-- Delivery -->
+                  <div style="display:flex;align-items:center;gap:7px">
+                    <input type="checkbox" id="qb-col-delivery" onchange="qbTogglePrintCol('delivery',this.checked)" style="flex-shrink:0">
+                    <input type="text" id="qb-lbl-delivery" placeholder="Delivery" onchange="qbSetColLabel('delivery',this.value)"
+                           style="flex:1;font-size:12px;border:1px solid var(--gray-200);border-radius:5px;padding:3px 7px;background:var(--gray-50)">
+                  </div>
+
                 </div>
-                <div style="margin-top:8px;font-size:11px;color:var(--gray-400)">Columns always shown: #, Model, Qty, Unit Price, Total Price</div>
+                <div style="margin-top:10px;font-size:11px;color:var(--gray-400)">✓ = visible in PDF &nbsp;|&nbsp; Edit the text field to rename the column header &nbsp;|&nbsp; Always shown: #, Model, Qty, Unit Price, Total</div>
               </div>
             </div>
 
@@ -494,7 +518,6 @@
                       <th>Brand</th>
                       <th>Model</th>
                       <th>Description</th>
-                      <th>Image</th>
                       <th>Qty</th>
                       <th>Unit Price</th>
                       <th>Total</th>
