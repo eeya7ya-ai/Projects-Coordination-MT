@@ -13,8 +13,13 @@ const QB_FILTERS      = { category: '', system: '', brand: '', type: '', series:
 
 // ── Print column preferences ──────────────────────────────────
 function getQBPrintCols() {
-  const defaults = { brand: true, picture: false, description: true, delivery: true };
+  const defaults = { brand: true, picture: false, description: true, specs: false, delivery: true };
   try { return { ...defaults, ...JSON.parse(localStorage.getItem('mt_qb_print_cols') || '{}') }; }
+  catch(_) { return defaults; }
+}
+function getQBColLabels() {
+  const defaults = { brand: 'Brand', picture: 'Picture', description: 'Description', specs: 'Specifications', delivery: 'Delivery' };
+  try { return { ...defaults, ...JSON.parse(localStorage.getItem('mt_qb_col_labels') || '{}') }; }
   catch(_) { return defaults; }
 }
 function qbTogglePrintCol(col, checked) {
@@ -22,11 +27,19 @@ function qbTogglePrintCol(col, checked) {
   cols[col] = !!checked;
   localStorage.setItem('mt_qb_print_cols', JSON.stringify(cols));
 }
+function qbSetColLabel(col, label) {
+  const labels = getQBColLabels();
+  labels[col] = label.trim() || col;
+  localStorage.setItem('mt_qb_col_labels', JSON.stringify(labels));
+}
 function initQBPrintColsUI() {
-  const cols = getQBPrintCols();
-  ['brand', 'picture', 'description', 'delivery'].forEach(c => {
-    const el = document.getElementById('qb-col-' + c);
-    if (el) el.checked = !!cols[c];
+  const cols   = getQBPrintCols();
+  const labels = getQBColLabels();
+  ['brand', 'picture', 'description', 'specs', 'delivery'].forEach(c => {
+    const chk = document.getElementById('qb-col-' + c);
+    if (chk) chk.checked = !!cols[c];
+    const lbl = document.getElementById('qb-lbl-' + c);
+    if (lbl) lbl.value = labels[c] || c;
   });
 }
 
@@ -384,7 +397,7 @@ function qbRenderTable() {
   const gm = qbGetGlobalMultiplier();
 
   Object.entries(grouped).forEach(([system, items]) => {
-    html += '<tr class="qb-section-header"><td colspan="9">' + escHtml(system.toUpperCase()) + '</td></tr>';
+    html += '<tr class="qb-section-header"><td colspan="8">' + escHtml(system.toUpperCase()) + '</td></tr>';
     items.forEach(item => {
       // Fixed-price items (manual/service) ignore global multiplier
       let effectivePrice;
@@ -405,7 +418,6 @@ function qbRenderTable() {
           (item.series || item.type ? '<div style="font-size:10px;color:var(--gray-400);margin-top:2px">' + escHtml(item.series || item.type) + '</div>' : '') +
         '</td>' +
         '<td class="qb-td-desc" title="' + escHtml(item.description) + '">' + escHtml(qbTruncate(item.description, 60)) + '</td>' +
-        '<td class="qb-td-specs">' + (item.image_data ? '<img src="' + escHtml(item.image_data) + '" style="width:38px;height:38px;object-fit:contain;border-radius:4px;border:1px solid #e2e8f0;background:#f8fafc;padding:2px;display:block;margin:0 auto" alt="">' : '<span style="color:#aaa;font-size:10px">No image</span>') + '</td>' +
         '<td class="qb-td-qty">' +
           '<div style="display:flex;align-items:center;gap:3px;justify-content:center">' +
             '<button class="qb-qty-btn" onclick="updateQBQty(' + item.id + ',' + (item.qty - 1) + ')">−</button>' +
@@ -421,7 +433,7 @@ function qbRenderTable() {
   });
 
   // Grand total row
-  html += '<tr class="qb-grand-total-row"><td colspan="9" style="text-align:center;padding:12px 16px">' +
+  html += '<tr class="qb-grand-total-row"><td colspan="8" style="text-align:center;padding:12px 16px">' +
     '<span style="font-weight:700;font-size:13px;text-transform:uppercase;letter-spacing:.5px">Total Material Cost:</span> ' +
     '<span style="font-size:16px;color:var(--red);font-weight:700;margin-left:12px">' + qbFmt(grandTotal, currency) + '</span>' +
   '</td></tr>';
@@ -647,7 +659,10 @@ function confirmQBManual() {
 }
 
 // ── Build quotation HTML (shared between preview and PDF export) ──
-function buildQuotationHTML() {
+// baseUrl: pass window.location.origin when generating for a popup print window,
+//          so that image src attributes resolve correctly in the about:blank context.
+function buildQuotationHTML(baseUrl) {
+  const _base    = baseUrl || '';
   const currency = document.getElementById('qb-c-currency')?.value || 'JOD';
   const gm       = qbGetGlobalMultiplier();
   const info     = (() => {
@@ -670,8 +685,10 @@ function buildQuotationHTML() {
     const [y, m, d] = iso.split('-'); return `${d}/${m}/${y}`;
   };
 
-  // ── Print column visibility ────────────────────────────────
-  const cols = getQBPrintCols();
+  // ── Print column visibility & labels ──────────────────────
+  const cols   = getQBPrintCols();
+  const clabels = getQBColLabels();
+  const colLabel = k => escHtml(clabels[k] || k);
   const defaultDelivery = info.delivery || '';
 
   // ── Recalculate unit prices ────────────────────────────────
@@ -706,9 +723,8 @@ function buildQuotationHTML() {
     grandTotal += sub;
   });
 
-  const logoHTML = logoData
-    ? `<img src="${logoData}" style="height:44px;width:auto;display:block;object-fit:contain;" alt="Logo">`
-    : `<img src="/Magic Tech Logo.png" style="height:44px;width:auto;display:block;object-fit:contain;" alt="MT Logo" onerror="this.style.display='none'">`;
+  const logoSrc  = logoData || (_base + '/Magic Tech Logo.png');
+  const logoHTML = `<img src="${logoSrc}" style="height:44px;width:auto;display:block;object-fit:contain;" alt="MT Logo" onerror="this.style.display='none'">`;
 
   const dateStr = fmtDate(info.date);
 
@@ -762,11 +778,12 @@ function buildQuotationHTML() {
     <thead>
       <tr>
         <th style="${TH};text-align:center">#</th>
-        ${cols.brand       ? `<th style="${TH};text-align:left">Brand</th>` : ''}
-        ${cols.picture     ? `<th style="${TH};text-align:center">Picture</th>` : ''}
+        ${cols.brand        ? `<th style="${TH};text-align:left">${colLabel('brand')}</th>` : ''}
+        ${cols.picture      ? `<th style="${TH};text-align:center">${colLabel('picture')}</th>` : ''}
         <th style="${TH};text-align:left">Model</th>
-        ${cols.description ? `<th style="${TH};text-align:left">Description</th>` : ''}
-        ${cols.delivery    ? `<th style="${TH};text-align:center">Delivery</th>` : ''}
+        ${cols.description  ? `<th style="${TH};text-align:left">${colLabel('description')}</th>` : ''}
+        ${cols.specs        ? `<th style="${TH};text-align:left">${colLabel('specs')}</th>` : ''}
+        ${cols.delivery     ? `<th style="${TH};text-align:center">${colLabel('delivery')}</th>` : ''}
         <th style="${TH};text-align:center">Qty</th>
         <th style="${TH};text-align:right">Unit Price</th>
         <th style="${TH};text-align:right">Total Price</th>
@@ -774,17 +791,18 @@ function buildQuotationHTML() {
     </thead>`;
 
   // Column count for subtotal colspan
-  const leftColCount  = 1 + (cols.brand ? 1 : 0) + (cols.picture ? 1 : 0) + 1 + (cols.description ? 1 : 0) + (cols.delivery ? 1 : 0);
+  const leftColCount  = 1 + (cols.brand ? 1 : 0) + (cols.picture ? 1 : 0) + 1 + (cols.description ? 1 : 0) + (cols.specs ? 1 : 0) + (cols.delivery ? 1 : 0);
   const rightColCount = 3; // qty + unit + total
 
   const colgroupHTML = () => `
     <colgroup>
       <col style="width:3%">
-      ${cols.brand       ? '<col style="width:8%">'  : ''}
-      ${cols.picture     ? '<col style="width:7%">'  : ''}
-      <col style="width:${cols.description ? '15' : '32'}%">
-      ${cols.description ? '<col>' : ''}
-      ${cols.delivery    ? '<col style="width:11%">' : ''}
+      ${cols.brand        ? '<col style="width:8%">'  : ''}
+      ${cols.picture      ? '<col style="width:7%">'  : ''}
+      <col style="width:${(cols.description || cols.specs) ? '15' : '32'}%">
+      ${cols.description  ? '<col>' : ''}
+      ${cols.specs        ? '<col style="width:14%">' : ''}
+      ${cols.delivery     ? '<col style="width:11%">' : ''}
       <col style="width:5%">
       <col style="width:12%">
       <col style="width:12%">
@@ -801,13 +819,92 @@ function buildQuotationHTML() {
       </div>
     </div>`;
 
-  // ── Page 1: MT.pdf cover (full-page embed, no borders) ────
+  // ── Page 1: HTML cover page (reliable cross-browser printing) ─
+  const coverLogoSrc = logoData || (_base + '/Magic Tech Logo.png');
   const coverPage = `
-    <div class="qb-page qb-cover-pdf" style="width:210mm;height:297mm;page-break-after:always;break-after:page;overflow:hidden;position:relative;background:#fff;margin:0;padding:0;display:block;-webkit-print-color-adjust:exact;print-color-adjust:exact">
-      <embed src="/MT.pdf#toolbar=0&navpanes=0&scrollbar=0&view=Fit&zoom=100"
-             type="application/pdf"
-             style="position:absolute;top:0;left:0;width:100%;height:100%;border:none;display:block;"
-             width="100%" height="100%">
+    <div class="qb-page" style="width:210mm;height:297mm;page-break-after:always;break-after:page;overflow:hidden;position:relative;background:#fff;margin:0;padding:0;display:flex;flex-direction:column;box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+
+      <!-- Top accent bar -->
+      <div style="background:${PRIMARY};height:10mm;width:100%;flex-shrink:0;-webkit-print-color-adjust:exact;print-color-adjust:exact"></div>
+
+      <!-- Main content -->
+      <div style="flex:1;display:flex;flex-direction:column;padding:18mm 22mm 12mm;box-sizing:border-box;overflow:hidden">
+
+        <!-- Logo -->
+        <div style="margin-bottom:14mm">
+          <img src="${coverLogoSrc}"
+               style="height:56px;width:auto;max-width:220px;object-fit:contain;display:block"
+               alt="MagicTech"
+               onerror="this.style.display='none'">
+        </div>
+
+        <!-- Quotation title -->
+        <div style="margin-bottom:10mm">
+          <div style="font-size:40pt;font-weight:900;color:${PRIMARY};line-height:1;letter-spacing:-1px;-webkit-print-color-adjust:exact;print-color-adjust:exact">SALES</div>
+          <div style="font-size:40pt;font-weight:900;color:${ACCENT};line-height:1;letter-spacing:-1px;-webkit-print-color-adjust:exact;print-color-adjust:exact">QUOTATION</div>
+          <div style="display:flex;gap:5px;margin-top:5mm;align-items:center">
+            <div style="width:50px;height:5px;background:${PRIMARY};border-radius:3px;-webkit-print-color-adjust:exact;print-color-adjust:exact"></div>
+            <div style="width:18px;height:5px;background:${GOLD};border-radius:3px;-webkit-print-color-adjust:exact;print-color-adjust:exact"></div>
+            <div style="width:8px;height:5px;background:${ACCENT};border-radius:3px;-webkit-print-color-adjust:exact;print-color-adjust:exact"></div>
+          </div>
+        </div>
+
+        <!-- Client info card -->
+        <div style="background:#fafafa;border:1px solid #e8e8e8;border-left:5px solid ${PRIMARY};padding:8mm 10mm;border-radius:0 6px 6px 0;max-width:130mm;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+          ${info.client || info.name ? `
+          <div style="margin-bottom:4mm">
+            <div style="font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:${TEXTSUB};margin-bottom:1.5mm">Prepared For</div>
+            <div style="font-size:16px;font-weight:800;color:${TEXT}">${escHtml(info.client || info.name)}</div>
+          </div>` : ''}
+          ${info.project ? `
+          <div style="margin-bottom:4mm">
+            <div style="font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:${TEXTSUB};margin-bottom:1.5mm">Project</div>
+            <div style="font-size:12px;font-weight:600;color:${TEXT}">${escHtml(info.project)}</div>
+          </div>` : ''}
+          <div style="display:flex;gap:10mm;flex-wrap:wrap;margin-top:2mm">
+            ${info.att || info.attn ? `
+            <div>
+              <div style="font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:${TEXTSUB};margin-bottom:1.5mm">Attention</div>
+              <div style="font-size:11px;font-weight:600;color:${TEXT}">${escHtml(info.att || info.attn)}</div>
+            </div>` : ''}
+            <div>
+              <div style="font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:${TEXTSUB};margin-bottom:1.5mm">Date</div>
+              <div style="font-size:11px;font-weight:600;color:${TEXT}">${escHtml(dateStr)}</div>
+            </div>
+            ${info.ref ? `
+            <div>
+              <div style="font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:${TEXTSUB};margin-bottom:1.5mm">Ref. No.</div>
+              <div style="font-size:11px;font-weight:600;color:${TEXT}">${escHtml(info.ref)}</div>
+            </div>` : ''}
+            ${info.validity ? `
+            <div>
+              <div style="font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:${TEXTSUB};margin-bottom:1.5mm">Valid</div>
+              <div style="font-size:11px;font-weight:600;color:${TEXT}">${escHtml(info.validity)} Days</div>
+            </div>` : ''}
+          </div>
+        </div>
+
+        <!-- Prepared by -->
+        ${info.prepared || info.saleseng ? `
+        <div style="margin-top:9mm;padding-top:5mm;border-top:1px solid #e8e8e8">
+          <div style="font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:${TEXTSUB};margin-bottom:2mm">Prepared By</div>
+          <div style="display:flex;gap:12mm;flex-wrap:wrap">
+            ${info.prepared ? `<div style="font-size:11px;color:${TEXT};font-weight:600">${escHtml(info.prepared)}${info.prepphone ? ' &nbsp;·&nbsp; ' + escHtml(info.prepphone) : ''}</div>` : ''}
+            ${info.saleseng ? `<div style="font-size:11px;color:${TEXT};font-weight:600">Sales: ${escHtml(info.saleseng)}${info.salesnumber ? ' &nbsp;·&nbsp; ' + escHtml(info.salesnumber) : ''}</div>` : ''}
+          </div>
+        </div>` : ''}
+      </div>
+
+      <!-- Bottom gradient stripe -->
+      <div style="height:2.5mm;background:linear-gradient(90deg,${PRIMARY} 0%,${ACCENT} 60%,${GOLD} 100%);flex-shrink:0;-webkit-print-color-adjust:exact;print-color-adjust:exact"></div>
+
+      <!-- Footer -->
+      <div style="background:${PRIMARY};padding:5mm 22mm;flex-shrink:0;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:2mm">
+          <div style="color:rgba(255,255,255,.95);font-size:10.5px;font-weight:700;letter-spacing:.3px">MagicTech Projects Coordination</div>
+          <div style="color:rgba(255,255,255,.75);font-size:9.5px">Tel: +962 65560272 &nbsp;|&nbsp; Amman — Gardens Street — Khawaja Complex No.65</div>
+        </div>
+      </div>
     </div>`;
 
   // ── Pages 2..N: One page per system ──────────────────────
@@ -840,8 +937,9 @@ function buildQuotationHTML() {
           <td style="padding:5px 6px;font-weight:700;color:${ACCENT};font-size:10px;border-bottom:1px solid #e8edf2;vertical-align:middle;word-break:break-word;line-height:1.3">${escHtml(item.model)}</td>
           ${cols.description ? `<td style="padding:5px 6px;font-size:10px;line-height:1.35;border-bottom:1px solid #e8edf2;vertical-align:middle">
             <span style="display:block;color:${TEXT};font-weight:600;line-height:1.3">${escHtml(descText)}</span>
-            ${specsText ? `<span style="color:${TEXTSUB};font-size:9px;display:block;margin-top:1px;line-height:1.35">${escHtml(specsText)}</span>` : ''}
+            ${!cols.specs && specsText ? `<span style="color:${TEXTSUB};font-size:9px;display:block;margin-top:1px;line-height:1.35">${escHtml(specsText)}</span>` : ''}
           </td>` : ''}
+          ${cols.specs ? `<td style="padding:5px 6px;font-size:9px;color:${TEXTSUB};line-height:1.35;border-bottom:1px solid #e8edf2;vertical-align:middle">${escHtml(item.specifications || '')}</td>` : ''}
           ${cols.delivery ? `<td style="padding:5px 6px;text-align:center;font-size:9.5px;color:${TEXTSUB};border-bottom:1px solid #e8edf2;vertical-align:middle;line-height:1.3">${escHtml(delivText)}</td>` : ''}
           <td style="padding:5px 6px;text-align:center;font-weight:600;font-size:10.5px;border-bottom:1px solid #e8edf2;vertical-align:middle">${item.qty}</td>
           <td style="padding:5px 6px;text-align:right;white-space:nowrap;font-size:10px;border-bottom:1px solid #e8edf2;vertical-align:middle">${fmtP(unit)}</td>
@@ -958,7 +1056,7 @@ function buildQuotationHTML() {
 // ── Preview Quotation ─────────────────────────────────────────
 function previewQuotation() {
   if (!qbItems.length) { showToast('Add items to the quotation before previewing', 'error'); return; }
-  const { pagesHTML } = buildQuotationHTML();
+  const { pagesHTML } = buildQuotationHTML('');
   const body = document.getElementById('qb-preview-body');
   body.innerHTML = `<style>.qb-page{border:none!important;outline:none!important;box-shadow:0 2px 12px rgba(0,0,0,.12)!important;border-radius:2px;margin-bottom:16px;}</style><div style="font-family:'Segoe UI',Arial,sans-serif;color:#1e2a38;font-size:13px;line-height:1.5;">${pagesHTML}</div>`;
   openModal('qb-preview-modal');
@@ -966,11 +1064,10 @@ function previewQuotation() {
 
 // ── PDF Export ────────────────────────────────────────────────
 // Uses a print window — identical rendering to the in-page preview.
-// html2pdf/html2canvas dropped: opacity tricks cause blank pages.
 function exportQBPdf() {
   if (!qbItems.length) { showToast('Add items to the quotation before exporting', 'error'); return; }
 
-  const { pagesHTML, info } = buildQuotationHTML();
+  const { pagesHTML, info } = buildQuotationHTML(window.location.origin);
   const ref = info.ref || 'Quotation';
   const title = `MT Quotation — ${ref}`;
 
@@ -980,6 +1077,7 @@ function exportQBPdf() {
   printWin.document.write(`<!DOCTYPE html>
 <html><head>
 <meta charset="UTF-8">
+<base href="${window.location.origin}/">
 <title>${title}</title>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
@@ -1453,27 +1551,29 @@ async function loadMyQuotations() {
     if (empty) empty.style.display = 'none';
     const statusColors = { draft: 'var(--info)', closed: 'var(--gray-500)', on_hold: 'var(--warning)', sent: 'var(--success)' };
     grid.innerHTML = quotations.map(q => {
-      const date = new Date(q.updated_at || q.created_at).toLocaleDateString('en-GB');
+      const date   = new Date(q.updated_at || q.created_at).toLocaleDateString('en-GB');
       const status = q.status || 'draft';
-      const color = statusColors[status] || 'var(--gray-500)';
-      const holdInfo = q.hold_until ? `<div style="font-size:12px;color:var(--warning);margin-top:4px">⏰ Follow-up: ${new Date(q.hold_until).toLocaleDateString('en-GB')}</div>` : '';
+      const color  = statusColors[status] || 'var(--gray-500)';
+      const holdInfo = q.hold_until
+        ? `<div class="proj-meta-row" style="color:var(--warning)">⏰ Follow-up: ${new Date(q.hold_until).toLocaleDateString('en-GB')}</div>`
+        : '';
       return `
       <div class="project-card" style="cursor:default">
         <div class="project-card-header">
-          <div>
-            <div class="project-name">${escHtml(q.title || q.ref_number || 'Untitled')}</div>
-            <div style="font-size:12px;color:var(--gray-500);margin-top:2px">${escHtml(q.client_name || '')} · Ref: ${escHtml(q.ref_number || 'N/A')}</div>
+          <div class="proj-name">${escHtml(q.title || q.ref_number || 'Untitled')}</div>
+          <div class="proj-client">${escHtml(q.client_name || 'No client')} &middot; Ref: ${escHtml(q.ref_number || 'N/A')}</div>
+          <div class="proj-priority" style="background:${color};text-transform:capitalize">${status.replace('_', ' ')}</div>
+        </div>
+        <div class="project-card-body">
+          <div class="proj-meta">
+            <div class="proj-meta-row">💰 ${escHtml(q.currency || 'JOD')} ${parseFloat(q.grand_total || 0).toFixed(2)}</div>
+            <div class="proj-meta-row">📅 ${date}</div>
+            ${holdInfo}
           </div>
-          <span style="background:${color};color:#fff;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;text-transform:capitalize">${status.replace('_', ' ')}</span>
-        </div>
-        <div class="project-meta" style="margin-top:12px;display:flex;flex-wrap:wrap;gap:8px;font-size:12px;color:var(--gray-600)">
-          <span>💰 ${escHtml(q.currency || 'JOD')} ${parseFloat(q.grand_total || 0).toFixed(2)}</span>
-          <span>📅 ${date}</span>
-        </div>
-        ${holdInfo}
-        <div style="margin-top:12px;display:flex;gap:8px">
-          <button class="btn btn-sm btn-secondary" onclick="loadQuotationToBuilder(${q.id})">Edit</button>
-          <button class="btn btn-sm" style="background:var(--red);color:#fff" onclick="deleteMyQuotation(${q.id})">Delete</button>
+          <div style="display:flex;gap:8px;margin-top:12px">
+            <button class="btn btn-sm btn-secondary" onclick="loadQuotationToBuilder(${q.id})">Edit</button>
+            <button class="btn btn-sm" style="background:var(--red);color:#fff" onclick="deleteMyQuotation(${q.id})">Delete</button>
+          </div>
         </div>
       </div>`;
     }).join('');
