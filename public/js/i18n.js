@@ -35,6 +35,7 @@ const TRANSLATIONS = {
     'page.my_projects':    'My Projects',
     'page.active_tasks':   'Active Tasks',
     'page.my_reports':     'My Reports',
+    'page.profile':        'My Profile',
     // ── Buttons ──
     'btn.logout':          'Logout',
     'btn.assign':          'Assign',
@@ -204,6 +205,7 @@ const TRANSLATIONS = {
     'page.my_projects':    'مشاريعي',
     'page.active_tasks':   'المهام النشطة',
     'page.my_reports':     'تقاريري',
+    'page.profile':        'ملفي الشخصي',
     // ── Buttons ──
     'btn.logout':          'تسجيل الخروج',
     'btn.assign':          'تعيين',

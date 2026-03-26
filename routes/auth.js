@@ -55,6 +55,21 @@ router.get('/me', verifyToken, async (req, res) => {
   }
 });
 
+// Update own profile
+router.put('/profile', verifyToken, async (req, res) => {
+  try {
+    const { full_name, department, phone, email } = req.body;
+    await db.run(
+      'UPDATE users SET full_name=?, department=?, phone=?, email=? WHERE id=?',
+      [full_name || '', department || '', phone || '', email || '', req.user.id]
+    );
+    res.json({ success: true, message: 'Profile updated successfully' });
+  } catch (err) {
+    console.error('Update profile error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Change password
 router.post('/change-password', verifyToken, async (req, res) => {
   try {
