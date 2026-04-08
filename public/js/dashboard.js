@@ -74,11 +74,12 @@ function navigate(page) {
   // Activate all matching nav items (sidebar + mobile bottom nav)
   document.querySelectorAll(`[data-page="${page}"]`).forEach(n => n.classList.add('active'));
 
-  const pageTitleKeys = { 'my-projects': 'page.my_projects', 'active-tasks': 'page.active_tasks', 'my-reports': 'page.my_reports' };
+  const pageTitleKeys = { 'my-projects': 'page.my_projects', 'active-tasks': 'page.active_tasks', 'my-reports': 'page.my_reports', 'profile': 'page.profile' };
   document.getElementById('page-title').textContent = t(pageTitleKeys[page] || page);
 
   if (page === 'active-tasks') renderActiveTasks();
   if (page === 'my-reports') loadMyReports();
+  if (page === 'profile') loadUserProfile();
 
   // Close sidebar on mobile after navigation
   closeSidebar();
@@ -564,6 +565,63 @@ async function markAllRead() {
   loadNotifications();
 }
 
+// ── User Profile ──────────────────────────────────────
+async function loadUserProfile() {
+  try {
+    const res = await apiFetch('/auth/me');
+    if (!res) return;
+    const data = await res.json();
+    if (!res.ok) return;
+    const av = document.getElementById('profile-page-avatar');
+    av.textContent = (data.full_name || 'U')[0].toUpperCase();
+    av.style.background = data.avatar_color || '#8B0000';
+    document.getElementById('profile-page-name').textContent = data.full_name || '—';
+    document.getElementById('profile-page-username').textContent = '@' + data.username;
+    document.getElementById('prof-full-name').value   = data.full_name   || '';
+    document.getElementById('prof-department').value  = data.department  || '';
+    document.getElementById('prof-email').value       = data.email       || '';
+    document.getElementById('prof-phone').value       = data.phone       || '';
+  } catch (err) {
+    console.error('Load profile error:', err);
+  }
+}
+
+async function saveUserProfile() {
+  const alertEl = document.getElementById('profile-alert');
+  const body = {
+    full_name:  document.getElementById('prof-full-name').value.trim(),
+    department: document.getElementById('prof-department').value.trim(),
+    email:      document.getElementById('prof-email').value.trim(),
+    phone:      document.getElementById('prof-phone').value.trim()
+  };
+  try {
+    const res = await apiFetch('/auth/profile', { method: 'PUT', body: JSON.stringify(body) });
+    const data = await res.json();
+    if (res.ok) {
+      // Update cached user info
+      currentUser.full_name  = body.full_name;
+      currentUser.department = body.department;
+      localStorage.setItem('elv_user', JSON.stringify(currentUser));
+      // Refresh sidebar & mobile header
+      document.getElementById('sidebar-name').textContent = body.full_name || 'User';
+      document.getElementById('sidebar-dept').textContent = body.department || 'ELV Team';
+      const av = document.getElementById('sidebar-avatar');
+      av.textContent = (body.full_name || 'U')[0].toUpperCase();
+      document.getElementById('profile-page-name').textContent = body.full_name || '—';
+      const mobName = document.getElementById('mob-profile-name');
+      const mobDept = document.getElementById('mob-profile-dept');
+      if (mobName) mobName.textContent = body.full_name || 'User';
+      if (mobDept) mobDept.textContent = body.department || 'ELV Team';
+      alertEl.innerHTML = '<div class="alert alert-success">Profile saved successfully.</div>';
+    } else {
+      alertEl.innerHTML = `<div class="alert alert-error">${data.error || 'Failed to save profile'}</div>`;
+    }
+  } catch (err) {
+    alertEl.innerHTML = '<div class="alert alert-error">Network error. Please try again.</div>';
+  }
+  setTimeout(() => { alertEl.innerHTML = ''; }, 4000);
+}
+
 // ── Change Password ───────────────────────────────────
 function showChangePassword() { openModal('pw-modal'); }
 
@@ -617,7 +675,7 @@ function reRenderCurrentPage() {
   if (pageId === 'my-projects') loadMyProjects();
   if (pageId === 'active-tasks') renderActiveTasks();
   if (pageId === 'my-reports') loadMyReports();
-  const pageTitleKeys = { 'my-projects': 'page.my_projects', 'active-tasks': 'page.active_tasks', 'my-reports': 'page.my_reports' };
+  const pageTitleKeys = { 'my-projects': 'page.my_projects', 'active-tasks': 'page.active_tasks', 'my-reports': 'page.my_reports', 'profile': 'page.profile' };
   const titleEl = document.getElementById('page-title');
   if (titleEl && pageTitleKeys[pageId]) titleEl.textContent = t(pageTitleKeys[pageId]);
   // Re-render notifications panel so titles/messages reflect new language
